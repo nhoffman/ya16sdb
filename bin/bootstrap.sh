@@ -3,7 +3,7 @@
 set -e
 
 MKREFPKG_DIR=$(cd $(dirname $BASH_SOURCE) && cd .. && pwd)
-DEENURP_DIR=${MKREFPKG_DIR}/deenurp
+DEENURP_DIR=${MKREFPKG_DIR}/src/deenurp
 
 if [ ! -d $DEENURP_DIR ]; then
   git clone git@github.com:fhcrc/deenurp.git $DEENURP_DIR
