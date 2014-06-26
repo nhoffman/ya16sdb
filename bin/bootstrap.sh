@@ -10,9 +10,10 @@ fi
 
 MKREFPKG_DIR=$(cd $(dirname $BASH_SOURCE) && cd .. && pwd)
 DEENURP_DIR=src/deenurp
+mkdir -p src
 
 if [ ! -d $DEENURP_DIR ]; then
-  git clone git@github.com:fhcrc/deenurp.git $DEENURP_DIR
+    git clone git@github.com:fhcrc/deenurp.git $DEENURP_DIR
 fi
 
 ${DEENURP_DIR}/bin/bootstrap.sh $venv
