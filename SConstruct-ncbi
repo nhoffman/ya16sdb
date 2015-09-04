@@ -11,11 +11,11 @@ if not venv:
 
 # requirements installed in the virtualenv
 from SCons.Script import (
-    Flatten, Variables, PathVariable, BoolVariable,
+    Variables, PathVariable, BoolVariable,
     Decider, ARGUMENTS, Help)
 
-from bioscons.fileutils import Targets
 from bioscons.slurm import SlurmEnvironment
+from bioscons.fileutils import Targets
 
 # check timestamps before calculating md5 checksums
 Decider('MD5-timestamp')
@@ -247,9 +247,9 @@ unnamed_taxonomy = env.Command(
 """
 Create blast database for 1200bp
 """
-named1200_blast = blast_db(env, named_fasta, '$out/named/blast')
-#unnamed1200_blast = blast_db(env, unnamed_fasta, '$out/unnamed/blast')
-#bp1200_blast = combine_blast_dbs(
+# named1200_blast = blast_db(env, named_fasta, '$out/named/blast')
+# unnamed1200_blast = blast_db(env, unnamed_fasta, '$out/unnamed/blast')
+# bp1200_blast = combine_blast_dbs(
 #    env,
 #    db_files=Flatten(named1200_blast + unnamed1200_blast),
 #    output_base='$out/blast/1200',
@@ -279,7 +279,7 @@ types_taxtable, = env.Command(
 """
 Make type strain Blast database
 """
-types_blast = blast_db(env, types_fasta, '$out/types/blast')
+# types_blast = blast_db(env, types_fasta, '$out/types/blast')
 
 # Taxonomic filtering
 
@@ -325,7 +325,7 @@ filtered_tax = env.Command(
             '--seq-info ${SOURCES[1]} '
             '--out-file $TARGET'))
 
-filtered_blast = blast_db(env, filtered_fasta, '$filtered/blast')
+# filtered_blast = blast_db(env, filtered_fasta, '$filtered/blast')
 
 """
 versions of stuff
