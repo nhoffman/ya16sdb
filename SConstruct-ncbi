@@ -135,7 +135,8 @@ get accessions (versions) of records with rrna 16s annotations from ncbi
 ncbi = base_env.Command(
     source=None,
     target='$out/versions.txt',
-    action=('entrez.py crosenth@uw.edu --term '
+    action=('deenurp -v ncbi_esearch '
+            'crosenth@uw.edu '
             '"16S[All Fields] AND '
             'rRNA[Feature Key] AND '
             'Bacteria[Organism] '
@@ -143,11 +144,9 @@ ncbi = base_env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 1200 : 999999999[Sequence Length]" '
-            '--log $out/ncbi.log '
-            '--max-records 100 '
-            '--rettype acc '
             '--retry 60000 '
             '--threads 8 '
+            '--log $out/records.log '
             '--out $TARGET'))
 
 """
@@ -166,34 +165,27 @@ accessions = base_env.Command(
             '$SOURCE > $TARGET' % (have_records, have_records)))
 
 """
-Download raw gb files
+Download gb files and write fasta and seq_info right away
 """
-raw_gb = base_env.Command(
-    source=accessions,
-    target='$out/records.gb',
-    action=('entrez.py crosenth@uw.edu '
-            '--ids $SOURCES '
-            '--rettype gb '
+raw_fasta, raw_seqinfo, raw_references = base_env.Command(
+    source=[accessions, tax_db],
+    target=['$out/records.fasta', '$out/records.csv', '$out/references.csv'],
+    action=('deenurp -v ncbi_extract_genbank '
+            'crosenth@uw.edu '
+            '${SOURCES[0]} '
+            '${TARGETS[:2]} '
+            '--taxonomy ${SOURCES[1]} '
+            '--refs-out ${TARGETS[2]} '
             '--strand 1 '
+            '--max-records 10000 '
             '--chunksize 1 '
             '--retry 60000 '
             '--feature rrna::16s '
-            '--threads 8 '
             '--log $out/records.log '
-            '--out $TARGET'))
+            '--threads 8'))
 
 out = os.path.join('$out', '{}'.format(version))
 env = base_env.Clone(out=out)
-
-raw_fasta, raw_seqinfo, raw_references = env.Command(
-    target=['$out/seqs.fasta.bz2',
-            '$out/seq_info.csv.bz2',
-            '$out/seq_refs.csv.bz2'],
-    source=[tax_db, raw_gb],
-    action=('deenurp extract-genbank '
-            '--database ${SOURCES[0]} '
-            '--references ${TARGETS[2]} '
-            '${SOURCES[1]} ${TARGETS[:2]}'))
 
 """
 Set the already downloaded list
@@ -202,6 +194,14 @@ versions = base_env.Command(
     target='$out/have_records.txt',
     source=raw_seqinfo,
     action='csvcut --columns version $SOURCE | tail --lines +2 > $TARGET')
+
+"""
+Check sequence orientation and 16s region
+"""
+env.Command(
+    target='',
+    source='',
+    action=('echo deenurp orientate_sequences $SOURCES $TARGETS'))
 
 """
 Drop sequences < 1200 bp and with more than 1% ambig and
@@ -261,7 +261,7 @@ Partition type strains
 types_fasta, types_seqinfo = env.Command(
     target=['$out/types/seqs.fasta', '$out/types/seq_info.csv'],
     source=[named_fasta, named_seqinfo],
-    action=('deenurp partition-refs SOURCES '
+    action=('deenurp partition_refs $SOURCES '
             '--type-seqs ${TARGETS[0]} '
             '--type-info ${TARGETS[1]}'))
 
@@ -299,7 +299,7 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '$filtered/seq_info.csv',
             '$filtered/details.csv'],
     action=('rm -f ${SOURCES[0]}.ssi && '
-            'deenurp filter-outliers '
+            'deenurp filter_outliers '
             '$SOURCES '
             '${TARGETS[0]} '
             '--filtered-seqinfo ${TARGETS[1]} '
