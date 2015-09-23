@@ -113,12 +113,15 @@ targets = Targets()
 
 """
 taxonomy md5 incase we need to update
+
+FIXME: run this step everytime
 """
 tax_md5 = base_env.Command(
     target=['$out/taxdmp.zip.md5'],
     source=None,
     action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
             '--output-document $TARGET'))
+base_env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
@@ -137,7 +140,7 @@ ncbi = base_env.Command(
     target='$out/versions.txt',
     action=('deenurp -v ncbi_esearch '
             'crosenth@uw.edu '
-            '"16S[All Fields] AND '
+            '"16s ribosomal rna[All Fields] AND '
             'rRNA[Feature Key] AND '
             'Bacteria[Organism] '
             'NOT(environmental samples[Organism] '
@@ -166,6 +169,8 @@ accessions = base_env.Command(
 
 """
 Download gb files and write fasta and seq_info right away
+
+FIXME: seperate updating of tax_ids from here
 """
 raw_fasta, raw_seqinfo, raw_references = base_env.Command(
     source=[accessions, tax_db],
@@ -177,8 +182,8 @@ raw_fasta, raw_seqinfo, raw_references = base_env.Command(
             '--taxonomy ${SOURCES[1]} '
             '--refs-out ${TARGETS[2]} '
             '--strand 1 '
-            '--max-records 10000 '
-            '--chunksize 1 '
+            # '--max-records 10000 '
+            '--chunksize 10000 '
             '--retry 60000 '
             '--feature rrna::16s '
             '--log $out/records.log '
@@ -198,19 +203,29 @@ versions = base_env.Command(
 """
 Check sequence orientation and 16s region
 """
-env.Command(
-    target='',
-    source='',
-    action=('echo deenurp orientate_sequences $SOURCES $TARGETS'))
+oriented, _, _ = env.Command(
+    target=['$out/orientated.fasta',
+            '$out/orientated.csv',
+            '$out/no_16s_match.fasta'],
+    source=[raw_fasta, 'data/rdp_16s_type_strains.fasta.bz2'],
+    action=('deenurp orientate_sequences '
+            '$SOURCES '
+            '--out_csv ${TARGETS[1]} '
+            '--out_notmatched ${TARGETS[2]} '
+            '--out ${TARGETS[0]}'))
 
 """
 Drop sequences < 1200 bp and with more than 1% ambig and
 partition into named and unnamed data sets.
+
+FIXME: move --deduplicate-groups to seperate command (rdp does not deduplicate)
+FIXME: if sequence was removed during orientation and is not in oriented.fasta
+       remove it from named/seq_info.csv and unnamed/seq_info.csv
 """
 named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
     target=['$out/named/seqs.fasta', '$out/named/seq_info.csv',
             '$out/unnamed/seqs.fasta', '$out/unnamed/seq_info.csv'],
-    source=[raw_fasta, raw_seqinfo],
+    source=[oriented, raw_seqinfo],
     action=('deenurp partition-refs '
             # filtering
             '--min-length 1200 '
