@@ -112,8 +112,6 @@ targets = Targets()
 
 """
 taxonomy md5 incase we need to update
-
-FIXME: run this step everytime
 """
 tax_md5 = base_env.Command(
     target=['$out/taxdmp.zip.md5'],
@@ -194,6 +192,10 @@ env = base_env.Clone(out=out)
 
 """
 Set the already downloaded list
+
+FIXME: combine this as a final output with about ncbi_extract_genbank output
+that way, if the pipeline fails we will still get this output which will be
+important if it needs to be rerun because of an ncbi server side exception.
 """
 versions = base_env.Command(
     target='$out/have_records.txt',
