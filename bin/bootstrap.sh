@@ -30,6 +30,18 @@ fi
 
 ${DEENURP}/bin/bootstrap.sh $venv
 
+if [ ! -f $venv/bin/makeblastdb ]; then
+  BLAST_TOOLS=ncbi-blast-2.2.31+
+  BLAST_FILE=${BLAST_TOOLS}-x64-linux.tar.gz
+  (cd src && \
+    wget -N ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_FILE && \
+    tar xvf $BLAST_FILE && \
+    cp ${BLAST_TOOLS}/bin/makeblastdb $venv/bin && \
+    rm -r ${BLAST_TOOLS})
+else
+    echo "makeblastdb is already installed: $(makeblastdb -version)"
+fi
+
 source $venv/bin/activate
 
 # set PIP_FIND_LINKES to use wheels https://pip.pypa.io/en/latest/user_guide.html#environment-variables
