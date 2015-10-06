@@ -12,13 +12,10 @@ if not venv:
 # requirements installed in the virtualenv
 from SCons.Script import (
     Variables, PathVariable, BoolVariable,
-    Decider, ARGUMENTS, Help, Touch)
+    ARGUMENTS, Help, Touch, Flatten)
 
 from bioscons.slurm import SlurmEnvironment
 from bioscons.fileutils import Targets
-
-# check timestamps before calculating md5 checksums
-Decider('MD5-timestamp')
 
 # Builders
 
@@ -106,6 +103,9 @@ base_env = SlurmEnvironment(
     time=False
 )
 
+# check timestamps before calculating md5 checksums
+base_env.Decider('MD5')
+
 Help(vars.GenerateHelpText(base_env))
 
 targets = Targets()
@@ -118,7 +118,7 @@ tax_md5 = base_env.Command(
     source=None,
     action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
             '--output-document $TARGET'))
-base_env.AlwaysBuild(tax_md5)
+# base_env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
@@ -137,38 +137,41 @@ ncbi = base_env.Command(
     target='$out/versions.txt',
     action=('deenurp -v ncbi_esearch '
             'crosenth@uw.edu '
-            '"16s ribosomal rna[All Fields] AND '
+            '"16s[All Fields] AND '
             'rRNA[Feature Key] AND '
             'Bacteria[Organism] '
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 1200 : 999999999[Sequence Length]" '
+            'AND 500 : 999999999[Sequence Length]" '
             '--retry 60000 '
             '--threads 8 '
             '--log $out/records.log '
             '--out $TARGET'))
-base_env.Precious(ncbi)
+base_env.AlwaysBuild(ncbi)
 
 """
-A grep diff between sequences we have and what ncbi returns.
-This will give us accession (versions) that are not present
-to pass to entrez.py for download.
+A grep diff between sequences we have, the blacklist and what
+ncbi returns.  This will give us accession (versions) that are
+not present to pass to entrez.py for download.
 """
 accessions = base_env.Command(
     target='$out/no_records.txt',
-    source=ncbi,
+    source=[ncbi],
     action=[Touch('$out/have_records.txt'),
+            'cat $out/have_records.txt data/blacklist.txt | '
             'grep '
             '--invert-match '
             '--fixed-strings '
-            '--file $out/have_records.txt '
-            '$SOURCE > $TARGET'])
+            '--file /dev/stdin '
+            '${SOURCES[0]} > $TARGET'])
 
 """
 Download gb files and write fasta and seq_info right away
 
 FIXME: seperate updating of tax_ids from here
+FIXME: if target files exist append output instead!
+
 """
 raw_fasta, raw_seqinfo, raw_references = base_env.Command(
     source=[accessions, tax_db],
@@ -176,19 +179,27 @@ raw_fasta, raw_seqinfo, raw_references = base_env.Command(
     action=('deenurp -v ncbi_extract_genbank '
             'crosenth@uw.edu '
             '${SOURCES[0]} '
-            '${TARGETS[:2]} '
+            '$TARGETS '
+            '--no-features data/blacklist.txt '
             '--taxonomy ${SOURCES[1]} '
-            '--refs-out ${TARGETS[2]} '
             '--strand 1 '
             # '--max-records 10000 '
-            '--chunksize 10000 '
+            '--chunksize 1 '
             '--retry 60000 '
             '--feature rrna::16s '
             '--log $out/records.log '
-            '--threads 8'))
+            '--threads 5'))
+base_env.Precious(raw_fasta, raw_seqinfo, raw_references)
 
-out = os.path.join('$out', '{}'.format(version))
-env = base_env.Clone(out=out)
+"""
+Because records are appended and ncbi errors are common we need to
+check sequences here for inconsistencies between
+records.fasta, records.csv and references.csv
+"""
+sync_fasta, sync_seqinfo, sync_references = base_env.Command(
+    source=[raw_fasta, raw_seqinfo, raw_references],
+    target=['$out/sync.fasta', '$out/sync.csv', '$out/sync_refs.csv'],
+    action=('sync_records.py $SOURCES $TARGETS'))
 
 """
 Set the already downloaded list
@@ -199,22 +210,37 @@ important if it needs to be rerun because of an ncbi server side exception.
 """
 versions = base_env.Command(
     target='$out/have_records.txt',
-    source=raw_seqinfo,
+    source=sync_seqinfo,
     action='csvcut --columns version $SOURCE | tail --lines +2 > $TARGET')
 
 """
 Check sequence orientation and 16s region
+
+FIXME: consider combining this with parition refs or moving min-length and
+       prop-ambig-cutoff into here
+
+FIXME: analyze no_16s matches, we want to make sure we're not losing sequences
+      that we want.
 """
-oriented, _, _ = env.Command(
-    target=['$out/orientated.fasta',
-            '$out/orientated.csv',
-            '$out/no_16s_match.fasta'],
-    source=[raw_fasta, 'data/rdp_16s_type_strains.fasta.bz2'],
+seqs, seq_info, _, _, _ = base_env.Command(
+    target=['$out/seqs.fasta',
+            '$out/seq_info.csv',
+            '$out/16s_alignments.csv',
+            '$out/no_16s_match.fasta',
+            '$out/no_16s_match.csv'],
+    source=[sync_fasta, 'data/rdp_16s_type_strains.fasta.bz2', sync_seqinfo],
     action=('deenurp orientate_sequences '
-            '$SOURCES '
-            '--out_csv ${TARGETS[1]} '
-            '--out_notmatched ${TARGETS[2]} '
-            '--out ${TARGETS[0]}'))
+            '${SOURCES[:2]} '
+            '--threads 8 '
+            '--seq_info ${SOURCES[2]} '
+            '--out ${TARGETS[0]} '
+            '--out_seq_info ${TARGETS[1]} '
+            '--out_csv ${TARGETS[2]} '
+            '--out_notmatched ${TARGETS[3]} '
+            '--out_notmatched_info ${TARGETS[4]}'))
+
+out = os.path.join('$out', '{}'.format(version))
+env = base_env.Clone(out=out)
 
 """
 Drop sequences < 1200 bp and with more than 1% ambig and
@@ -227,8 +253,8 @@ FIXME: if sequence was removed during orientation and is not in oriented.fasta
 named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
     target=['$out/named/seqs.fasta', '$out/named/seq_info.csv',
             '$out/unnamed/seqs.fasta', '$out/unnamed/seq_info.csv'],
-    source=[oriented, raw_seqinfo],
-    action=('deenurp partition-refs '
+    source=[seqs, seq_info],
+    action=('deenurp partition_refs '
             # filtering
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
@@ -264,13 +290,13 @@ unnamed_taxonomy = env.Command(
 """
 Create blast database for 1200bp
 """
-# named1200_blast = blast_db(env, named_fasta, '$out/named/blast')
-# unnamed1200_blast = blast_db(env, unnamed_fasta, '$out/unnamed/blast')
-# bp1200_blast = combine_blast_dbs(
-#    env,
-#    db_files=Flatten(named1200_blast + unnamed1200_blast),
-#    output_base='$out/blast/1200',
-#    title="Combine named and unnamed ncbi")
+named1200_blast = blast_db(env, named_fasta, '$out/named/blast')
+unnamed1200_blast = blast_db(env, unnamed_fasta, '$out/unnamed/blast')
+bp1200_blast = combine_blast_dbs(
+    env,
+    db_files=Flatten(named1200_blast + unnamed1200_blast),
+    output_base='$out/blast/1200',
+    title="Combine named and unnamed ncbi")
 
 """
 Partition type strains
@@ -296,7 +322,7 @@ types_taxtable, = env.Command(
 """
 Make type strain Blast database
 """
-# types_blast = blast_db(env, types_fasta, '$out/types/blast')
+types_blast = blast_db(env, types_fasta, '$out/types/blast')
 
 # Taxonomic filtering
 
@@ -342,14 +368,14 @@ filtered_tax = env.Command(
             '--seq-info ${SOURCES[1]} '
             '--out-file $TARGET'))
 
-# filtered_blast = blast_db(env, filtered_fasta, '$filtered/blast')
+filtered_blast = blast_db(env, filtered_fasta, '$filtered/blast')
 
 """
 versions of stuff
 """
 version = env.Command(
     target='$out/version.txt',
-    source=[raw_fasta, named_fasta, types_fasta, filtered_fasta],
+    source=[sync_fasta, named_fasta, types_fasta, filtered_fasta],
     action=('(echo -n "mkrefpkg "; git describe --tags --dirty) > $TARGET && '
             'deenurp --version >> $TARGET '))
 
