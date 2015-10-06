@@ -197,9 +197,7 @@ raw_fasta, raw_seqinfo, raw_references = base_env.Command(
             '--feature rrna::16s '
             '--log $log '
             '--threads $nproc '
-            '$email '
-            '$SOURCE '
-            '$TARGETS'))
+            '$email $SOURCE $TARGETS'))
 base_env.Precious(raw_fasta, raw_seqinfo, raw_references)
 
 """
