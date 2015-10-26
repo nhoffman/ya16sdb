@@ -179,7 +179,6 @@ accessions = base_env.Command(
 Download gb files and write fasta and seq_info right away
 
 TODO: seperate updating of tax_ids from here
-TODO: remove taxid_classified True/False from here
 """
 raw_fasta, raw_info, raw_references = base_env.Command(
     source=accessions,
@@ -199,11 +198,6 @@ base_env.Precious(raw_fasta, raw_info, raw_references)
 Because records are appended and ncbi errors are common we need to
 check sequences here for inconsistencies between
 records.fasta, records.csv and references.csv
-
-TODO: must make two passes to remove all records from accessions any
-       if seqnames are missmatched between seq_info and fasta
-
-TODO: overwrite raw files with these outputs
 """
 sync_fasta, sync_info, sync_refs = base_env.Command(
     source=[raw_fasta, raw_info, raw_references],
@@ -217,15 +211,12 @@ sync_fasta, sync_info, sync_refs = base_env.Command(
             Copy('${SOURCES[2]}', '${TARGETS[2]}')
             ])
 
-
 """
 Check sequence orientation and 16s region
 
-TODO: analyze no_16s matches, we want to make sure we're not losing sequences
-      that we want.
-TODO: show default settings in --help
-TODO: show query sequence coordinates (we want to know which sequences were in
-      wrong orientation
+TODO: save state of outputs to avoid extra work on records already processed
+TODO: analyze no_16s matches, we want to make sure
+      we're not losing sequences that we want.
 """
 seqs, orientated_info, _, _, _ = base_env.Command(
     target=['$out/seqs.fasta',
@@ -391,7 +382,6 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '--min-seqs-for-filtering 5 '
             '--threads $nproc'),
     slurm_queue='full')
-
 env.Precious([filtered_fasta, filtered_seqinfo, filtered_details])
 
 """
