@@ -12,7 +12,7 @@ if not venv:
 # requirements installed in the virtualenv
 from SCons.Script import (
     Variables, PathVariable, BoolVariable,
-    ARGUMENTS, Help, Touch, Flatten)
+    ARGUMENTS, Help, Touch, Flatten, Copy)
 
 from bioscons.slurm import SlurmEnvironment
 
@@ -23,10 +23,8 @@ vars.Add(PathVariable('out', 'Path to output directory', 'ncbi',
          PathVariable.PathIsDirCreate))
 vars.Add(PathVariable('data', 'Path to data directory', 'data',
          PathVariable.PathIsDirCreate))
-vars.Add('nproc',
-         ('Number of concurrent processes '
-          'NOTE: will affect number of nbi queries requests'),
-         5)
+vars.Add('nproc', ('Number of concurrent processes '), 18)
+vars.Add('nreq', ('Number of concurrent http requests to ncbi'), 5)
 vars.Add(BoolVariable('use_cluster', 'Use slurm', False))
 vars.Add(PathVariable('blacklist',
                       'path to blastlist.txt',
@@ -40,12 +38,8 @@ vars.Add(PathVariable('training_set',
 vars.Add(PathVariable('log',
                       'path to type strain training set',
                       '$out/ncbi.log'))
-vars.Add(PathVariable('email',
-                      'email address for ncbi',
-                      'crosenth@uw.edu'))
-vars.Add(PathVariable('retry',
-                      'ncbi retry milliseconds',
-                      '60000'))
+vars.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
+vars.Add('retry', 'ncbi retry milliseconds', '60000')
 
 # Provides access to options prior to instantiation of env object
 # below; it's better to access variables through the env object.
@@ -152,9 +146,9 @@ ncbi = base_env.Command(
     target='$out/all_records.txt',
     action=('deenurp -v ncbi_esearch '
             '--retry $retry '
-            '--threads $nproc '
+            '--threads $nreq '
             '--log $log '
-            '--out $TARGET'
+            '--out $TARGET '
             '$email '
             '"16s[All Fields] AND '
             'rRNA[Feature Key] AND '
@@ -184,9 +178,10 @@ accessions = base_env.Command(
 """
 Download gb files and write fasta and seq_info right away
 
-FIXME: seperate updating of tax_ids from here
+TODO: seperate updating of tax_ids from here
+TODO: remove taxid_classified True/False from here
 """
-raw_fasta, raw_seqinfo, raw_references = base_env.Command(
+raw_fasta, raw_info, raw_references = base_env.Command(
     source=accessions,
     target=['$out/raw.fasta', '$out/raw.csv', '$out/raw_refs.csv'],
     action=('deenurp -v ncbi_extract_genbank '
@@ -196,38 +191,54 @@ raw_fasta, raw_seqinfo, raw_references = base_env.Command(
             '--retry $retry '
             '--feature rrna::16s '
             '--log $log '
-            '--threads $nproc '
+            '--threads $nreq '
             '$email $SOURCE $TARGETS'))
-base_env.Precious(raw_fasta, raw_seqinfo, raw_references)
+base_env.Precious(raw_fasta, raw_info, raw_references)
 
 """
 Because records are appended and ncbi errors are common we need to
 check sequences here for inconsistencies between
 records.fasta, records.csv and references.csv
+
+TODO: must make two passes to remove all records from accessions any
+       if seqnames are missmatched between seq_info and fasta
+
+TODO: overwrite raw files with these outputs
 """
-sync_fasta, sync_seqinfo, _, = base_env.Command(
-    source=[raw_fasta, raw_seqinfo, raw_references],
+sync_fasta, sync_info, sync_refs = base_env.Command(
+    source=[raw_fasta, raw_info, raw_references],
     target=['$out/sync.fasta',
             '$out/sync_info.csv',
             '$out/refs.csv'],
-    action=('sync_records.py --accessions $have_records $SOURCES $TARGETS'))
+    action=['sync_records.py --accessions $have_records $SOURCES $TARGETS',
+            # overwrite the "raw" files with the sync files
+            Copy('${SOURCES[0]}', '${TARGETS[0]}'),
+            Copy('${SOURCES[1]}', '${TARGETS[1]}'),
+            Copy('${SOURCES[2]}', '${TARGETS[2]}')
+            ])
+
 
 """
 Check sequence orientation and 16s region
 
-FIXME: analyze no_16s matches, we want to make sure we're not losing sequences
+TODO: analyze no_16s matches, we want to make sure we're not losing sequences
       that we want.
+TODO: show default settings in --help
+TODO: show query sequence coordinates (we want to know which sequences were in
+      wrong orientation
 """
-seqs, seq_info, _, _, _ = base_env.Command(
+seqs, orientated_info, _, _, _ = base_env.Command(
     target=['$out/seqs.fasta',
-            '$out/seq_info.csv',
+            '$out/orientated_info.csv',
             '$out/alignments.csv',
             '$out/notmatched.fasta',
             '$out/notmatched.csv'],
-    source=[sync_fasta, '$training_set', sync_seqinfo],
+    source=[sync_fasta, '$training_set', sync_info],
     action=('deenurp orientate_sequences '
             '${SOURCES[:2]} '
             '--threads $nproc '
+            '--id 0.70 '
+            '--log $out/vsearch.log '
             '--seq_info ${SOURCES[2]} '
             '--out ${TARGETS[0]} '
             '--out_seq_info ${TARGETS[1]} '
@@ -235,36 +246,48 @@ seqs, seq_info, _, _, _ = base_env.Command(
             '--out_notmatched ${TARGETS[3]} '
             '--out_notmatched_info ${TARGETS[4]}'))
 
-out = os.path.join('$out', '{}'.format(version))
+out = os.path.join('$out', str(version))
 env = base_env.Clone(out=out)
 
 """
 update seq_info with latest tax_ids
+
+TODO: make a mkrefpkg branch for this
+"""
+taxids_update, _ = env.Command(
+    target=['$out/update_taxids.csv', '$out/unknown_taxons.csv'],
+    source=[orientated_info, tax_db],
+    action=['taxit update_taxids '
+            '--name-column organism '
+            '--out ${TARGETS[0]} '
+            '--unknowns ${TARGETS[1]} '
+            '$SOURCES'])
+
+"""
+Create a fully formed seq_info file with column taxids_classified
+for deenurp partition_refs
 """
 seq_info = env.Command(
     target='$out/seq_info.csv',
-    source=[seq_info, tax_db],
-    action=('taxit update_taxids ${SOURCES[0]} '
-            '--database ${SOURCES[1]} '
-            '--out $TARGET'))
+    source=[taxids_update, tax_db],
+    action=['taxit taxid_classified --out $TARGET $SOURCES'])
 
 """
 Make general taxtable
 """
 tax = base_env.Command(
     target='$out/taxonomy.csv',
-    source=[tax_db, seq_info],
+    source=[tax_db, taxids_update],
     action=('taxit taxtable '
             '--database ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET'))
 
-
 """
 Drop sequences < 1200 bp and with more than 1% ambig and
 partition into named and unnamed data sets.
 
-FIXME: move --deduplicate-groups to seperate command (rdp does not deduplicate)
+TODO: move --deduplicate-groups to seperate command (rdp does not deduplicate)
 """
 named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
     target=['$out/named/seqs.fasta', '$out/named/seq_info.csv',
