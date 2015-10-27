@@ -117,7 +117,7 @@ def combine_blast_dbs(env, db_files, output_base, title, dbtype='nucl'):
             title=title)
     )
 
-# script start here
+# start script
 
 """
 taxonomy md5 incase we need to update
@@ -127,7 +127,7 @@ tax_md5 = base_env.Command(
     source=None,
     action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
             '--output-document $TARGET'))
-# base_env.AlwaysBuild(tax_md5)
+base_env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
@@ -241,36 +241,28 @@ out = os.path.join('$out', str(version))
 env = base_env.Clone(out=out)
 
 """
-update seq_info with latest tax_ids
+update seq_info with latest tax_ids and add taxid_classified column
 
 TODO: make a mkrefpkg branch for this
 """
-taxids_update, _ = env.Command(
-    target=['$out/update_taxids.csv', '$out/unknown_taxons.csv'],
+seq_info, _ = env.Command(
+    target=['$out/seq_info.csv', '$out/unknown_taxons.csv'],
     source=[orientated_info, tax_db],
     action=['taxit update_taxids '
             '--name-column organism '
-            '--out ${TARGETS[0]} '
             '--unknowns ${TARGETS[1]} '
-            '$SOURCES'])
-
-"""
-Create a fully formed seq_info file with column taxids_classified
-for deenurp partition_refs
-"""
-seq_info = env.Command(
-    target='$out/seq_info.csv',
-    source=[taxids_update, tax_db],
-    action=['taxit taxid_classified --out $TARGET $SOURCES'])
+            '$SOURCES | '
+            'taxit taxid_classified '
+            '--out ${TARGETS[0]} '
+            '${SOURCES[1]}'])
 
 """
 Make general taxtable
 """
 tax = base_env.Command(
     target='$out/taxonomy.csv',
-    source=[tax_db, taxids_update],
-    action=('taxit taxtable '
-            '--database ${SOURCES[0]} '
+    source=[tax_db, seq_info],
+    action=('taxit taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET'))
 
