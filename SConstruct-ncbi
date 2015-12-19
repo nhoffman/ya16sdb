@@ -286,6 +286,7 @@ tax = base_env.Command(
     target='$out/taxonomy.csv',
     source=[tax_db, seq_info],
     action=('taxit taxtable '
+            '--full '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -314,6 +315,7 @@ named_tax = env.Command(
     target='$out/named/taxonomy.csv',
     source=[tax_db, named_seqinfo],
     action=('taxit taxtable '
+            '--full '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -325,6 +327,7 @@ unnamed_tax = env.Command(
     target='$out/unnamed/taxonomy.csv',
     source=[tax_db, unnamed_seqinfo],
     action=('taxit taxtable '
+            '--full '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -358,6 +361,7 @@ types_tax = env.Command(
     target='$out/types/taxonomy.csv',
     source=[tax_db, types_seqinfo],
     action=('taxit taxtable '
+            '--full '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -420,6 +424,7 @@ filtered_tax = env.Command(
     target='$filtered/taxonomy.csv',
     source=[tax_db, filtered_seqinfo],
     action=('taxit taxtable '
+            '--full '
             '--seq-info ${SOURCES[1]} '
             '--out-file $TARGET '
             '${SOURCES[0]}'))
