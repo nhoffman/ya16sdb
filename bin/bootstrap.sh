@@ -31,13 +31,10 @@ fi
 ${DEENURP}/bin/bootstrap.sh $venv
 
 if [ ! -f $venv/bin/makeblastdb ]; then
-  BLAST_TOOLS=ncbi-blast-2.2.31+
-  BLAST_FILE=${BLAST_TOOLS}-x64-linux.tar.gz
+  BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
   (cd src && \
-    wget -N ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_FILE && \
-    tar xvf $BLAST_FILE && \
-    cp ${BLAST_TOOLS}/bin/makeblastdb $venv/bin && \
-    rm -r ${BLAST_TOOLS})
+    wget -N ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-*-x64-linux.tar.gz && \
+    tar tzf $BLAST_GZ | grep makeblastdb | xargs tar xzvf $BLAST_GZ --strip-components 2 --directory ../$venv/bin)
 else
     echo "makeblastdb is already installed: $(makeblastdb -version)"
 fi
