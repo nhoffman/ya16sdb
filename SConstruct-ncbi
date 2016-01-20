@@ -25,7 +25,7 @@ vars.Add(PathVariable('out', 'Path to output directory', 'output-ncbi',
 vars.Add(PathVariable('data', 'Path to data directory', 'data',
          PathVariable.PathIsDirCreate))
 vars.Add('nproc', ('Number of concurrent processes '), 25)
-vars.Add('nreq', ('Number of concurrent http requests to ncbi'), 5)
+vars.Add('nreq', ('Number of concurrent http requests to ncbi'), 3)
 vars.Add(BoolVariable('use_cluster', 'Use slurm', False))
 # FIXME: this will error if it doesn't exist
 vars.Add(PathVariable('blacklist',
