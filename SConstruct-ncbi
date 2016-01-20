@@ -2,8 +2,9 @@
 Download and curate the NCBI 16S rRNA sequences
 """
 
-import sys
 import os
+import sys
+import time
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
@@ -16,25 +17,28 @@ from SCons.Script import (
 
 from bioscons.slurm import SlurmEnvironment
 
-version = '0.1'
+version = time.strftime('%Y%m%d')
 
 vars = Variables(None, ARGUMENTS)
-vars.Add(PathVariable('out', 'Path to output directory', 'ncbi',
+vars.Add(PathVariable('out', 'Path to output directory', 'output-ncbi',
          PathVariable.PathIsDirCreate))
 vars.Add(PathVariable('data', 'Path to data directory', 'data',
          PathVariable.PathIsDirCreate))
 vars.Add('nproc', ('Number of concurrent processes '), 25)
 vars.Add('nreq', ('Number of concurrent http requests to ncbi'), 5)
 vars.Add(BoolVariable('use_cluster', 'Use slurm', False))
+# FIXME: this will error if it doesn't exist
 vars.Add(PathVariable('blacklist',
                       'path to blastlist.txt',
                       '$data/blacklist.txt'))
+# FIXME: this will error if it doesn't exist
 vars.Add(PathVariable('have_records',
                       'path to have_records.txt',
                       '$out/have_records.txt'))
 vars.Add(PathVariable('training_set',
                       'path to type strain training set',
                       '$data/rdp_16s_type_strains.fasta.bz2'))
+# FIXME: this will error if it doesn't exist
 vars.Add(PathVariable('log',
                       'path to type strain training set',
                       '$out/ncbi.log'))
@@ -120,25 +124,6 @@ def combine_blast_dbs(env, db_files, output_base, title, dbtype='nucl'):
 # start script
 
 """
-taxonomy md5 incase we need to update
-"""
-tax_md5 = base_env.Command(
-    target=['$out/taxdmp.zip.md5'],
-    source=None,
-    action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
-            '--output-document $TARGET'))
-# base_env.AlwaysBuild(tax_md5)
-
-"""
-download and parse the full ncbi taxonomy
-"""
-tax_db, taxdmp = base_env.Command(
-    target=['$out/ncbi_taxonomy.db', '$out/taxdmp.zip'],
-    source=tax_md5,
-    action='taxit new_database --download-dir $out --database-file $TARGET',
-    use_cluster=False)
-
-"""
 get accessions (versions) of records with rrna 16s annotations from ncbi
 """
 ncbi = base_env.Command(
@@ -157,7 +142,7 @@ ncbi = base_env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 500 : 999999999[Sequence Length]"'))
-# base_env.AlwaysBuild(ncbi)
+base_env.AlwaysBuild(ncbi)
 
 """
 get accessions (versions) of records considered type strains
@@ -202,9 +187,9 @@ accessions = base_env.Command(
 """
 Download gb files and write fasta and seq_info right away
 """
-raw_fasta, raw_info, raw_references = base_env.Command(
+raw_fasta, raw_info, raw_pubs = base_env.Command(
     source=[accessions, types],
-    target=['$out/raw.fasta', '$out/raw.csv', '$out/raw_refs.csv'],
+    target=['$out/raw.fasta', '$out/raw.csv', '$out/raw_pubs.csv'],
     action=('deenurp -v ncbi_extract_genbank '
             '--no-features $blacklist '
             '--strand 1 '
@@ -215,18 +200,18 @@ raw_fasta, raw_info, raw_references = base_env.Command(
             '--log $log '
             '--threads $nreq '
             '$email ${SOURCES[0]} $TARGETS'))
-base_env.Precious(raw_fasta, raw_info, raw_references)
+base_env.Precious(raw_fasta, raw_info, raw_pubs)
 
 """
 Because records are appended and ncbi errors are common we need to
 check sequences here for inconsistencies between
 records.fasta, records.csv and references.csv
 """
-sync_fasta, sync_info, sync_refs = base_env.Command(
-    source=[raw_fasta, raw_info, raw_references],
+sync_fasta, sync_info, sync_pubs = base_env.Command(
+    source=[raw_fasta, raw_info, raw_pubs],
     target=['$out/sync.fasta',
             '$out/sync.csv',
-            '$out/refs.csv'],
+            '$out/sync_pubs.csv'],
     action=['sync_records.py --accessions $have_records $SOURCES $TARGETS',
             # overwrite the "raw" files with the sync files
             Copy('${SOURCES[0]}', '${TARGETS[0]}'),
@@ -241,9 +226,9 @@ TODO: save state of outputs to avoid extra work on records already processed
 TODO: analyze no_16s matches, we want to make sure
       we're not losing valid sequences.
 """
-seqs, orientated_info, _, _, _ = base_env.Command(
-    target=['$out/seqs.fasta',
-            '$out/orientated_info.csv',
+orientated, orientated_info, _, _, _ = base_env.Command(
+    target=['$out/orientated.fasta',
+            '$out/orientated.csv',
             '$out/alignments.csv',
             '$out/notmatched.fasta',
             '$out/notmatched.csv'],
@@ -260,13 +245,40 @@ seqs, orientated_info, _, _, _ = base_env.Command(
             '--out_notmatched_info ${TARGETS[4]} '
             '${SOURCES[:2]}'))
 
+# move to version specific refsets
 out = os.path.join('$out', str(version))
 env = base_env.Clone(out=out)
 
+seqs, pubs, _ = env.Command(
+    target=['$out/seqs.fasta', '$out/pubs.csv', '$out/new_accessions.txt'],
+    source=[orientated, sync_pubs, accessions],
+    action=[Copy('${TARGETS[0]}',  '${SOURCES[0]}'),
+            Copy('${TARGETS[1]}',  '${SOURCES[1]}'),
+            Copy('${TARGETS[2]}',  '${SOURCES[2]}')])
+
+"""
+taxonomy md5 incase we need to update
+
+TODO: move this process into its own pipeline
+"""
+tax_md5 = env.Command(
+    target=['$out/taxdmp.zip.md5'],
+    source=None,
+    action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
+            '--output-document $TARGET'))
+# base_env.AlwaysBuild(tax_md5)
+
+"""
+download and parse the full ncbi taxonomy
+"""
+tax_db, taxdmp = env.Command(
+    target=['$out/ncbi_taxonomy.db', '$out/taxdmp.zip'],
+    source=tax_md5,
+    action='taxit new_database --download-dir $out --database-file $TARGET',
+    use_cluster=False)
+
 """
 update seq_info with latest tax_ids and add taxid_classified column
-
-TODO: create way to add a species rank column to the seq_info
 """
 seq_info, _ = env.Command(
     target=['$out/seq_info.csv', '$out/unknown_taxons.csv'],
@@ -282,7 +294,7 @@ seq_info, _ = env.Command(
 """
 Make general taxtable
 """
-tax = base_env.Command(
+tax = env.Command(
     target='$out/taxonomy.csv',
     source=[tax_db, seq_info],
     action=('taxit taxtable '
@@ -298,7 +310,7 @@ partition into named and unnamed data sets.
 named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
     target=['$out/named/seqs.fasta', '$out/named/seq_info.csv',
             '$out/unnamed/seqs.fasta', '$out/unnamed/seq_info.csv'],
-    source=[seqs, seq_info],
+    source=[orientated, seq_info],
     action=('deenurp partition_refs '
             # filtering
             '--min-length 1200 '
@@ -430,15 +442,6 @@ filtered_tax = env.Command(
             '${SOURCES[0]}'))
 
 filtered_blast = blast_db(env, filtered_fasta, '$filtered/blast')
-
-"""
-versions of stuff
-"""
-version = env.Command(
-    target='$out/version.txt',
-    source=[sync_fasta, named_fasta, types_fasta, filtered_fasta],
-    action=('(echo -n "mkrefpkg "; git describe --tags --dirty) > $TARGET && '
-            'deenurp --version >> $TARGET '))
 
 """
 Append contributers
