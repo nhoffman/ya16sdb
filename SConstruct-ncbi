@@ -4,7 +4,6 @@ Download and curate the NCBI 16S rRNA sequences
 
 import os
 import sys
-import time
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
@@ -17,7 +16,7 @@ from SCons.Script import (
 
 from bioscons.slurm import SlurmEnvironment
 
-version = time.strftime('%Y%m%d')
+version = 'release'
 
 vars = Variables(None, ARGUMENTS)
 vars.Add(PathVariable('out', 'Path to output directory', 'output-ncbi',
@@ -142,7 +141,7 @@ ncbi = base_env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 500 : 999999999[Sequence Length]"'))
-base_env.AlwaysBuild(ncbi)
+# base_env.AlwaysBuild(ncbi)
 
 """
 get accessions (versions) of records considered type strains
@@ -304,6 +303,17 @@ tax = env.Command(
             '${SOURCES[0]}'))
 
 """
+Count reference sequences that can be used for classification filtering
+"""
+tax_counts = env.Command(
+    target='$out/tax_counts.csv',
+    source=[tax, seq_info],
+    action=('taxit count_taxids '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '${SOURCES[0]}'))
+
+"""
 Drop sequences < 1200 bp and with more than 1% ambig and
 partition into named and unnamed data sets.
 """
@@ -333,6 +343,17 @@ named_tax = env.Command(
             '${SOURCES[0]}'))
 
 """
+Count reference sequences that can be used for classification filtering
+"""
+named_tax_counts = env.Command(
+    target='$out/named/tax_counts.csv',
+    source=[named_tax, named_seqinfo],
+    action=('taxit count_taxids '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '${SOURCES[0]}'))
+
+"""
 Make unnamed taxtable
 """
 unnamed_tax = env.Command(
@@ -340,6 +361,17 @@ unnamed_tax = env.Command(
     source=[tax_db, unnamed_seqinfo],
     action=('taxit taxtable '
             '--full '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '${SOURCES[0]}'))
+
+"""
+Count reference sequences that can be used for classification filtering
+"""
+unnamed_tax_counts = env.Command(
+    target='$out/unnamed/tax_counts.csv',
+    source=[unnamed_tax, unnamed_seqinfo],
+    action=('taxit count_taxids '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -379,6 +411,17 @@ types_tax = env.Command(
             '${SOURCES[0]}'))
 
 """
+Count reference sequences that can be used for classification filtering
+"""
+unnamed_ref_counts = env.Command(
+    target='$out/types/tax_counts.csv',
+    source=[types_tax, types_seqinfo],
+    action=('taxit count_taxids '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '${SOURCES[0]}'))
+
+"""
 Make type strain Blast database
 """
 types_blast = blast_db(env, types_fasta, '$out/types/blast')
@@ -411,12 +454,13 @@ dedup_fasta, dedup_info = env.Command(
 # Filter sequences. Use --threads if you need to to limit the number
 # of processes - otherwise deenurp will use all of them!
 filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
-    source=[dedup_fasta, dedup_info, named_tax],
+    source=[seq_info, dedup_fasta, dedup_info, named_tax],
     target=['$filtered/seqs.fasta',
             '$filtered/seq_info.csv',
             '$filtered/details.csv'],
     action=('rm -f ${SOURCES[0]}.ssi && '
             'deenurp filter_outliers '
+            '--filter-rank species '
             '--strategy cluster '
             '--distance-percentile 90 '
             '--min-distance 0.01 '
@@ -425,7 +469,8 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '--threads $nproc '
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
-            '$SOURCES ${TARGETS[0]}'),
+            '--previous-details ${TARGETS[2]} '
+            '${SOURCES[1:]} ${TARGETS[0]}'),
     slurm_queue='full')
 env.Precious([filtered_fasta, filtered_seqinfo, filtered_details])
 
@@ -442,6 +487,17 @@ filtered_tax = env.Command(
             '${SOURCES[0]}'))
 
 filtered_blast = blast_db(env, filtered_fasta, '$filtered/blast')
+
+"""
+Count reference sequences that can be used for classification filtering
+"""
+filtered_ref_counts = env.Command(
+    target='$filtered/tax_counts.csv',
+    source=[filtered_tax, filtered_seqinfo],
+    action=('taxit count_taxids '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '${SOURCES[0]}'))
 
 """
 Append contributers
