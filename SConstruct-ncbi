@@ -125,7 +125,7 @@ ncbi = env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 500 : 999999999[Sequence Length]"'))
-# env.AlwaysBuild(ncbi)
+env.AlwaysBuild(ncbi)
 
 """
 get accessions (versions) of records considered type strains
@@ -200,8 +200,7 @@ sync_fasta, sync_info, _, _ = env.Command(
             '$cache/sync.csv',
             '$cache/sync_pubs.csv',
             '$out/release/pubs.csv'],
-    action=['sync_records.py --accessions $accessions '
-            '$SOURCES $TARGETS',
+    action=['sync_records.py --accessions $accessions $SOURCES ${TARGETS[:3]}',
             # overwrite the "raw" files with the sync files
             Copy('${SOURCES[0]}', '${TARGETS[0]}'),
             Copy('${SOURCES[1]}', '${TARGETS[1]}'),
@@ -247,7 +246,7 @@ tax_md5 = env.Command(
     source=None,
     action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
             '--output-document $TARGET'))
-# env.AlwaysBuild(tax_md5)
+env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
@@ -255,7 +254,9 @@ download and parse the full ncbi taxonomy
 tax_db, taxdmp = env.Command(
     target=['$out/taxonomy/ncbi_taxonomy.db', '$out/taxonomy/taxdmp.zip'],
     source=tax_md5,
-    action='taxit new_database --download-dir $out --database-file $TARGET',
+    action=('taxit new_database '
+            '--download-dir $out/taxonomy '
+            '--database-file $TARGET'),
     use_cluster=False)
 
 """
