@@ -187,16 +187,15 @@ Because records are appended and ncbi errors are common we need to
 check sequences here for inconsistencies between
 records.fasta, records.csv and references.csv
 """
-sync_fasta, sync_info, _, _, _ = env.Command(
-    source=[raw_fasta, raw_info, raw_pubs],
+sync_fasta, sync_info, _, _ = env.Command(
+    source=[raw_fasta, raw_info, raw_pubs, new_accessions],
     target=['$out/cache/sync.fasta',
             '$out/cache/sync.csv',
             '$out/cache/sync_pubs.csv',
-            '$out/release/pubs.csv',
-            '$out/cache/accessions.txt'],
+            '$out/release/pubs.csv'],
     action=['sync_records.py '
-            '--accessions ${TARGETS[3]} '
-            '$SOURCES ${TARGETS[:3]}',
+            '--accessions ${SOURCES[3]} '
+            '${SOURCES[:3]} ${TARGETS[:3]}',
             # overwrite the "raw" files with the sync files
             Copy('${SOURCES[0]}', '${TARGETS[0]}'),
             Copy('${SOURCES[1]}', '${TARGETS[1]}'),
