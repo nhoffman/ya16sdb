@@ -22,30 +22,13 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nproc', ('Number of concurrent processes '), 25)
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 3)
 vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
-vrs.Add(PathVariable('out',
-                     'Path to output directory',
-                     'output-ncbi',
-                     PathVariable.PathIsDirCreate))
-vrs.Add(PathVariable('cache',
-                     'Path to output directory',
-                     '$out/cache',
-                     PathVariable.PathIsDirCreate))
-vrs.Add(PathVariable('training_set',
-                     'path to type strain training set',
-                     'data/rdp_16s_type_strains.fasta.bz2'))
+vrs.Add('out', 'Path to output directory', 'output-ncbi')
 vrs.Add(PathVariable('training_set',
                      'path to type strain training set',
                      'data/rdp_16s_type_strains.fasta.bz2'))
 vrs.Add(PathVariable('blacklist',
                      'path to custom accession blacklist',
                      'data/blacklist.txt'))
-# FIXME: these will through an exception if they do not exist
-vrs.Add(PathVariable('accessions',
-                     'path to accession list of downloaded sequences',
-                     '$out/accessions.txt'))
-vrs.Add(PathVariable('no_features',
-                     'path to cached list of accessions with no 16s features',
-                     '$cache/no_features.txt'))
 
 # Provides access to options prior to instantiation of env object
 # below; it's better to access variables through the env object.
@@ -152,33 +135,43 @@ types = env.Command(
             'AND 500 : 999999999[Sequence Length]"'))
 
 """
+Touch these files in case they do not exist yet
+
+current_accessions - text file list of the current accession
+                     numbers downloaded and processed
+no_features - text file list of accessions with no 16S features to be parsed
+"""
+current_accessions, no_features = env.Command(
+    target=['$out/accessions.txt', '$out/cache/no_features.txt'],
+    source=None,
+    action=[Touch('${TARGETS[0]}'), Touch('${TARGETS[1]}')])
+env.AlwaysBuild(current_accessions, no_features)
+
+"""
 A grep diff between sequences we have, the blacklist and what
 ncbi returns.  This will give us accession (versions) that are
 not present to pass to entrez.py for download.
 """
 new_accessions = env.Command(
-    target='$out/release/new_accessions.txt',
-    source=ncbi,
-    action=[Touch('$accessions'),
-            Touch('$no_features'),
-            Touch('$blacklist'),
-            'cat $accessions $no_features $blacklist | '
+    target=['$out/release/new_accessions.txt'],
+    source=[current_accessions, no_features, ncbi],
+    action=['cat ${SOURCES[:2]} $blacklist | '
             'grep '
             '--invert-match '
             '--fixed-strings '
             '--file /dev/stdin '
-            '$SOURCE > $TARGET'])
+            '${SOURCES[2]} > $TARGET'])
 
 """
 Download gb files and write fasta and seq_info right away
 """
 raw_fasta, raw_info, raw_pubs = env.Command(
-    source=[new_accessions, types],
-    target=['$cache/raw.fasta',
-            '$cache/raw.csv',
-            '$cache/raw_pubs.csv'],
+    source=[no_features, types, new_accessions],
+    target=['$out/cache/raw.fasta',
+            '$out/cache/raw.csv',
+            '$out/cache/raw_pubs.csv'],
     action=('deenurp -v ncbi_extract_genbank '
-            '--no-features $no_features '
+            '--no-features ${SOURCES[0]} '
             '--strand 1 '
             '--chunksize 1 '
             '--retry $retry '
@@ -186,7 +179,7 @@ raw_fasta, raw_info, raw_pubs = env.Command(
             '--feature rrna::16s '
             '--log $out/ncbi.log '
             '--threads $nreq '
-            '$email ${SOURCES[0]} $TARGETS'))
+            '$email ${SOURCES[2]} $TARGETS'))
 env.Precious(raw_fasta, raw_info, raw_pubs)
 
 """
@@ -194,13 +187,16 @@ Because records are appended and ncbi errors are common we need to
 check sequences here for inconsistencies between
 records.fasta, records.csv and references.csv
 """
-sync_fasta, sync_info, _, _ = env.Command(
+sync_fasta, sync_info, _, _, _ = env.Command(
     source=[raw_fasta, raw_info, raw_pubs],
-    target=['$cache/sync.fasta',
-            '$cache/sync.csv',
-            '$cache/sync_pubs.csv',
-            '$out/release/pubs.csv'],
-    action=['sync_records.py --accessions $accessions $SOURCES ${TARGETS[:3]}',
+    target=['$out/cache/sync.fasta',
+            '$out/cache/sync.csv',
+            '$out/cache/sync_pubs.csv',
+            '$out/release/pubs.csv',
+            '$out/cache/accessions.txt'],
+    action=['sync_records.py '
+            '--accessions ${TARGETS[3]} '
+            '$SOURCES ${TARGETS[:3]}',
             # overwrite the "raw" files with the sync files
             Copy('${SOURCES[0]}', '${TARGETS[0]}'),
             Copy('${SOURCES[1]}', '${TARGETS[1]}'),
@@ -443,9 +439,9 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '--threads $nproc '
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
-            '--previous-details $cache/details.csv '
+            '--previous-details $out/cache/details.csv '
             '${SOURCES[1:]} ${TARGETS[0]}',
-            Copy('$cache/details.csv', '${TARGETS[2]}')],
+            Copy('$out/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
 
 """
