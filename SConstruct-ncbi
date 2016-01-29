@@ -166,44 +166,50 @@ new_accessions = env.Command(
 """
 Download gb files and write fasta and seq_info right away
 """
-raw_fasta, raw_info, raw_pubs = env.Command(
+raw_fasta, raw_info, raw_pubmed_ids, raw_references = env.Command(
     source=[no_features, types, new_accessions],
     target=['$out/cache/raw.fasta',
             '$out/cache/raw.csv',
-            '$out/cache/raw_pubs.csv'],
+            '$out/cache/raw_pubmed_ids.csv',
+            '$out/cache/raw_references.csv'],
     action=('deenurp -v ncbi_extract_genbank '
-            '--no-features ${SOURCES[0]} '
             '--strand 1 '
             '--chunksize 1 '
             '--retry $retry '
-            '--type-strains ${SOURCES[1]} '
             '--feature rrna::16s '
             '--log $out/ncbi.log '
             '--threads $nreq '
-            '$email ${SOURCES[2]} $TARGETS'))
-env.Precious(raw_fasta, raw_info, raw_pubs)
+            '--no-features ${SOURCES[0]} '
+            '--type-strains ${SOURCES[1]} '
+            '--pubmed_ids ${TARGETS[2]} '
+            '--references ${TARGETS[3]} '
+            '$email ${SOURCES[2]} ${TARGETS[:2]}'))
+env.Precious(raw_fasta, raw_info, raw_pubmed_ids, raw_references)
 
 """
 Because records are appended and ncbi errors are common we need to
 check sequences here for inconsistencies between
-records.fasta, records.csv and references.csv
+raw.fasta, raw.csv, raw_pubmed_ids and raw_references.csv
 """
-sync_fasta, sync_info, _, _ = env.Command(
-    source=[raw_fasta, raw_info, raw_pubs, current_accessions],
+sync_fasta, sync_info, sync_pubmed_ids, sync_references = env.Command(
+    source=[raw_fasta,
+            raw_info,
+            raw_pubmed_ids,
+            raw_references,
+            no_features,
+            current_accessions],
     target=['$out/cache/sync.fasta',
             '$out/cache/sync.csv',
-            '$out/cache/sync_pubs.csv',
-            '$out/release/pubs.csv'],
+            '$out/cache/sync_pubmed_ids.csv',
+            '$out/cache/sync_references.csv'],
     action=['sync_records.py '
-            '--accessions ${SOURCES[3]} '
-            '${SOURCES[:3]} ${TARGETS[:3]}',
+            '--accessions ${SOURCES[5]} '
+            '${SOURCES[:5]} $TARGETS',
             # overwrite the "raw" files with the sync files
             Copy('${SOURCES[0]}', '${TARGETS[0]}'),
             Copy('${SOURCES[1]}', '${TARGETS[1]}'),
             Copy('${SOURCES[2]}', '${TARGETS[2]}'),
-            # copy pubs over to release dir TODO: move this to orientation step
-            Copy('${TARGETS[3]}', '${TARGETS[2]}')
-            ])
+            Copy('${SOURCES[3]}', '${TARGETS[3]}')])
 
 """
 Check sequence orientation and 16s region
@@ -213,8 +219,8 @@ TODO: analyze no_16s matches, we want to make sure
       we're not losing valid sequences.
 TODO: need pubs output here
 """
-seqs, orientated_info, _, _, _ = env.Command(
-    target=['$out/release/seqs.fasta',
+orientated, orientated_info, _, _, _ = env.Command(
+    target=['$out/orientated/seqs.fasta',
             '$out/orientated/seq_info.csv',
             '$out/orientated/alignments.csv',
             '$out/orientated/notmatched.fasta',
@@ -231,6 +237,18 @@ seqs, orientated_info, _, _, _ = env.Command(
             '--out_notmatched ${TARGETS[3]} '
             '--out_notmatched_info ${TARGETS[4]} '
             '${SOURCES[:2]}'))
+
+"""
+Copy over files to release dir for processing
+"""
+seqs, pubmed_ids, references = env.Command(
+    target=['$out/release/seqs.fasta',
+            '$out/release/pubmed_ids.csv',
+            '$out/release/references.csv'],
+    source=[orientated, sync_pubmed_ids, sync_references],
+    action=[Copy('${TARGETS[0]}', '${SOURCES[0]}'),
+            Copy('${TARGETS[1]}', '${SOURCES[1]}'),
+            Copy('${TARGETS[2]}', '${SOURCES[2]}')])
 
 """
 taxonomy md5 incase we need to update
