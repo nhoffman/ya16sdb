@@ -219,8 +219,8 @@ TODO: analyze no_16s matches, we want to make sure
       we're not losing valid sequences.
 TODO: need pubs output here
 """
-seqs, orientated_info, _, _, _ = env.Command(
-    target=['$out/release/seqs.fasta',
+orientated, orientated_info, _, _, _ = env.Command(
+    target=['$out/orientated/seqs.fasta',
             '$out/orientated/seq_info.csv',
             '$out/orientated/alignments.csv',
             '$out/orientated/notmatched.fasta',
@@ -241,6 +241,14 @@ seqs, orientated_info, _, _, _ = env.Command(
 """
 Copy over files to release dir for processing
 """
+seqs, pubmed_ids, references = env.Command(
+    target=['$out/release/seqs.fasta',
+            '$out/release/pubmed_ids.csv',
+            '$out/release/references.csv'],
+    source=[orientated, sync_pubmed_ids, sync_references],
+    action=[Copy('${TARGETS[0]}', '${SOURCES[0]}'),
+            Copy('${TARGETS[1]}', '${SOURCES[1]}'),
+            Copy('${TARGETS[2]}', '${SOURCES[2]}')])
 
 """
 taxonomy md5 incase we need to update
