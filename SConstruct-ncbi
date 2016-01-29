@@ -146,6 +146,7 @@ current_accessions, no_features = env.Command(
     source=None,
     action=[Touch('${TARGETS[0]}'), Touch('${TARGETS[1]}')])
 env.AlwaysBuild(current_accessions, no_features)
+env.Precious(current_accessions, no_features)
 
 """
 A grep diff between sequences we have, the blacklist and what
@@ -188,7 +189,7 @@ check sequences here for inconsistencies between
 records.fasta, records.csv and references.csv
 """
 sync_fasta, sync_info, _, _ = env.Command(
-    source=[raw_fasta, raw_info, raw_pubs, new_accessions],
+    source=[raw_fasta, raw_info, raw_pubs, current_accessions],
     target=['$out/cache/sync.fasta',
             '$out/cache/sync.csv',
             '$out/cache/sync_pubs.csv',
