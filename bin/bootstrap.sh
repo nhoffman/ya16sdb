@@ -21,7 +21,7 @@ DEENURP=src/deenurp
 mkdir -p src
 
 if [[ -z "$DEENURP_BRANCH" ]]; then
-    DEENURP_BRANCH=v0.1.4
+    DEENURP_BRANCH=v0.1.5
 fi
 
 if [ ! -d $DEENURP ]; then
