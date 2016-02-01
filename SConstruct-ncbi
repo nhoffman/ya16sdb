@@ -136,8 +136,8 @@ types = env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 500 : 999999999[Sequence Length] '
-            'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism])'
-            # 'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism] OR txid71451[Organism])'
+            # 'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism])'
+            'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism] OR txid71451[Organism])'
             '"'))
 
 """
@@ -447,6 +447,8 @@ dedup_fasta, dedup_info = env.Command(
 
 # Filter sequences. Use --threads if you need to to limit the number
 # of processes - otherwise deenurp will use all of them!
+#
+# FIXME: consider first running taxit update_taxids on previous-details
 filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
     source=[seq_info, dedup_fasta, dedup_info, named_tax],
     target=['$out/release/filtered/seqs.fasta',
