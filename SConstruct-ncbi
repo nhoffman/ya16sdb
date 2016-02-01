@@ -107,7 +107,10 @@ ncbi = env.Command(
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]"'))
+            'AND 500 : 999999999[Sequence Length] '
+            'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism]) '
+            # 'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism] OR txid71451[Organism])'
+            '"'))
 env.AlwaysBuild(ncbi)
 
 """
@@ -132,7 +135,10 @@ types = env.Command(
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]"'))
+            'AND 500 : 999999999[Sequence Length] '
+            'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism])'
+            # 'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism] OR txid71451[Organism])'
+            '"'))
 
 """
 Touch these files in case they do not exist yet
