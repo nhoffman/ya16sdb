@@ -446,7 +446,7 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
     target=['$out/release/filtered/seqs.fasta',
             '$out/release/filtered/seq_info.csv',
             '$out/release/filtered/details.csv'],
-    action=['rm -f ${SOURCES[0]}.ssi && '
+    action=['rm -f ${SOURCES[1]}.ssi && '
             'deenurp filter_outliers '
             '--filter-rank species '
             '--strategy cluster '
