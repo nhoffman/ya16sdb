@@ -162,12 +162,15 @@ not present to pass to entrez.py for download.
 new_accessions = env.Command(
     target=['$out/release/new_accessions.txt'],
     source=[current_accessions, no_features, ncbi],
-    action=['cat ${SOURCES[:2]} $blacklist | '
+    action=[Touch('$TARGET'),
+            'cat ${SOURCES[:2]} $blacklist | '
             'grep '
             '--invert-match '
             '--fixed-strings '
             '--file /dev/stdin '
-            '${SOURCES[2]} > $TARGET'])
+            '${SOURCES[2]} > $TARGET '
+            # avoid the grep no match exit code 1 that scons hates
+            '|| true'])
 
 """
 Download gb files and write fasta and seq_info right away
@@ -266,7 +269,7 @@ tax_md5 = env.Command(
     source=None,
     action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
             '--output-document $TARGET'))
-env.AlwaysBuild(tax_md5)
+# env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
