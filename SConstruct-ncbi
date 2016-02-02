@@ -108,8 +108,6 @@ ncbi = env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 500 : 999999999[Sequence Length] '
-            'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism]) '
-            # 'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism] OR txid71451[Organism])'
             '"'))
 env.AlwaysBuild(ncbi)
 
@@ -136,8 +134,6 @@ types = env.Command(
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
             'AND 500 : 999999999[Sequence Length] '
-            # 'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism])'
-            'AND (txid38289[Organism] OR txid575[Organism] OR txid1329834[Organism] OR txid71451[Organism])'
             '"'))
 
 """
@@ -429,7 +425,7 @@ unnamed_ref_counts = env.Command(
 """
 Make type strain Blast database
 """
-types_blast = blast_db(env, types_fasta, '$out/types/blast')
+types_blast = blast_db(env, types_fasta, '$out/release/types/blast')
 
 # Taxonomic filtering
 
