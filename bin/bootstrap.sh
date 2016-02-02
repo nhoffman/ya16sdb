@@ -23,7 +23,7 @@ DEENURP=src/deenurp
 mkdir -p src
 
 if [[ -z "$DEENURP_BRANCH" ]]; then
-    DEENURP_BRANCH=master
+    DEENURP_BRANCH=v0.1.6
 fi
 
 if [[ ! -d $DEENURP ]]; then
@@ -31,6 +31,17 @@ if [[ ! -d $DEENURP ]]; then
 fi
 
 ${DEENURP}/bin/bootstrap.sh $venv
+
+if [ ! -f $venv/bin/makeblastdb ]; then
+  BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
+  (cd src &&
+   wget --quiet -N ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
+   tar tzf $BLAST_GZ |
+   grep makeblastdb |
+   xargs tar xzf $BLAST_GZ --strip-components 2 --directory ../$venv/bin)
+else
+    echo "makeblastdb is already installed: $(makeblastdb -version)"
+fi
 
 source $venv/bin/activate
 
