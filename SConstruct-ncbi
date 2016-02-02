@@ -265,7 +265,7 @@ tax_md5 = env.Command(
     source=None,
     action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
             '--output-document $TARGET'))
-# env.AlwaysBuild(tax_md5)
+env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
