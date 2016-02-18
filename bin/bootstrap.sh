@@ -38,7 +38,7 @@ if [ ! -f $venv/bin/makeblastdb ]; then
    wget --quiet -N ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
    tar tzf $BLAST_GZ |
    grep makeblastdb |
-   xargs tar xzf $BLAST_GZ --strip-components 2 --directory ../$venv/bin)
+   xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
 else
     echo "makeblastdb is already installed: $(makeblastdb -version)"
 fi
