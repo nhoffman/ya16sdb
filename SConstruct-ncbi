@@ -223,6 +223,8 @@ TODO: save state of outputs to avoid extra work on records already processed
 TODO: analyze no_16s matches, we want to make sure
       we're not losing valid sequences.
 TODO: need pubs output here
+
+FIXME: add a filter by coverage
 """
 orientated, orientated_info, _, _, _ = env.Command(
     target=['$out/orientated/seqs.fasta',
