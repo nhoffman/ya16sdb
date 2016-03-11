@@ -318,6 +318,18 @@ tax_counts = env.Command(
             '${SOURCES[0]}'))
 
 """
+Deduplicate sequences by isolate (accession)
+"""
+dedup_fasta, dedup_info = env.Command(
+    target=['$out/release/dedup.fasta',
+            '$out/release/dedup.csv'],
+    source=[seqs, seq_info],
+    action=('deenurp deduplicate_sequences '
+            '--group-by accession '
+            '--prefer-columns is_type '
+            '$SOURCES $TARGETS'))
+
+"""
 Drop sequences < 1200 bp and with more than 1% ambig and
 partition into named and unnamed data sets.
 """
@@ -326,7 +338,7 @@ named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
             '$out/release/named/seq_info.csv',
             '$out/release/unnamed/seqs.fasta',
             '$out/release/unnamed/seq_info.csv'],
-    source=[seqs, seq_info],
+    source=[dedup_fasta, dedup_info],
     action=('deenurp partition_refs '
             # filtering
             '--min-length 1200 '
@@ -431,27 +443,12 @@ types_blast = blast_db(env, types_fasta, '$out/release/types/blast')
 
 # Taxonomic filtering
 
-"""
-Deduplicate sequences by species rank
-
-TODO: Either include that full taxonomy as an argument or engineer a
-way to append the 'species' column to the seq_info.csv
-"""
-dedup_fasta, dedup_info = env.Command(
-    target=['$out/release/filtered/dedup.fasta',
-            '$out/release/filtered/dedup.csv'],
-    source=[named_fasta, named_seqinfo],
-    action=('deenurp deduplicate_sequences '
-            '--group-by species '
-            '--prefer-columns is_type '
-            '$SOURCES $TARGETS'))
-
 # Filter sequences. Use --threads if you need to to limit the number
 # of processes - otherwise deenurp will use all of them!
 #
 # FIXME: consider first running taxit update_taxids on previous-details
 filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
-    source=[seq_info, dedup_fasta, dedup_info, named_tax],
+    source=[named_fasta, named_seqinfo, named_tax],
     target=['$out/release/filtered/seqs.fasta',
             '$out/release/filtered/seq_info.csv',
             '$out/release/filtered/details.csv'],
