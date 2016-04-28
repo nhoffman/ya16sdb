@@ -20,7 +20,7 @@ vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nproc', ('Number of concurrent processes '), 25)
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 3)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 7)
 vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
 vrs.Add('out', 'Path to output directory', 'output-ncbi')
 vrs.Add(PathVariable('training_set',
@@ -91,6 +91,10 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
 
 """
 get accessions (versions) of records with rrna 16s annotations from ncbi
+
+TODO: Limit to a recent date frame as initial search.  If latest records
+are not found then run the whole thing in full.  This will save time in
+execution of this step.
 """
 ncbi = env.Command(
     source=None,
@@ -271,6 +275,9 @@ env.AlwaysBuild(tax_md5)
 
 """
 download and parse the full ncbi taxonomy
+
+TODO: add ranks table
+TODO: add `species` attribute to node table
 """
 tax_db, taxdmp = env.Command(
     target=['$out/taxonomy/ncbi_taxonomy.db', '$out/taxonomy/taxdmp.zip'],
@@ -464,7 +471,7 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
             '--previous-details $out/cache/details.csv '
-            '${SOURCES[1:]} ${TARGETS[0]}',
+            '$SOURCES ${TARGETS[0]}',
             Copy('$out/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
 
