@@ -15,7 +15,7 @@ if [[ -n "$1" ]]; then
 elif [[ -n $VIRTUAL_ENV ]]; then
     venv=$VIRTUAL_ENV
 else
-    venv=$(basename $(pwd))-env
+  venv=$(pwd)/$(basename $(pwd))-env
 fi
 
 MKREFPKG_DIR=$(cd $(dirname $BASH_SOURCE) && cd .. && pwd)
