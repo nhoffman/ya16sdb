@@ -19,7 +19,7 @@ from bioscons.slurm import SlurmEnvironment
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('nproc', ('Number of concurrent processes '), 20)
+vrs.Add('nproc', ('Number of concurrent processes '), 14)
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 7)
 vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
 vrs.Add('out', 'Path to output directory', 'output-ncbi')
