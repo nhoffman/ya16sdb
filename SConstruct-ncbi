@@ -19,7 +19,7 @@ from bioscons.slurm import SlurmEnvironment
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('nproc', ('Number of concurrent processes '), 25)
+vrs.Add('nproc', ('Number of concurrent processes '), 20)
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 7)
 vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
 vrs.Add('out', 'Path to output directory', 'output-ncbi')
@@ -95,6 +95,8 @@ get accessions (versions) of records with rrna 16s annotations from ncbi
 TODO: Limit to a recent date frame as initial search.  If latest records
 are not found then run the whole thing in full.  This will save time in
 execution of this step.
+
+TODO: rename --threads to --server-queries (or something)
 """
 ncbi = env.Command(
     source=None,
@@ -117,8 +119,9 @@ env.AlwaysBuild(ncbi)
 
 """
 get accessions (versions) of records considered type strains
-
 NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+
 NOTE: type_material[Filter] == sequence_from_type[Filter]
 """
 types = env.Command(
@@ -352,8 +355,7 @@ named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
             '--prop-ambig-cutoff 0.01 '
             '--named-seqs ${TARGETS[0]} --named-info ${TARGETS[1]} '
             '--unnamed-seqs ${TARGETS[2]} --unnamed-info ${TARGETS[3]} '
-            '$SOURCES')
-)
+            '$SOURCES'))
 
 """
 Make named taxtable
@@ -448,30 +450,46 @@ Make type strain Blast database
 """
 types_blast = blast_db(env, types_fasta, '$out/release/types/blast')
 
-# Taxonomic filtering
+"""
+"""
+derep_fasta, derep_seqinfo, derep_map = env.Command(
+    target=['$out/release/filtered/derep.fasta',
+            '$out/release/filtered/derep_info.csv',
+            '$out/release/filtered/derep_map.csv'],
+    source=[named_fasta, named_seqinfo],
+    action=('deenurp dereplicate_named '
+            '--id 1.0 '
+            '--seqs-out ${TARGETS[0]} '
+            '--seq-info-out ${TARGETS[1]} '
+            '--derep-map-out ${TARGETS[2]} '
+            '$SOURCES'))
 
-# Filter sequences. Use --threads if you need to to limit the number
-# of processes - otherwise deenurp will use all of them!
-#
-# FIXME: consider first running taxit update_taxids on previous-details
+"""
+Filter sequences. Use --threads if you need to to limit the number
+of processes - otherwise deenurp will use all of them!
+
+FIXME: consider first running taxit update_taxids on previous-details
+FIXME: create a new taxtable for derep_fasta and derep_info
+"""
 filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
-    source=[named_fasta, named_seqinfo, named_tax],
+    source=[derep_fasta, derep_seqinfo, named_tax],
     target=['$out/release/filtered/seqs.fasta',
             '$out/release/filtered/seq_info.csv',
             '$out/release/filtered/details.csv'],
-    action=['rm -f ${SOURCES[1]}.ssi && '
-            'deenurp filter_outliers '
+    action=['deenurp filter_outliers '
             '--filter-rank species '
-            '--strategy cluster '
-            '--distance-percentile 90 '
-            '--min-distance 0.01 '
-            '--max-distance 0.05 '
-            '--min-seqs-for-filtering 5 '
-            '--threads $nproc '
+            '--threads 4 '  # 4 x 15 jobs = 60 total processes
+            '--jobs 15 '
+            '--output-seqs ${TARGETS[0]}  '
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
             '--previous-details $out/cache/details.csv '
-            '$SOURCES ${TARGETS[0]}',
+            '--strategy cluster '
+            '--cluster-type RobustSingleLinkage '
+            '--distance-percentile 50.0 '
+            '--min-distance 0.005 '
+            '--max-distance 0.02 '
+            '$SOURCES',
             Copy('$out/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
 
