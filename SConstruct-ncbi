@@ -451,6 +451,8 @@ Make type strain Blast database
 types_blast = blast_db(env, types_fasta, '$out/release/types/blast')
 
 """
+dereplicate sequences using vsearch clustering to reduce giant species
+clusters like Bacilius genus and E. Coli
 """
 derep_fasta, derep_seqinfo, derep_map = env.Command(
     target=['$out/release/filtered/derep.fasta',
@@ -476,10 +478,11 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
     target=['$out/release/filtered/seqs.fasta',
             '$out/release/filtered/seq_info.csv',
             '$out/release/filtered/details.csv'],
-    action=['deenurp filter_outliers '
+    action=['deenurp filter_outliers -vvv '
+            '--log $out/deenurp.log '
             '--filter-rank species '
-            '--threads 4 '  # 4 x 15 jobs = 60 total processes
-            '--jobs 15 '
+            '--threads 14 '
+            '--jobs 1 '
             '--output-seqs ${TARGETS[0]}  '
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
