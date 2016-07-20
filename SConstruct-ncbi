@@ -481,17 +481,18 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
     action=['deenurp filter_outliers -vvv '
             '--log $out/deenurp.log '
             '--filter-rank species '
-            '--threads 14 '
+            '--threads-per-job 14 '
             '--jobs 1 '
             '--output-seqs ${TARGETS[0]}  '
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
             '--previous-details $out/cache/details.csv '
             '--strategy cluster '
-            '--cluster-type RobustSingleLinkage '
+            '--cluster-type single '
             '--distance-percentile 50.0 '
-            '--min-distance 0.005 '
+            '--min-distance 0.01 '
             '--max-distance 0.02 '
+            '--min-seqs-for-filtering 10 '
             '$SOURCES',
             Copy('$out/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
