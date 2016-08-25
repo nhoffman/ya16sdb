@@ -23,7 +23,7 @@ DEENURP=src/deenurp
 mkdir -p src
 
 if [[ -z "$DEENURP_BRANCH" ]]; then
-    DEENURP_BRANCH=v0.1.6
+    DEENURP_BRANCH=v0.1.8
 fi
 
 if [[ ! -d $DEENURP ]]; then
@@ -35,7 +35,7 @@ ${DEENURP}/bin/bootstrap.sh $venv
 if [ ! -f $venv/bin/makeblastdb ]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
   (cd src &&
-   wget --quiet -N ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
+   wget --quiet -nc ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
    tar tzf $BLAST_GZ |
    grep makeblastdb |
    xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
