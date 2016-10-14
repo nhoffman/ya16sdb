@@ -63,6 +63,7 @@ env = SlurmEnvironment(
     time=False
 )
 
+# FIXME: this should be set to the default MD5-timestamp
 env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
@@ -113,8 +114,7 @@ ncbi = env.Command(
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length] '
-            '"'))
+            'AND 500 : 999999999[Sequence Length]"'))
 env.AlwaysBuild(ncbi)
 
 """
@@ -232,6 +232,10 @@ TODO: analyze no_16s matches, we want to make sure
 TODO: need pubs output here
 
 FIXME: add a filter by coverage
+FIXME: add --maxaccepts --maxrejects to speed this up,
+       all we care about is the orientation
+       --maxaccepts 1
+       --maxrejects 5
 """
 orientated, orientated_info, _, _, _ = env.Command(
     target=['$out/orientated/seqs.fasta',
@@ -277,16 +281,30 @@ tax_md5 = env.Command(
 env.AlwaysBuild(tax_md5)
 
 """
-download and parse the full ncbi taxonomy
-
-TODO: add ranks table
-TODO: add `species` attribute to node table
+download zip file, unzip and check on names, nodes and merged records
 """
-tax_db, taxdmp = env.Command(
-    target=['$out/taxonomy/ncbi_taxonomy.db', '$out/taxonomy/taxdmp.zip'],
+tax_names, tax_nodes, tax_merged = env.Command(
+    target=['$out/taxonomy/nodes.dmp',
+            '$out/taxonomy/names.dmp',
+            '$out/taxonomy/merged.dmp'],
     source=tax_md5,
+    action=['wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip '
+            '--output-document $out/taxonomy/taxdmp.zip ',
+            'unzip $out/taxonomy/taxdmp.zip '
+            'nodes.dmp names.dmp merged.dmp '
+            '-d $out/taxonomy/'])
+
+"""
+parse new taxdmp.zip file
+
+TODO: allow taxit new_database to read from the dmp files
+"""
+tax_db = env.Command(
+    target='$out/taxonomy/ncbi_taxonomy.db',
+    source=[tax_names, tax_nodes, tax_merged],
     action=('taxit new_database '
-            '--download-dir $out/taxonomy '
+            '--clobber '
+            '--taxdump-file $out/taxonomy/taxdmp.zip '
             '--database-file $TARGET'),
     use_cluster=False)
 
@@ -296,10 +314,9 @@ update seq_info with latest tax_ids and add taxid_classified column
 seq_info, _ = env.Command(
     target=['$out/release/seq_info.csv', '$out/release/unknown_taxons.csv'],
     source=[orientated_info, tax_db],
-    action=['taxit update_taxids '
+    action=['taxit -v update_taxids '
             '--name-column organism '
             '--taxid-classified '
-            '--append-lineage species '
             '--unknowns ${TARGETS[1]} '
             '--out ${TARGETS[0]} '
             '$SOURCES'])
@@ -310,8 +327,7 @@ Make general taxtable
 tax = env.Command(
     target='$out/release/taxonomy.csv',
     source=[tax_db, seq_info],
-    action=('taxit taxtable '
-            '--full '
+    action=('taxit -v taxtable '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -322,7 +338,7 @@ Count reference sequences that can be used for classification filtering
 tax_counts = env.Command(
     target='$out/release/tax_counts.csv',
     source=[tax, seq_info],
-    action=('taxit count_taxids '
+    action=('taxit -v count_taxids '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -334,7 +350,7 @@ dedup_fasta, dedup_info = env.Command(
     target=['$out/release/dedup.fasta',
             '$out/release/dedup.csv'],
     source=[seqs, seq_info],
-    action=('deenurp deduplicate_sequences '
+    action=('deenurp -v deduplicate_sequences '
             '--group-by accession '
             '--prefer-columns is_type '
             '$SOURCES $TARGETS'))
@@ -349,7 +365,7 @@ named_fasta, named_seqinfo, unnamed_fasta, unnamed_seqinfo = env.Command(
             '$out/release/unnamed/seqs.fasta',
             '$out/release/unnamed/seq_info.csv'],
     source=[dedup_fasta, dedup_info],
-    action=('deenurp partition_refs '
+    action=('deenurp -v partition_refs '
             # filtering
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
@@ -362,9 +378,10 @@ Make named taxtable
 """
 named_tax = env.Command(
     target='$out/release/named/taxonomy.csv',
-    source=[tax_db, named_seqinfo],
-    action=('taxit taxtable '
+    source=[tax_db, named_seqinfo, tax],
+    action=('taxit -v taxtable '
             '--full '
+            '--from-table ${SOURCES[2]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -375,7 +392,7 @@ Count reference sequences that can be used for classification filtering
 named_tax_counts = env.Command(
     target='$out/release/named/tax_counts.csv',
     source=[named_tax, named_seqinfo],
-    action=('taxit count_taxids '
+    action=('taxit -v count_taxids '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -385,9 +402,10 @@ Make unnamed taxtable
 """
 unnamed_tax = env.Command(
     target='$out/release/unnamed/taxonomy.csv',
-    source=[tax_db, unnamed_seqinfo],
-    action=('taxit taxtable '
+    source=[tax_db, unnamed_seqinfo, tax],
+    action=('taxit -v taxtable '
             '--full '
+            '--from-table ${SOURCES[2]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -398,7 +416,7 @@ Count reference sequences that can be used for classification filtering
 unnamed_tax_counts = env.Command(
     target='$out/release/unnamed/tax_counts.csv',
     source=[unnamed_tax, unnamed_seqinfo],
-    action=('taxit count_taxids '
+    action=('taxit -v count_taxids '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -417,7 +435,7 @@ types_fasta, types_seqinfo = env.Command(
     target=['$out/release/types/seqs.fasta',
             '$out/release/types/seq_info.csv'],
     source=[named_fasta, named_seqinfo],
-    action=('deenurp partition_refs '
+    action=('deenurp -v partition_refs '
             '--type-seqs ${TARGETS[0]} '
             '--type-info ${TARGETS[1]} '
             '$SOURCES'))
@@ -427,9 +445,10 @@ Make type strain taxtable
 """
 types_tax = env.Command(
     target='$out/release/types/taxonomy.csv',
-    source=[tax_db, types_seqinfo],
-    action=('taxit taxtable '
+    source=[tax_db, types_seqinfo, tax],
+    action=('taxit -v taxtable '
             '--full '
+            '--from-table ${SOURCES[2]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -440,7 +459,7 @@ Count reference sequences that can be used for classification filtering
 unnamed_ref_counts = env.Command(
     target='$out/release/types/tax_counts.csv',
     source=[types_tax, types_seqinfo],
-    action=('taxit count_taxids '
+    action=('taxit -v count_taxids '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
@@ -458,13 +477,14 @@ derep_fasta, derep_seqinfo, derep_map = env.Command(
     target=['$out/release/filtered/derep.fasta',
             '$out/release/filtered/derep_info.csv',
             '$out/release/filtered/derep_map.csv'],
-    source=[named_fasta, named_seqinfo],
-    action=('deenurp dereplicate_named '
+    source=[named_fasta, named_seqinfo, named_tax],
+    action=('deenurp -v dereplicate_named '
             '--id 1.0 '
+            '--taxonomy ${SOURCES[2]} '
             '--seqs-out ${TARGETS[0]} '
             '--seq-info-out ${TARGETS[1]} '
             '--derep-map-out ${TARGETS[2]} '
-            '$SOURCES'))
+            '${SOURCES[:2]}'))
 
 """
 Filter sequences. Use --threads if you need to to limit the number
@@ -478,7 +498,7 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
     target=['$out/release/filtered/seqs.fasta',
             '$out/release/filtered/seq_info.csv',
             '$out/release/filtered/details.csv'],
-    action=['deenurp filter_outliers -vvv '
+    action=['deenurp -vvv filter_outliers '
             '--log $out/deenurp.log '
             '--filter-rank species '
             '--threads-per-job 14 '
@@ -502,9 +522,10 @@ Make filtered taxtable
 """
 filtered_tax = env.Command(
     target='$out/release/filtered/taxonomy.csv',
-    source=[tax_db, filtered_seqinfo],
-    action=('taxit taxtable '
+    source=[tax_db, filtered_seqinfo, named_tax],
+    action=('taxit -v taxtable '
             '--full '
+            '--from-table ${SOURCES[2]} '
             '--seq-info ${SOURCES[1]} '
             '--out-file $TARGET '
             '${SOURCES[0]}'))
@@ -517,7 +538,7 @@ Count reference sequences that can be used for classification filtering
 filtered_ref_counts = env.Command(
     target='$out/release/filtered/tax_counts.csv',
     source=[filtered_tax, filtered_seqinfo],
-    action=('taxit count_taxids '
+    action=('taxit -v count_taxids '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
