@@ -5,16 +5,16 @@ Download and curate the NCBI 16S rRNA sequences
 import os
 import sys
 
-venv = os.environ.get('VIRTUAL_ENV')
-if not venv:
-    sys.exit('--> an active virtualenv is required'.format(venv))
-
 # requirements installed in the virtualenv
 from SCons.Script import (
     Variables, PathVariable, BoolVariable,
     ARGUMENTS, Help, Touch, Copy)
 
 from bioscons.slurm import SlurmEnvironment
+
+venv = os.environ.get('VIRTUAL_ENV')
+if not venv:
+    sys.exit('--> an active virtualenv is required'.format(venv))
 
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
@@ -140,8 +140,7 @@ types = env.Command(
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length] '
-            '"'))
+            'AND 500 : 999999999[Sequence Length]"'))
 
 """
 Touch these files in case they do not exist yet
@@ -232,10 +231,9 @@ TODO: analyze no_16s matches, we want to make sure
 TODO: need pubs output here
 
 FIXME: add a filter by coverage
-FIXME: add --maxaccepts --maxrejects to speed this up,
-       all we care about is the orientation
-       --maxaccepts 1
-       --maxrejects 5
+
+TODO: break this up into vsearch and a script
+      that filters fixes the orientation
 """
 orientated, orientated_info, _, _, _ = env.Command(
     target=['$out/orientated/seqs.fasta',
