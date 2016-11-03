@@ -23,7 +23,7 @@ DEENURP=src/deenurp
 mkdir -p src
 
 if [[ -z "$DEENURP_BRANCH" ]]; then
-    DEENURP_BRANCH=v0.1.8
+    DEENURP_BRANCH=master
 fi
 
 if [[ ! -d $DEENURP ]]; then
@@ -32,18 +32,19 @@ fi
 
 ${DEENURP}/bin/bootstrap.sh $venv
 
-if [ ! -f $venv/bin/makeblastdb ]; then
+source $venv/bin/activate
+
+if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
   (cd src &&
-   wget --quiet -nc ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
+	  wget -nc --user anonymous --password $(git config user.email) \
+	       ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
    tar tzf $BLAST_GZ |
    grep makeblastdb |
    xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
 else
     echo "makeblastdb is already installed: $(makeblastdb -version)"
 fi
-
-source $venv/bin/activate
 
 # set PIP_FIND_LINKS to use wheels https://pip.pypa.io/en/latest/user_guide.html#environment-variables
 pip install --upgrade --requirement ${MKREFPKG_DIR}/requirements.txt
