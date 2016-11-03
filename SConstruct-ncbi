@@ -507,10 +507,10 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '--previous-details $out/cache/details.csv '
             '--strategy cluster '
             '--cluster-type single '
-            '--distance-percentile 50.0 '
+            '--distance-percentile 90.0 '
             '--min-distance 0.01 '
             '--max-distance 0.02 '
-            '--min-seqs-for-filtering 10 '
+            '--min-seqs-for-filtering 5 '
             '$SOURCES',
             Copy('$out/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
