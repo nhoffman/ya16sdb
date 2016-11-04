@@ -91,7 +91,7 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
 
 # start script
 
-tax_db = '/molmicro/common/taxonomy/output/LATEST/ncbi_taxonomy.db'
+tax_db = '/molmicro/common/ncbi/taxonomy/output/LATEST/ncbi_taxonomy.db'
 
 """
 get accessions (versions) of records with rrna 16s annotations from ncbi
@@ -288,7 +288,7 @@ Make general taxtable
 tax = env.Command(
     target='$out/release/taxonomy.csv',
     source=[tax_db,
-            '/molmicro/common/taxonomy/output/LATEST/taxonomy.csv',
+            '/molmicro/common/ncbi/taxonomy/output/LATEST/taxonomy.csv',
             seq_info],
     action=('taxit -v taxtable '
             '--from-table ${SOURCES[1]} '
