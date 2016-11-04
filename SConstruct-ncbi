@@ -10,11 +10,12 @@ from SCons.Script import (
     Variables, PathVariable, BoolVariable,
     ARGUMENTS, Help, Touch, Copy)
 
-from bioscons.slurm import SlurmEnvironment
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
+
+from bioscons.slurm import SlurmEnvironment
 
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
@@ -89,6 +90,8 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
     return blast_out
 
 # start script
+
+tax_db = '/molmicro/common/taxonomy/output/LATEST/ncbi_taxonomy.db'
 
 """
 get accessions (versions) of records with rrna 16s annotations from ncbi
@@ -267,46 +270,6 @@ seqs, pubmed_ids, references = env.Command(
             Copy('${TARGETS[2]}', '${SOURCES[2]}')])
 
 """
-taxonomy md5 incase we need to update
-
-TODO: move this process into its own pipeline
-"""
-tax_md5 = env.Command(
-    target=['$out/taxonomy/taxdmp.zip.md5'],
-    source=None,
-    action=('wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip.md5 '
-            '--output-document $TARGET'))
-env.AlwaysBuild(tax_md5)
-
-"""
-download zip file, unzip and check on names, nodes and merged records
-"""
-tax_names, tax_nodes, tax_merged = env.Command(
-    target=['$out/taxonomy/nodes.dmp',
-            '$out/taxonomy/names.dmp',
-            '$out/taxonomy/merged.dmp'],
-    source=tax_md5,
-    action=['wget ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip '
-            '--output-document $out/taxonomy/taxdmp.zip ',
-            'unzip $out/taxonomy/taxdmp.zip '
-            'nodes.dmp names.dmp merged.dmp '
-            '-d $out/taxonomy/'])
-
-"""
-parse new taxdmp.zip file
-
-TODO: allow taxit new_database to read from the dmp files
-"""
-tax_db = env.Command(
-    target='$out/taxonomy/ncbi_taxonomy.db',
-    source=[tax_names, tax_nodes, tax_merged],
-    action=('taxit new_database '
-            '--clobber '
-            '--taxdump-file $out/taxonomy/taxdmp.zip '
-            '--database-file $TARGET'),
-    use_cluster=False)
-
-"""
 update seq_info with latest tax_ids and add taxid_classified column
 """
 seq_info, _ = env.Command(
@@ -324,9 +287,12 @@ Make general taxtable
 """
 tax = env.Command(
     target='$out/release/taxonomy.csv',
-    source=[tax_db, seq_info],
+    source=[tax_db,
+            '/molmicro/common/taxonomy/output/LATEST/taxonomy.csv',
+            seq_info],
     action=('taxit -v taxtable '
-            '--seq-info ${SOURCES[1]} '
+            '--from-table ${SOURCES[1]} '
+            '--seq-info ${SOURCES[2]} '
             '--out $TARGET '
             '${SOURCES[0]}'))
 
