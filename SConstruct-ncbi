@@ -2,20 +2,21 @@
 Download and curate the NCBI 16S rRNA sequences
 """
 
+import ConfigParser
 import os
 import sys
+
+from bioscons.slurm import SlurmEnvironment
 
 # requirements installed in the virtualenv
 from SCons.Script import (
     Variables, PathVariable, BoolVariable,
-    ARGUMENTS, Help, Touch, Copy)
-
+    ARGUMENTS, Help, Touch, Copy, File)
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
 
-from bioscons.slurm import SlurmEnvironment
 
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
@@ -37,6 +38,16 @@ varargs = dict({opt.key: opt.default for opt in vrs.options}, **vrs.args)
 truevals = {True, 'yes', 'y', 'True', 'true', 't'}
 nproc = varargs['nproc']
 use_cluster = varargs['use_cluster'] in truevals
+
+settings = 'settings.conf'
+if not os.path.exists(settings):
+    print('settings.conf required for links to ncbi taxonomy '
+          'use "scons settings=settings-example.conf"')
+    sys.exit(1)
+
+conf = ConfigParser.SafeConfigParser(allow_no_value=True)
+conf.optionxform = str  # options are case-sensitive
+conf.read(settings)
 
 """
 Explicitly define PATH, giving preference to local executables; it's
@@ -91,7 +102,8 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
 
 # start script
 
-tax_db = '/molmicro/common/ncbi/taxonomy/output/LATEST/ncbi_taxonomy.db'
+tax_latest = conf.get('DEFAULT', 'output_tax')
+tax_db = conf.get('ref', 'taxdb')
 
 """
 get accessions (versions) of records with rrna 16s annotations from ncbi
@@ -288,7 +300,7 @@ Make general taxtable
 tax = env.Command(
     target='$out/release/taxonomy.csv',
     source=[tax_db,
-            '/molmicro/common/ncbi/taxonomy/output/LATEST/taxonomy.csv',
+            File('taxonomy.csv', tax_latest),
             seq_info],
     action=('taxit -v taxtable '
             '--from-table ${SOURCES[1]} '
