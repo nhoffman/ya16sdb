@@ -494,6 +494,14 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
     slurm_queue='full')
 
 """
+copy details.csv to cache
+"""
+env.Command(
+    source=filtered_details,
+    target='$out/cache/details.csv',
+    action=Copy('$TARGET', '$SOURCE'))
+
+"""
 Make filtered taxtable
 """
 filtered_tax = env.Command(
