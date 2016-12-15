@@ -108,8 +108,8 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
 
     return blast_out
 
-# start script
 
+# start script
 tax_latest = conf.get('DEFAULT', 'output_tax')
 tax_db = conf.get('ref', 'taxdb')
 
@@ -500,6 +500,36 @@ filtered_fasta, filtered_seqinfo, filtered_details = env.Command(
             '$SOURCES',
             Copy('$base/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
+
+# find top hit for each sequence among type strains
+type_hits = env.Command(
+    target='$out/filtered/vsearch.blast6out',
+    source=[derep_fasta, types_fasta],
+    action=('vsearch --usearch_global ${SOURCES[0]} --db ${SOURCES[1]} '
+            '--blast6out $TARGET --id 0.75 --threads 12 '
+            '--maxaccepts 1 --strand plus'))
+
+'''
+bokeh plot filtered sequences
+
+hard coded: sort column 2 (records) desc
+
+FIXME: BokehDeprecationWarning 2> /dev/null
+'''
+env.Command(
+    target='$out/filtered/index.html',
+    source=[filtered_details, named_tax, type_hits, types_seqinfo],
+    action=('plot_details.py $SOURCES '
+            '--param strategy:cluster '
+            '--param cluster_type:single '
+            '--param distance_percentile:90.0 '
+            '--param min_distance:0.01 '
+            '--param max_distance:0.02 '
+            '--log $base/deenurp.log '
+            '--plot-dir $out/filtered/plots '
+            '--plot-index $TARGET '
+            '2> /dev/null'
+            ))
 
 """
 Make filtered taxtable
