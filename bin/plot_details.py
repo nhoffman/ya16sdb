@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-"""Try hdbscan
-
+"""
 """
 
 import argparse
+import csv
 import itertools
 import gviz_api
 import jinja2
@@ -60,7 +60,7 @@ def paired_plots(data, title=None, text_cols=None):
     data['i'] = range(len(data))
     data['hit_agrees'] = data.species == data.hit_id
 
-    source = ColumnDataSource(data)
+    source = ColumnDataSource(data.fillna(''))
 
     # start with outliers in table
     text_data = data[data.is_out][['x', 'y', 'i'] + text_cols]
@@ -196,6 +196,11 @@ def main(arguments):
         help=('output directory for plots; index file '
               'will be named $plot_dir.html'))
     parser.add_argument(
+        '--plot-map',
+        metavar='CSV',
+        type=argparse.FileType('w'),
+        help='tax_id,outfile')
+    parser.add_argument(
         '-N',
         type=int,
         help='max number of taxa to read')
@@ -278,7 +283,11 @@ def main(arguments):
     details.loc[:, 'tax_name'] = details.apply(seq_ncbi_link, axis=1)
 
     def hit_ncbi_link(row):
-        return url.format(row['hit_version'], row['hit_tax_name'])
+        if pd.isnull(row['hit_tax_name']):
+            tag = ''
+        else:
+            tag = url.format(row['hit_version'], row['hit_tax_name'])
+        return tag
     details.loc[:, 'hit_tax_name'] = details.apply(hit_ncbi_link, axis=1)
 
     # define table layout for index page
@@ -290,6 +299,10 @@ def main(arguments):
          ('outliers', 'number'),
          ('pct out', 'number')]
     )
+
+    if args.plot_map:
+        map_out = csv.writer(args.plot_map)
+        map_out.writerow(['tax_id', 'html'])
 
     table_data = []
     by_species = details.groupby(by=['species', 'species_name'])
@@ -314,9 +327,12 @@ def main(arguments):
 
         filename = '{}.html'.format(label)
         output_file(
-            filename=os.path.join(plot_dir, filename),
+            filename=os.path.join(args.plot_dir, filename),
             title=species_name)
         save(gridplot([[step_plt, pca_plt], [tab]]))
+
+        if args.plot_map:
+            map_out.writerow([species_id, filename])
 
         n_out = sum(species.is_out)
         pct_out = (100.0 * n_out) / len(species)

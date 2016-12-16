@@ -517,7 +517,7 @@ hard coded: sort column 2 (records) desc
 FIXME: BokehDeprecationWarning 2> /dev/null
 '''
 env.Command(
-    target='$out/filtered/index.html',
+    target=['$out/filtered/index.html', '$out/filtered/plots/index.html'],
     source=[filtered_details, named_tax, type_hits, types_seqinfo],
     action=('plot_details.py $SOURCES '
             '--param strategy:cluster '
@@ -527,7 +527,8 @@ env.Command(
             '--param max_distance:0.02 '
             '--log $base/deenurp.log '
             '--plot-dir $out/filtered/plots '
-            '--plot-index $TARGET '
+            '--plot-map ${TARGETS[1]} '
+            '--plot-index ${TARGETS[0]} '
             '2> /dev/null'
             ))
 
