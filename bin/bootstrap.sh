@@ -32,21 +32,35 @@ fi
 
 ${DEENURP}/bin/bootstrap.sh $venv
 
+# install Python3
+virtualenv $venv
+pyvenv --without-pip $venv
 source $venv/bin/activate
+wget --quiet --output-document src/get-pip.py https://bootstrap.pypa.io/get-pip.py
+python3 src/get-pip.py
 
 if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
   (cd src &&
-	  wget -nc --user anonymous --password $(git config user.email) \
-	       ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
+   wget -nc --user anonymous --password $(git config user.email) \
+      ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
    tar tzf $BLAST_GZ |
    grep makeblastdb |
    xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
 else
-    echo "makeblastdb is already installed: $(makeblastdb -version)"
+  echo "makeblastdb is already installed: $(makeblastdb -version)"
+fi
+
+if [[ ! -f $venv/bin/esearch ]]; then
+  (cd src &&
+   wget ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz &&
+   tar tzf edirect.tar.gz |
+   grep -E "esearch|edirect.pl" |
+   xargs tar xzf edirect.tar.gz --strip-components 1 --directory $venv/bin)
+else
+  echo "esearch already installed: $(esearch -version)"
 fi
 
 # set PIP_FIND_LINKS to use wheels https://pip.pypa.io/en/latest/user_guide.html#environment-variables
-pip install --upgrade --requirement ${MKREFPKG_DIR}/requirements.txt
-
-virtualenv --relocatable $venv
+pip2 install --requirement ${MKREFPKG_DIR}/requirements2.txt
+pip3 install --requirement ${MKREFPKG_DIR}/requirements3.txt
