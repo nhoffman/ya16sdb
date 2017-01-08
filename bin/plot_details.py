@@ -305,7 +305,7 @@ def main(arguments):
         map_out.writerow(['tax_id', 'html'])
 
     table_data = []
-    by_species = details.groupby(by=['species', 'species_name'])
+    by_species = details.groupby(by=['species', 'species_name'], sort=False)
     by_species = itertools.islice(by_species, args.N)
     for (species_id, species_name), species in by_species:
         if species.x.isnull().all():
