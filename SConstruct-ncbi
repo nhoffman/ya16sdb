@@ -26,7 +26,7 @@ vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nproc', ('Number of concurrent processes '), 14)
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 7)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 5)
 vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
 vrs.Add('base', help='Path to base output directory', default='output-ncbi')
 vrs.Add('out',
@@ -125,19 +125,23 @@ TODO: rename --threads to --server-queries (or something)
 ncbi = env.Command(
     source=None,
     target='$base/esearch.txt',
-    action=('deenurp -v ncbi_esearch '
-            '--retry $retry '
-            '--threads $nreq '
-            '--log $base/ncbi.log '
-            '--out $TARGET '
-            '$email '
-            '"16s[All Fields] AND '
+    action=('esearch '
+            '-db nucleotide '
+            '-query "16s[All Fields] AND '
             'rRNA[Feature Key] AND '
             'Bacteria[Organism] '
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]"'))
+            'AND 500 : 999999999[Sequence Length]" | '
+            'mefetch '
+            '-mode text '
+            '-format acc '
+            '-retry $retry '
+            '-proc $nreq '
+            '-log $base/ncbi.log '
+            '-out $TARGET '
+            '$email'))
 env.AlwaysBuild(ncbi)
 
 """
@@ -150,20 +154,24 @@ NOTE: type_material[Filter] == sequence_from_type[Filter]
 types = env.Command(
     source=ncbi,
     target='$out/types/accessions.txt',
-    action=('deenurp -v ncbi_esearch '
-            '--retry $retry '
-            '--threads $nreq '
-            '--log $base/ncbi.log '
-            '--out $TARGET '
-            '$email '
-            '"sequence_from_type[Filter] AND '
+    action=('esearch '
+            '-db nucleotide '
+            '-query "sequence_from_type[Filter] AND '
             '16s[All Fields] AND '
             'rRNA[Feature Key] AND '
             'Bacteria[Organism] '
             'NOT(environmental samples[Organism] '
             'OR metagenomes[Organism] '
             'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]"'))
+            'AND 500 : 999999999[Sequence Length]" | '
+            'mefetch '
+            '-mode text '
+            '-format acc '
+            '-proc $nreq '
+            '-retry $retry '
+            '-log $base/ncbi.log '
+            '-out $TARGET '
+            '$email'))
 
 """
 Touch these files in case they do not exist yet
