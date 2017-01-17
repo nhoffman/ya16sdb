@@ -41,7 +41,7 @@ def get_color(name, alpha=None):
     return col
 
 
-def paired_plots(data, title=None, text_cols=None):
+def paired_plots(data, title=None, text_cols=['seqname']):
     """Create an interactive scatterplot. ``data`` is a pandas dataframe
     with (at least) column 'dist' in addition to columns
     containing other features. ``text_cols`` is a list of columns to
@@ -51,20 +51,19 @@ def paired_plots(data, title=None, text_cols=None):
 
     """
 
-    text_cols = text_cols or ['seqname']
-
     red = get_color('red', alpha=0.5)
     black = get_color('black', alpha=0.5)
 
-    data['distance'] = ['%0.4f' % x for x in data['dist']]
     data['i'] = range(len(data))
-    data['hit_agrees'] = data.species == data.hit_id
+    data['color'] = data['is_out'].apply(lambda x: red if x else black)
+    data = data.fillna('')
+    data.loc[data['is_out'], 'size'] = 15
+    data.loc[~data['is_out'], 'size'] = 10
 
-    source = ColumnDataSource(data.fillna(''))
+    source = ColumnDataSource(data)
 
-    # start with outliers in table
-    text_data = data[data.is_out][['x', 'y', 'i'] + text_cols]
-    text_source = ColumnDataSource(data=text_data)
+    # start with is_outs in table
+    text_source = ColumnDataSource(data=data[data['is_out']])
 
     callback = CustomJS(
         args=dict(source=source, text_source=text_source),
@@ -93,23 +92,27 @@ def paired_plots(data, title=None, text_cols=None):
         plot_width=600,
         plot_height=600,
         tools=tools,
+        x_axis_label='rank order',
+        y_axis_label='% distance from centroid',
     )
 
     # underlying markers are visible only when selected
     step_plt.scatter(
-        x='i', y='dist',
         source=text_source,
+        size='size',
+        x='i',
+        y='dist_from_cent',
         marker='circle',
-        color=[red if o else black for o in data.is_out],
-        size=15,
+        color='color',
     )
 
     step_plt.scatter(
-        x='i', y='dist',
         source=source,
+        size='size',
+        x='i',
+        y='dist_from_cent',
         marker='circle',
-        color=[red if o else black for o in data.is_out],
-        size=10,
+        color='color',
     )
 
     pca_plt = figure(
@@ -117,31 +120,51 @@ def paired_plots(data, title=None, text_cols=None):
         plot_width=600,
         plot_height=600,
         tools=tools,
+        x_axis_label='distance',
+        y_axis_label='distance'
     )
 
     # underlying markers are visible only when selected
     pca_plt.circle(
-        x='x', y='y',
         source=text_source,
-        color=[red if o else black for o in text_data.is_out],
-        size=15,
+        size='size',
+        x='x',
+        y='y',
+        color='color',
     )
 
     pca_plt.circle(
-        x='x', y='y',
         source=source,
-        color=[red if o else black for o in data.is_out],
-        size=10,
+        size='size',
+        x='x',
+        y='y',
+        color='color',
     )
+
+    formatters = {
+        'seqname': bokeh.models.widgets.tables.HTMLTemplateFormatter(
+            template='<a href="https://www.ncbi.nlm.nih.gov/nuccore/'
+                     '<%= version %>"><%= value %></a>'),
+        'type strain hit': bokeh.models.widgets.tables.HTMLTemplateFormatter(),
+        'description': bokeh.models.widgets.tables.HTMLTemplateFormatter(
+            template='<div title="<%= value %>"><%= value %></div>'),
+        'identity': bokeh.models.widgets.tables.NumberFormatter(format='0.0%'),
+        'dist': bokeh.models.widgets.tables.NumberFormatter(format='0.00%')
+    }
+
+    titles = {
+        'dist': 'distance from centroid'
+    }
 
     tab = DataTable(
         source=text_source,
         columns=[TableColumn(
             field=col,
-            title=col,
-            formatter=bokeh.models.widgets.tables.HTMLTemplateFormatter())
+            title=titles.get(col, col),
+            formatter=formatters.get(col, None))
             for col in text_cols],
         fit_columns=True,
+        row_headers=False,
         width=1200,
         height=1200,
         sortable=True)
@@ -180,7 +203,7 @@ def main(arguments):
         help='location for index.html template [%(default)s]')
     parser.add_argument(
         '--log',
-        help="output of 'deenurp filter_outliers --log'",
+        help="output of 'deenurp filter_is_outs --log'",
         type=argparse.FileType('r'))
 
     parser.add_argument(
@@ -241,6 +264,7 @@ def main(arguments):
         args.hits,
         header=None,
         dtype={'seqname': str, 'hit': str, 'pct_id': float},
+        na_filter=False,
         names=['seqname', 'hit', 'pct_id'],
         usecols=['seqname', 'hit', 'pct_id'])
     hits = hits.set_index('seqname')
@@ -251,12 +275,13 @@ def main(arguments):
         usecols=['seqname', 'tax_id', 'version'])
     hit_info = hit_info.set_index('seqname')
 
-    cols = ['seqname', 'tax_id', 'ambig_count', 'centroid', 'version',
-            'cluster', 'dist', 'is_out', 'species', 'x', 'y']
+    cols = ['seqname', 'tax_id', 'ambig_count', 'centroid',
+            'version', 'cluster', 'dist', 'is_out', 'species',
+            'x', 'y', 'is_type', 'description']
     details = pd.read_csv(
         args.details,
         usecols=cols,
-        dtype={'species': str, 'tax_id': str, 'version': str})
+        dtype={'species': str, 'tax_id': str, 'version': str, 'dist': float})
     details = details.set_index('seqname')
 
     hits = hits.join(hit_info, on='hit')  # get tax_id
@@ -264,7 +289,7 @@ def main(arguments):
     hits = hits.join(species, on='species')  # get species tax name
     hits = hits.rename(
         columns={'species': 'hit_id',
-                 'tax_name': 'hit_tax_name',
+                 'tax_name': 'type strain hit',
                  'version': 'hit_version'})
     hits = hits.drop('tax_id', axis=1)  # we only care about the species_id
 
@@ -272,23 +297,27 @@ def main(arguments):
     details = details.join(hits)
     details = details.reset_index()  # move seqname back as a column
 
-    # make the hit_name link back to an ncbi url to the actual record
-    url = '<a href="https://www.ncbi.nlm.nih.gov/nuccore/{}">{}</a>'
-
     # output file purposes
     details.loc[:, 'species_name'] = details['tax_name']
 
-    def seq_ncbi_link(row):
-        return url.format(row['version'], row['tax_name'])
-    details.loc[:, 'tax_name'] = details.apply(seq_ncbi_link, axis=1)
+    # make the hit_name link back to an ncbi url to the actual record
+    url = '<a href="https://www.ncbi.nlm.nih.gov/nuccore/{}">{}</a>'
 
     def hit_ncbi_link(row):
-        if pd.isnull(row['hit_tax_name']):
+        if pd.isnull(row['type strain hit']):
             tag = ''
         else:
-            tag = url.format(row['hit_version'], row['hit_tax_name'])
+            tag = url.format(row['hit_version'], row['type strain hit'])
         return tag
-    details.loc[:, 'hit_tax_name'] = details.apply(hit_ncbi_link, axis=1)
+    details.loc[:, 'type strain hit'] = details.apply(hit_ncbi_link, axis=1)
+
+    details['outlier'] = details['is_out'].apply(
+        lambda x: 'yes' if x else '')
+    details['type strain'] = details['is_type'].apply(
+        lambda x: 'yes' if x else '')
+    # to retain sorting and use with NumberFormatter
+    details['identity'] = details['pct_id'] / 100
+    details['dist_from_cent'] = details['dist'] * 100
 
     # define table layout for index page
     table = gviz_api.DataTable(
@@ -296,7 +325,7 @@ def main(arguments):
          ('species', 'string'),
          ('records', 'number'),
          ('clustered', 'boolean'),
-         ('outliers', 'number'),
+         ('is_outs', 'number'),
          ('pct out', 'number')]
     )
 
@@ -319,11 +348,13 @@ def main(arguments):
             title=species_name,
             text_cols=[
                 'seqname',
+                'description',
+                'type strain',
                 'dist',
-                'is_out',
-                'tax_name',
-                'pct_id',
-                'hit_tax_name'])
+                'outlier',
+                'type strain hit',
+                'identity'
+            ])
 
         filename = '{}.html'.format(label)
         output_file(
@@ -334,7 +365,7 @@ def main(arguments):
         if args.plot_map:
             map_out.writerow([species_id, filename])
 
-        n_out = sum(species.is_out)
+        n_out = sum(species['is_out'])
         pct_out = (100.0 * n_out) / len(species)
         clustered = not (species.cluster == -1).all()
 
