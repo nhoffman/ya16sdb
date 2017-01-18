@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+generates plots of species level sequence filtering
 """
 
 import argparse
@@ -15,10 +16,12 @@ import pandas as pd
 import sys
 
 import bokeh
-from bokeh.plotting import figure, save, output_file, ColumnDataSource
+from bokeh.embed import file_html
+from bokeh.plotting import figure, ColumnDataSource
 from bokeh.models import CustomJS
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import gridplot
+from bokeh.resources import CSSResources, JSResources
 
 # from bokeh import colors
 
@@ -28,6 +31,21 @@ logging.basicConfig(
     level=logging.WARNING)
 
 log = logging
+
+# total pixel width = 1220
+TABLE_WIDTHS = {
+    'seqname': 175,
+    'description': 410,
+    'type strain': 80,
+    'dist': 175,
+    'outlier': 80,
+    'type strain hit': 200,
+    'identity': 100
+}
+
+TABLE_HEADER = {
+    'dist': 'distance from centroid'
+}
 
 
 def get_color(name, alpha=None):
@@ -60,7 +78,7 @@ def paired_plots(data, title=None, text_cols=['seqname']):
     data.loc[data['is_out'], 'size'] = 15
     data.loc[~data['is_out'], 'size'] = 10
 
-    source = ColumnDataSource(data)
+    source = ColumnDataSource(data=data)
 
     # start with is_outs in table
     text_source = ColumnDataSource(data=data[data['is_out']])
@@ -93,7 +111,7 @@ def paired_plots(data, title=None, text_cols=['seqname']):
         plot_height=600,
         tools=tools,
         x_axis_label='rank order',
-        y_axis_label='% distance from centroid',
+        y_axis_label='distance from centroid (%)',
     )
 
     # underlying markers are visible only when selected
@@ -144,7 +162,8 @@ def paired_plots(data, title=None, text_cols=['seqname']):
     formatters = {
         'seqname': bokeh.models.widgets.tables.HTMLTemplateFormatter(
             template='<a href="https://www.ncbi.nlm.nih.gov/nuccore/'
-                     '<%= version %>"><%= value %></a>'),
+                     '<%= version %>">'
+                     '<div title="<%= value %>"><%= value %></div></a>'),
         'type strain hit': bokeh.models.widgets.tables.HTMLTemplateFormatter(),
         'description': bokeh.models.widgets.tables.HTMLTemplateFormatter(
             template='<div title="<%= value %>"><%= value %></div>'),
@@ -152,18 +171,15 @@ def paired_plots(data, title=None, text_cols=['seqname']):
         'dist': bokeh.models.widgets.tables.NumberFormatter(format='0.00%')
     }
 
-    titles = {
-        'dist': 'distance from centroid'
-    }
-
     tab = DataTable(
         source=text_source,
         columns=[TableColumn(
             field=col,
-            title=titles.get(col, col),
+            title=TABLE_HEADER.get(col, col),
+            width=TABLE_WIDTHS[col],
             formatter=formatters.get(col, None))
             for col in text_cols],
-        fit_columns=True,
+        fit_columns=False,
         row_headers=False,
         width=1200,
         height=1200,
@@ -199,8 +215,12 @@ def main(arguments):
         help='colon separated index.html information')
     parser.add_argument(
         '--index-template',
-        default='data/index.html.jinja2',
+        default='data/index.jinja',
         help='location for index.html template [%(default)s]')
+    parser.add_argument(
+        '--plot-template',
+        default='data/plot.jinja',
+        help='location for the plot template [%(default)s]')
     parser.add_argument(
         '--log',
         help="output of 'deenurp filter_is_outs --log'",
@@ -301,13 +321,16 @@ def main(arguments):
     details.loc[:, 'species_name'] = details['tax_name']
 
     # make the hit_name link back to an ncbi url to the actual record
-    url = '<a href="https://www.ncbi.nlm.nih.gov/nuccore/{}">{}</a>'
+    url = ('<a href="https://www.ncbi.nlm.nih.gov/nuccore/{version}">'
+           '<div title="{hit}">{hit}</div></a>')
 
     def hit_ncbi_link(row):
         if pd.isnull(row['type strain hit']):
             tag = ''
         else:
-            tag = url.format(row['hit_version'], row['type strain hit'])
+            tag = url.format(
+                **{'version': row['hit_version'],
+                   'hit': row['type strain hit']})
         return tag
     details.loc[:, 'type strain hit'] = details.apply(hit_ncbi_link, axis=1)
 
@@ -356,11 +379,16 @@ def main(arguments):
                 'identity'
             ])
 
+        html = file_html(
+            gridplot([[step_plt, pca_plt], [tab]]),
+            resources=(
+                JSResources(mode='cdn'),
+                CSSResources(mode='cdn')),
+            title=species_name,
+            template=jinja2.Template(open(args.plot_template, 'r').read()))
         filename = '{}.html'.format(label)
-        output_file(
-            filename=os.path.join(args.plot_dir, filename),
-            title=species_name)
-        save(gridplot([[step_plt, pca_plt], [tab]]))
+        with open(os.path.join(args.plot_dir, filename), 'w') as out:
+            out.write(html)
 
         if args.plot_map:
             map_out.writerow([species_id, filename])
