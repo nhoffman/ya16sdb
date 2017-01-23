@@ -11,6 +11,7 @@ import gviz_api
 import jinja2
 import json
 import logging
+import math
 import os
 import pandas as pd
 import sys
@@ -35,8 +36,9 @@ log = logging
 # total pixel width = 1220
 TABLE_WIDTHS = {
     'seqname': 175,
-    'description': 410,
+    'description': 330,
     'type strain': 80,
+    'weight': 80,
     'dist': 175,
     'outlier': 80,
     'type strain hit': 200,
@@ -44,19 +46,9 @@ TABLE_WIDTHS = {
 }
 
 TABLE_HEADER = {
-    'dist': 'distance from centroid'
+    'dist': 'distance from centroid',
+    'weight': 'reps'
 }
-
-
-def get_color(name, alpha=None):
-
-    col = getattr(bokeh.colors, name).copy()
-
-    if alpha is not None:
-        assert 0.0 <= alpha <= 1.0
-        col.a = alpha
-
-    return col
 
 
 def paired_plots(data, title=None, text_cols=['seqname']):
@@ -68,39 +60,18 @@ def paired_plots(data, title=None, text_cols=['seqname']):
     Returns a pair of plot objects (plt, tab).
 
     """
-
-    red = get_color('red', alpha=0.5)
-    black = get_color('black', alpha=0.5)
-
     data['i'] = range(len(data))
-    data['color'] = data['is_out'].apply(lambda x: red if x else black)
     data = data.fillna('')
-    data.loc[data['is_out'], 'size'] = 15
-    data.loc[~data['is_out'], 'size'] = 10
+    data['select_alpha'] = data['is_type'].apply(lambda x: 0 if x else 1)
+    data['unselect_alpha'] = data['is_type'].apply(lambda x: 0 if x else 0.2)
+    data['out_alpha'] = data['is_out'].apply(lambda x: 1 if x else 0)
+    data['size'] = data['weight'].apply(lambda x: math.log(3 * x, 3) * 10)
+    data['triangle_size'] = data['size'] * 1.1
 
     source = ColumnDataSource(data=data)
-
+    types = ColumnDataSource(data=data[data['is_type']])
     # start with is_outs in table
-    text_source = ColumnDataSource(data=data[data['is_out']])
-
-    callback = CustomJS(
-        args=dict(source=source, text_source=text_source),
-        code="""
-        var inds = cb_obj.get('selected')['1d'].indices;
-        var data = source.get('data');
-        var text_data = text_source.get('data');
-
-        for (var column in text_data){
-            text_data[column] = [];
-            for (var i = 0; i < inds.length; i++) {
-                var ind = inds[i];
-                text_data[column].push(data[column][ind])
-            }
-        }
-
-        source.trigger('change');
-        text_source.trigger('change');
-        """)
+    table_rows = ColumnDataSource(data=data[data['is_out']])
 
     tools = ['box_select', 'lasso_select', 'resize',
              'box_zoom', 'pan', 'reset', 'tap']
@@ -116,21 +87,49 @@ def paired_plots(data, title=None, text_cols=['seqname']):
 
     # underlying markers are visible only when selected
     step_plt.scatter(
-        source=text_source,
-        size='size',
+        source=ColumnDataSource(data=data[data['is_out']]),
         x='i',
         y='dist_from_cent',
+        color='red',
+        fill_alpha='out_alpha',
+        line_alpha='select_alpha',
         marker='circle',
-        color='color',
+        size='size'
+    )
+
+    # underlying markers are visible only when selected
+    step_plt.scatter(
+        source=table_rows,
+        fill_alpha=0,
+        line_alpha='select_alpha',
+        x='i',
+        y='dist_from_cent',
+        color='gray',
+        marker='circle',
+        size='size'
+    )
+
+    step_plt.scatter(
+        source=types,
+        fill_alpha='out_alpha',
+        color='red',
+        line_alpha=1,
+        line_color='red',
+        x='i',
+        y='dist_from_cent',
+        marker='triangle',
+        size='triangle_size'
     )
 
     step_plt.scatter(
         source=source,
-        size='size',
+        fill_alpha=0,
+        line_alpha='unselect_alpha',
+        line_color='gray',
         x='i',
         y='dist_from_cent',
         marker='circle',
-        color='color',
+        size='size'
     )
 
     pca_plt = figure(
@@ -142,21 +141,45 @@ def paired_plots(data, title=None, text_cols=['seqname']):
         y_axis_label='distance'
     )
 
+    pca_plt.circle(
+        source=ColumnDataSource(data=data[data['is_out']]),
+        size='size',
+        fill_alpha='out_alpha',
+        line_alpha='select_alpha',
+        x='x',
+        y='y',
+        color='red',
+    )
+
     # underlying markers are visible only when selected
     pca_plt.circle(
-        source=text_source,
+        source=table_rows,
+        line_alpha='select_alpha',
+        fill_alpha=0,
         size='size',
         x='x',
         y='y',
-        color='color',
+        color='gray',
+    )
+
+    pca_plt.triangle(
+        source=types,
+        line_color='red',
+        fill_alpha='out_alpha',
+        line_alpha=1,
+        size='triangle_size',
+        x='x',
+        y='y',
     )
 
     pca_plt.circle(
         source=source,
+        fill_alpha=0,
+        line_alpha='unselect_alpha',
+        line_color='gray',
         size='size',
         x='x',
         y='y',
-        color='color',
     )
 
     formatters = {
@@ -172,7 +195,7 @@ def paired_plots(data, title=None, text_cols=['seqname']):
     }
 
     tab = DataTable(
-        source=text_source,
+        source=table_rows,
         columns=[TableColumn(
             field=col,
             title=TABLE_HEADER.get(col, col),
@@ -185,8 +208,31 @@ def paired_plots(data, title=None, text_cols=['seqname']):
         height=1200,
         sortable=True)
 
+    code = """
+        var inds = cb_obj.selected['1d'].indices;
+        var data = source.data;
+        var text_data = text_source.data;
+
+        for (var column in text_data){
+            text_data[column] = [];
+            for (var i = 0; i < inds.length; i++) {
+                var ind = inds[i];
+                text_data[column].push(data[column][ind])
+            }
+        }
+
+        source.trigger('change');
+        text_source.trigger('change');
+        table.trigger('change');
+        """
+
     # note that the callback is added to the source for the scatter plot only
-    source.callback = callback
+    source.callback = CustomJS(
+        args=dict(
+            source=source,
+            table=tab,
+            text_source=table_rows),
+        code=code)
 
     return step_plt, pca_plt, tab
 
@@ -297,11 +343,16 @@ def main(arguments):
 
     cols = ['seqname', 'tax_id', 'ambig_count', 'centroid',
             'version', 'cluster', 'dist', 'is_out', 'species',
-            'x', 'y', 'is_type', 'description']
+            'x', 'y', 'is_type', 'description', 'weight']
     details = pd.read_csv(
         args.details,
         usecols=cols,
-        dtype={'species': str, 'tax_id': str, 'version': str, 'dist': float})
+        dtype={
+            'species': str,
+            'tax_id': str,
+            'version': str,
+            'dist': float,
+            'weight': int})
     details = details.set_index('seqname')
 
     hits = hits.join(hit_info, on='hit')  # get tax_id
@@ -310,7 +361,8 @@ def main(arguments):
     hits = hits.rename(
         columns={'species': 'hit_id',
                  'tax_name': 'type strain hit',
-                 'version': 'hit_version'})
+                 'version': 'hit_version'
+                 })
     hits = hits.drop('tax_id', axis=1)  # we only care about the species_id
 
     details = details.join(species, on='species')  # get species tax name
@@ -373,6 +425,7 @@ def main(arguments):
                 'seqname',
                 'description',
                 'type strain',
+                'weight',
                 'dist',
                 'outlier',
                 'type strain hit',
