@@ -33,20 +33,15 @@ fi
 ${DEENURP}/bin/bootstrap.sh $venv
 
 # install Python3
-virtualenv $venv
-pyvenv --without-pip $venv
+python3.6 -m venv --copies $venv
 source $venv/bin/activate
-wget --quiet --output-document src/get-pip.py https://bootstrap.pypa.io/get-pip.py
-python3 src/get-pip.py
 
 if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
   (cd src &&
    wget -nc --user anonymous --password $(git config user.email) \
       ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
-   tar tzf $BLAST_GZ |
-   grep makeblastdb |
-   xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
+   tar tzf $BLAST_GZ | grep makeblastdb | xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
 else
   echo "makeblastdb is already installed: $(makeblastdb -version)"
 fi
