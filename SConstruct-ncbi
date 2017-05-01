@@ -273,7 +273,7 @@ vsearch = env.Command(
             '--usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
             '--id 0.70 '
-            #  '--query_cov 1.0 '  # this filters too much for some reason
+            #  '--query_cov 1.0 '  # this filters too much, unfortunately
             '--userfields query+target+qstrand+id+tilo+tihi '
             '--strand both '
             '--top_hits_only '
@@ -351,6 +351,8 @@ tax = env.Command(
     source=seq_info,
     action=('taxit -v taxtable '
             '--seq-info $SOURCE '
+            '--clade-ids 2 '  # Bacteria
+            '--from-scratch '
             '--valid '
             '--ranked '
             '--out $TARGET '
@@ -403,6 +405,7 @@ types_tax = env.Command(
     target='$out/1200bp/classified/types/taxonomy.csv',
     source=[types_info, tax],
     action=('taxit -v taxtable '
+            '--from-scratch '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '--schema ncbi '
@@ -484,6 +487,19 @@ filtered_fa, filtered_info, filtered_details = env.Command(
             Copy('$base/cache/details.csv', '${TARGETS[2]}')],
     slurm_queue='full')
 
+"""
+Make filtered taxtable
+"""
+filtered_tax = env.Command(
+    target='$out/1200bp/classified/filtered/taxonomy.csv',
+    source=[filtered_info, tax],
+    action=('taxit -v taxtable '
+            '--from-scratch '
+            '--seq-info ${SOURCES[1]} '
+            '--out-file $TARGET '
+            '--schema ncbi '
+            '$tax_url'))
+
 # find top hit for each sequence among type strains
 type_hits = env.Command(
     target='$out/1200bp/classified/filtered/vsearch.blast6out',
@@ -518,18 +534,6 @@ env.Command(
             '--plot-index ${TARGETS[0]} '
             '2> /dev/null'
             ))
-
-"""
-Make filtered taxtable
-"""
-filtered_tax = env.Command(
-    target='$out/1200bp/classified/filtered/taxonomy.csv',
-    source=[filtered_info, tax],
-    action=('taxit -v taxtable '
-            '--seq-info ${SOURCES[1]} '
-            '--out-file $TARGET '
-            '--schema ncbi '
-            '$tax_url'))
 
 blast_db(env, filtered_fa, '$out/1200bp/classified/filtered/blast')
 
