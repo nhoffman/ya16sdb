@@ -273,7 +273,6 @@ vsearch = env.Command(
             '--usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
             '--id 0.70 '
-            #  '--query_cov 1.0 '  # this filters too much, unfortunately
             '--userfields query+target+qstrand+id+tilo+tihi '
             '--strand both '
             '--top_hits_only '
@@ -352,7 +351,6 @@ tax = env.Command(
     action=('taxit -v taxtable '
             '--seq-info $SOURCE '
             '--clade-ids 2 '  # Bacteria
-            '--from-scratch '
             '--valid '
             '--ranked '
             '--out $TARGET '
@@ -403,9 +401,9 @@ Make type strain taxtable
 """
 types_tax = env.Command(
     target='$out/1200bp/classified/types/taxonomy.csv',
-    source=[types_info, tax],
+    source=[tax, types_info],
     action=('taxit -v taxtable '
-            '--from-scratch '
+            '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
             '--schema ncbi '
@@ -441,33 +439,43 @@ dedup_fa, dedup_info = env.Command(
 """
 dereplicate sequences using vsearch clustering to reduce giant species
 clusters like Bacilius genus and E. Coli
+
+NOTE: we might not need to do this anymore now that filter_outliers has enough
+resources to finish in a reasonable amount of time
 """
-derep_fa, derep_info, derep_map = env.Command(
-    target=['$out/1200bp/classified/derep/seqs.fasta',
-            '$out/1200bp/classified/derep/seq_info.csv',
-            '$out/1200bp/classified/derep/map.csv'],
-    source=[dedup_fa, dedup_info, tax],
-    action=('deenurp -v dereplicate_named '
-            '--id 1.0 '
-            '--group-on species '
-            '--taxonomy ${SOURCES[2]} '
-            '--seqs-out ${TARGETS[0]} '
-            '--seq-info-out ${TARGETS[1]} '
-            '--derep-map-out ${TARGETS[2]} '
-            '${SOURCES[:2]}'))
+# derep_fa, derep_info = env.Command(
+#     target=['$out/1200bp/classified/dedup/derep/seqs.fasta',
+#             '$out/1200bp/classified/dedup/derep/seq_info.csv',
+#             '$out/1200bp/classified/dedup/derep/map.csv'],
+#     source=[dedup_fa, dedup_info, tax],
+#     action=('deenurp -v dereplicate_named '
+#             '--id 1.0 '
+#             '--group-on species '
+#             '--taxonomy ${SOURCES[2]} '
+#             '--seqs-out ${TARGETS[0]} '
+#             '--seq-info-out ${TARGETS[1]} '
+#             '--derep-map-out ${TARGETS[2]} '
+#             '${SOURCES[:2]}'))
+
+filtered_details_in = env.Command(
+    source=None,
+    target='$out/1200bp/classified/filtered/details_in.csv',
+    action=('taxit update_taxids '
+            '--schema ncbi '
+            '--out $TARGET '
+            '$base/filtered_details.csv $tax_url'))
 
 """
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 
-FIXME: consider first running taxit update_taxids on previous-details
-FIXME: create a new taxtable for derep_fasta and derep_info
+FIXME: I have switched to the dedup set for testing purposes
 """
 filtered_fa, filtered_info, filtered_details = env.Command(
-    source=[derep_fa, derep_info, tax],
+    source=[dedup_fa, dedup_info, tax, filtered_details_in],
     target=['$out/1200bp/classified/filtered/seqs.fasta',
             '$out/1200bp/classified/filtered/seq_info.csv',
-            '$out/1200bp/classified/filtered/details.csv'],
+            '$out/1200bp/classified/filtered/details_out.csv'],
     action=['deenurp -vvv filter_outliers '
             '--log $base/deenurp.log '
             '--filter-rank species '
@@ -476,37 +484,47 @@ filtered_fa, filtered_info, filtered_details = env.Command(
             '--output-seqs ${TARGETS[0]}  '
             '--filtered-seqinfo ${TARGETS[1]} '
             '--detailed-seqinfo ${TARGETS[2]} '
-            '--previous-details $base/cache/details.csv '
+            '--previous-details ${SOURCES[3]} '
             '--strategy cluster '
             '--cluster-type single '
             '--distance-percentile 90.0 '
             '--min-distance 0.01 '
             '--max-distance 0.02 '
             '--min-seqs-for-filtering 10 '
-            '$SOURCES',
-            Copy('$base/cache/details.csv', '${TARGETS[2]}')],
-    slurm_queue='full')
+            '${SOURCES[:3]}',
+            # cache this
+            Copy('$base/filtered_details.csv', '${TARGETS[2]}')])
 
 """
 Make filtered taxtable
 """
 filtered_tax = env.Command(
     target='$out/1200bp/classified/filtered/taxonomy.csv',
-    source=[filtered_info, tax],
+    source=[tax, filtered_info],
     action=('taxit -v taxtable '
-            '--from-scratch '
+            '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out-file $TARGET '
             '--schema ncbi '
             '$tax_url'))
 
-# find top hit for each sequence among type strains
+'''
+find top hit for each sequence among type strains
+
+take --maxaccepts 2 so we can filter out hits where the query and target
+sequences are the same
+'''
 type_hits = env.Command(
     target='$out/1200bp/classified/filtered/vsearch.blast6out',
-    source=[derep_fa, types_fasta],
-    action=('vsearch --usearch_global ${SOURCES[0]} --db ${SOURCES[1]} '
-            '--blast6out $TARGET --id 0.75 --threads 12 '
-            '--maxaccepts 1 --strand plus'))
+    source=[dedup_fa, types_fasta],
+    action=('vsearch --usearch_global ${SOURCES[0]} '
+            '--db ${SOURCES[1]} '
+            '--blast6out $TARGET '
+            '--id 0.75 '
+            '--self '  # reject same sequence hits
+            '--threads 12 '
+            '--maxaccepts 1 '
+            '--strand plus'))
 
 '''
 bokeh plot filtered sequences
@@ -520,7 +538,7 @@ TODO: include derep_map.csv to input for
 '''
 env.Command(
     target=['$out/1200bp/classified/filtered/index.html',
-            '$out/1200bp/classified/filtered/plots/index.html'],
+            '$out/1200bp/classified/filtered/plots/map.csv'],
     source=[filtered_details, tax, type_hits, types_info],
     action=('plot_details.py $SOURCES '
             '--param strategy:cluster '
@@ -529,10 +547,9 @@ env.Command(
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
             '--log $base/deenurp.log '
-            '--plot-dir $out/filtered/plots '
+            '--plot-dir $out/1200bp/classified/filtered/plots '
             '--plot-map ${TARGETS[1]} '
-            '--plot-index ${TARGETS[0]} '
-            '2> /dev/null'
+            '--plot-index ${TARGETS[0]}'
             ))
 
 blast_db(env, filtered_fa, '$out/1200bp/classified/filtered/blast')
