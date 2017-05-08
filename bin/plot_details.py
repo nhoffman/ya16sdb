@@ -1,7 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 """
 generates plots of species level sequence filtering
+
+NOTE: git+https://github.com/google/google-visualization-python.git
+NOT compatible with py3
 """
 
 import argparse
@@ -11,7 +14,6 @@ import gviz_api
 import jinja2
 import json
 import logging
-import math
 import os
 import pandas as pd
 import sys
@@ -35,10 +37,9 @@ log = logging
 
 # total pixel width = 1220
 TABLE_WIDTHS = {
-    'seqname': 175,
-    'description': 330,
+    'seqname': 215,
+    'description': 370,
     'type strain': 80,
-    'weight': 80,
     'dist': 175,
     'outlier': 80,
     'type strain hit': 200,
@@ -47,7 +48,6 @@ TABLE_WIDTHS = {
 
 TABLE_HEADER = {
     'dist': 'distance from centroid',
-    'weight': 'reps'
 }
 
 
@@ -65,7 +65,7 @@ def paired_plots(data, title=None, text_cols=['seqname']):
     data['select_alpha'] = data['is_type'].apply(lambda x: 0 if x else 1)
     data['unselect_alpha'] = data['is_type'].apply(lambda x: 0 if x else 0.2)
     data['out_alpha'] = data['is_out'].apply(lambda x: 1 if x else 0)
-    data['size'] = data['weight'].apply(lambda x: math.log(3 * x, 3) * 10)
+    data['size'] = 10
     data['triangle_size'] = data['size'] * 1.1
 
     source = ColumnDataSource(data=data)
@@ -343,7 +343,7 @@ def main(arguments):
 
     cols = ['seqname', 'tax_id', 'ambig_count', 'centroid',
             'version', 'cluster', 'dist', 'is_out', 'species',
-            'x', 'y', 'is_type', 'description', 'weight']
+            'x', 'y', 'is_type', 'description']
     details = pd.read_csv(
         args.details,
         usecols=cols,
@@ -351,8 +351,7 @@ def main(arguments):
             'species': str,
             'tax_id': str,
             'version': str,
-            'dist': float,
-            'weight': int})
+            'dist': float})
     details = details.set_index('seqname')
 
     hits = hits.join(hit_info, on='hit')  # get tax_id
@@ -420,12 +419,11 @@ def main(arguments):
 
         step_plt, pca_plt, tab = paired_plots(
             species,
-            title=species_name,
+            title='{} - {}'.format(species_id, species_name),
             text_cols=[
                 'seqname',
                 'description',
                 'type strain',
-                'weight',
                 'dist',
                 'outlier',
                 'type strain hit',
@@ -434,10 +432,8 @@ def main(arguments):
 
         html = file_html(
             gridplot([[step_plt, pca_plt], [tab]]),
-            resources=(
-                JSResources(mode='cdn'),
-                CSSResources(mode='cdn')),
-            title=species_name,
+            (JSResources(mode='cdn'), CSSResources(mode='cdn')),
+            title='{} - {}'.format(species_id, species_name),
             template=jinja2.Template(open(args.plot_template, 'r').read()))
         filename = '{}.html'.format(label)
         with open(os.path.join(args.plot_dir, filename), 'w') as out:
