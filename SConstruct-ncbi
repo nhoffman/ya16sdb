@@ -288,8 +288,8 @@ vsearch = env.Command(
 4) Deduplicate pubmed_ids and references from
    multiple 16s regions per accession
 5) Append seqs, seq_info, pubmed_ids and references to previous data set
-7) drop seqnames missing eigher a sequence or row in seq_info and sequences
-   filtered out of the vsearch 16s alignment
+7) drop seqnames missing eigher a sequence or row in seq_info, sequences
+   filtered out of the vsearch 16s alignment or sequences with unknown tax_ids
 8) Copy full dataset back to base dir for next download
 
 NOTE: seqs that failed either the vsearch or taxit update_taxids will
@@ -460,10 +460,11 @@ resources to finish in a reasonable amount of time
 filtered_details_in = env.Command(
     source=None,
     target='$out/1200bp/classified/filtered/details_in.csv',
-    action=('taxit update_taxids '
+    action=[Touch('$base/filtered_details.csv'),
+            'taxit update_taxids '
             '--schema ncbi '
             '--out $TARGET '
-            '$base/filtered_details.csv $tax_url'))
+            '$base/filtered_details.csv $tax_url'])
 
 """
 Filter sequences. Use --threads if you need to to limit the number
@@ -504,7 +505,7 @@ filtered_tax = env.Command(
     action=('taxit -v taxtable '
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
-            '--out-file $TARGET '
+            '--out $TARGET '
             '--schema ncbi '
             '$tax_url'))
 
