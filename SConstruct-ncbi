@@ -186,7 +186,7 @@ not present to pass to entrez.py for download.
 versions = env.Command(
     target='$out/new/versions.txt',
     source=['data/blacklist.txt', ncbi],
-    action=['cat $version_cache ${SOURCES[0]} | '
+    action=['cat $versions_cache ${SOURCES[0]} | '
             'grep '
             '--invert-match '
             '--fixed-strings '
