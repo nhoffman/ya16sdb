@@ -12,8 +12,7 @@ from bioscons.slurm import SlurmEnvironment
 
 # requirements installed in the virtualenv
 from SCons.Script import (
-    Variables, PathVariable, BoolVariable,
-    ARGUMENTS, Help, Touch, Copy)
+    Variables, PathVariable, BoolVariable, ARGUMENTS, Help, Copy)
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
@@ -43,6 +42,13 @@ vrs.Add(PathVariable('training_set',
 vrs.Add(PathVariable('blacklist',
                      'path to custom accession blacklist',
                      'data/blacklist.txt'))
+
+# cache
+vrs.Add('seqs_cache', default='$base/seqs.fasta')
+vrs.Add('seq_info_cache', default='$base/seq_info.csv')
+vrs.Add('pubmed_ids_cache', default='$base/pubmed_ids.csv')
+vrs.Add('references_cache', default='$base/references.csv')
+vrs.Add('versions_cache', default='$base/versions.txt')
 
 # Provides access to options prior to instantiation of env object
 # below; it's better to access variables through the env object.
@@ -180,8 +186,7 @@ not present to pass to entrez.py for download.
 versions = env.Command(
     target='$out/new/versions.txt',
     source=['data/blacklist.txt', ncbi],
-    action=[Touch('$base/versions.txt'),
-            'cat $base/versions.txt ${SOURCES[0]} | '
+    action=['cat $version_cache ${SOURCES[0]} | '
             'grep '
             '--invert-match '
             '--fixed-strings '
@@ -282,7 +287,7 @@ vsearch = env.Command(
             '--userout $TARGET'))
 
 """
-1) Fix sequence orientations
+1) Fix sequence orientation of new sequences
 2) Remove sequences not in 16s region
 3) Add is_type column
 4) Deduplicate pubmed_ids and references from
@@ -302,18 +307,18 @@ all_fa, all_info, pubmed_ids, references, _ = env.Command(
             '$out/pubmed_ids.csv',
             '$out/references.csv',
             '$out/versions.txt'],
-    source=[new_fasta, '$base/seqs.fasta',
-            known_info, '$base/seq_info.csv',
-            new_pubmed_ids, '$base/pubmed_ids.csv',
-            new_references, '$base/references.csv',
-            no_features, '$base/versions.txt',
+    source=[new_fasta, '$seqs_cache',
+            known_info, '$seq_info_cache',
+            new_pubmed_ids, '$pubmed_ids_cache',
+            new_references, '$references_cache',
+            no_features, '$versions_cache',
             vsearch, types],
     action=['annotate_and_append.py $SOURCES $TARGETS',
             # cache for next download
-            Copy('$base/seqs.fasta', '${TARGETS[0]}'),
-            Copy('$base/pubmed_ids.csv', '${TARGETS[2]}'),
-            Copy('$base/references.csv', '${TARGETS[3]}'),
-            Copy('$base/versions.txt', '${TARGETS[4]}')])
+            Copy('$seqs_cache', '${TARGETS[0]}'),
+            Copy('$pubmed_ids_cache', '${TARGETS[2]}'),
+            Copy('$references_cache', '${TARGETS[3]}'),
+            Copy('$versions_cache', '${TARGETS[4]}')])
 
 """
 update tax_ids and append taxid_classified column
@@ -326,7 +331,7 @@ update_all_info = env.Command(
             '--out $TARGET '
             '--schema ncbi '
             '$SOURCE $tax_url',
-            Copy('$base/seq_info.csv', '$TARGET')])
+            Copy('$seq_info_cache', '$TARGET')])
 
 """
 pull sequences at least 1200 bp and less than 1% ambiguous
