@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 seq_info_columns = ['seqname', 'version', 'accession', 'name',
                     'description', 'gi', 'tax_id', 'date', 'source',
                     'keywords', 'organism', 'length', 'ambig_count',
-                    'is_type', 'seq_start', 'seq_stop']
+                    'seq_start', 'seq_stop']
 
 reference_columns = ['pubmed_id', 'medline_id', 'title',
                      'authors', 'journal', 'consrtm', 'comment']
@@ -137,18 +137,18 @@ def parse_record(record):
 
     info = dict(accession=accession,
                 ambig_count=count_ambiguous(record.seq),
-                length=len(record),
-                seqname=seq_id,
                 date=record.annotations['date'],
                 description=record.description,
                 gi=record.annotations.get('gi', ''),
                 keywords=';'.join(record.annotations.get('keywords', [])),
+                length=len(record),
                 name=record.name,
                 organism=organism,
-                source=record.annotations['source'],
-                tax_id=tax_id,
                 seq_start=seq_start,
                 seq_stop=seq_stop,
+                seqname=seq_id,
+                source=record.annotations['source'],
+                tax_id=tax_id,
                 version=version)
     return info
 
