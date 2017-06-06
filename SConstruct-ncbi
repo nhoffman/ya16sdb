@@ -278,6 +278,7 @@ vsearch = env.Command(
             '--usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
             '--id 0.70 '
+            '--threads 14 '
             '--userfields query+target+qstrand+id+tilo+tihi '
             '--strand both '
             '--top_hits_only '
@@ -463,13 +464,9 @@ resources to finish in a reasonable amount of time
 #             '${SOURCES[:2]}'))
 
 filtered_details_in = env.Command(
-    source=None,
+    source='$base/filtered_details.csv',
     target='$out/1200bp/classified/filtered/details_in.csv',
-    action=[Touch('$base/filtered_details.csv'),
-            'taxit update_taxids '
-            '--schema ncbi '
-            '--out $TARGET '
-            '$base/filtered_details.csv $tax_url'])
+    action='taxit update_taxids --schema ncbi --out $TARGET $SOURCE $tax_url')
 
 """
 Filter sequences. Use --threads if you need to to limit the number
@@ -483,7 +480,7 @@ filtered_fa, filtered_info, filtered_details = env.Command(
             '$out/1200bp/classified/filtered/seq_info.csv',
             '$out/1200bp/classified/filtered/details_out.csv'],
     action=['deenurp -vvv filter_outliers '
-            '--log $base/deenurp.log '
+            '--log $out/1200bp/classified/filtered/deenurp.log '
             '--filter-rank species '
             '--threads-per-job 14 '
             '--jobs 1 '
@@ -527,6 +524,7 @@ type_hits = env.Command(
             '--db ${SOURCES[1]} '
             '--blast6out $TARGET '
             '--id 0.75 '
+            '--threads 14 '
             '--self '  # reject same sequence hits
             '--threads 12 '
             '--maxaccepts 1 '
