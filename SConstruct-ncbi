@@ -2,7 +2,6 @@
 Download and curate the NCBI 16S rRNA sequences
 """
 
-import ConfigParser
 import datetime
 import errno
 import os
@@ -56,16 +55,6 @@ varargs = dict({opt.key: opt.default for opt in vrs.options}, **vrs.args)
 truevals = {True, 'yes', 'y', 'True', 'true', 't'}
 nproc = varargs['nproc']
 use_cluster = varargs['use_cluster'] in truevals
-
-settings = 'settings.conf'
-if not os.path.exists(settings):
-    print('settings.conf required for links to ncbi taxonomy '
-          'use "scons settings=settings-example.conf"')
-    sys.exit(1)
-
-conf = ConfigParser.SafeConfigParser(allow_no_value=True)
-conf.optionxform = str  # options are case-sensitive
-conf.read(settings)
 
 """
 Explicitly define PATH, giving preference to local executables; it's
@@ -146,35 +135,6 @@ ncbi = env.Command(
             '-format acc '
             '-retry $retry '
             '-proc $nreq '
-            '-log $out/ncbi.log '
-            '-out $TARGET'))
-
-"""
-get accessions (versions) of records considered type strains
-NCBI web blast uses `sequence_from_type[Filter]` so we will use that
-http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
-
-NOTE: type_material[Filter] == sequence_from_type[Filter]
-"""
-types = env.Command(
-    source=ncbi,
-    target='$out/types.txt',
-    action=('esearch '
-            '-db nucleotide '
-            '-query "sequence_from_type[Filter] AND '
-            '16s[All Fields] AND '
-            'rRNA[Feature Key] AND '
-            'Bacteria[Organism] '
-            'NOT(environmental samples[Organism] '
-            'OR metagenomes[Organism] '
-            'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]" | '
-            'mefetch '
-            '-email $email '
-            '-mode text '
-            '-format acc '
-            '-proc $nreq '
-            '-retry $retry '
             '-log $out/ncbi.log '
             '-out $TARGET'))
 
@@ -290,7 +250,7 @@ vsearch = env.Command(
 """
 1) Fix sequence orientation of new sequences
 2) Remove sequences not in 16s region
-3) Add is_type column
+3) MOVED: Add is_type column
 4) Deduplicate pubmed_ids and references from
    multiple 16s regions per accession
 5) Append seqs, seq_info, pubmed_ids and references to previous data set
@@ -302,9 +262,9 @@ NOTE: seqs that failed either the vsearch or taxit update_taxids will
 not be appended to the versions.txt file and will therefore be re-downloaded
 the next time this pipeline is run
 """
-all_fa, all_info, pubmed_ids, references, _ = env.Command(
+all_fa, appended_info, pubmed_ids, references, _ = env.Command(
     target=['$out/seqs.fasta',
-            '$out/raw_info.csv',
+            '$out/appended_info.csv',
             '$out/pubmed_ids.csv',
             '$out/references.csv',
             '$out/versions.txt'],
@@ -313,7 +273,7 @@ all_fa, all_info, pubmed_ids, references, _ = env.Command(
             new_pubmed_ids, '$pubmed_ids_cache',
             new_references, '$references_cache',
             no_features, '$versions_cache',
-            vsearch, types],
+            vsearch],
     action=['annotate_and_append.py $SOURCES $TARGETS',
             # cache for next download
             Copy('$seqs_cache', '${TARGETS[0]}'),
@@ -322,11 +282,52 @@ all_fa, all_info, pubmed_ids, references, _ = env.Command(
             Copy('$versions_cache', '${TARGETS[4]}')])
 
 """
+get accessions (versions) of records considered type strains
+NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+
+NOTE: type_material[Filter] == sequence_from_type[Filter]
+"""
+types = env.Command(
+    source=ncbi,
+    target='$out/types.txt',
+    action=('esearch '
+            '-db nucleotide '
+            '-query "sequence_from_type[Filter] AND '
+            '16s[All Fields] AND '
+            'rRNA[Feature Key] AND '
+            'Bacteria[Organism] '
+            'NOT(environmental samples[Organism] '
+            'OR metagenomes[Organism] '
+            'OR txid32644[Organism]) '
+            'AND 500 : 999999999[Sequence Length]" | '
+            'mefetch '
+            '-email $email '
+            '-mode text '
+            '-format acc '
+            '-proc $nreq '
+            '-retry $retry '
+            '-log $out/ncbi.log '
+            '-out $TARGET'))
+
+"""
+Remove and re-append is_type column with sequences in:
+
+1) types set above
+2) sequences with 'ATCC' in description
+3) sequences with 'NR_' to start version number
+"""
+types_appended_info = env.Command(
+    target='$out/is_type_info.csv',
+    source=[appended_info, types],
+    action='is_type.py $SOURCES $TARGET')
+
+"""
 update tax_ids and append taxid_classified column
 """
 update_all_info = env.Command(
     target='$out/seq_info.csv',
-    source=all_info,
+    source=types_appended_info,
     action=['taxit -v update_taxids '
             '--name-column organism '
             '--out $TARGET '
@@ -471,16 +472,15 @@ filtered_details_in = env.Command(
 """
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
-
-FIXME: I have switched to the dedup set for testing purposes
 """
-filtered_fa, filtered_info, filtered_details = env.Command(
+filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
     source=[dedup_fa, dedup_info, tax, filtered_details_in],
     target=['$out/1200bp/classified/filtered/seqs.fasta',
             '$out/1200bp/classified/filtered/seq_info.csv',
-            '$out/1200bp/classified/filtered/details_out.csv'],
+            '$out/1200bp/classified/filtered/details_out.csv',
+            '$out/1200bp/classified/filtered/deenurp.log'],
     action=['deenurp -vvv filter_outliers '
-            '--log $out/1200bp/classified/filtered/deenurp.log '
+            '--log ${TARGETS[3]} '
             '--filter-rank species '
             '--threads-per-job 14 '
             '--jobs 1 '
@@ -543,14 +543,14 @@ TODO: include derep_map.csv to input for
 env.Command(
     target=['$out/1200bp/classified/filtered/index.html',
             '$out/1200bp/classified/filtered/plots/map.csv'],
-    source=[filtered_details, tax, type_hits, types_info],
-    action=('plot_details.py $SOURCES '
+    source=[filtered_details, tax, type_hits, types_info, deenurp_log],
+    action=('plot_details.py ${SOURCES[:4]} '
             '--param strategy:cluster '
             '--param cluster_type:single '
             '--param distance_percentile:90.0 '
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
-            '--log $base/deenurp.log '
+            '--log-in ${SOURCES[4]} '
             '--plot-dir $out/1200bp/classified/filtered/plots '
             '--plot-map ${TARGETS[1]} '
             '--plot-index ${TARGETS[0]}'
