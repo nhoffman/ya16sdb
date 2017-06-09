@@ -268,7 +268,7 @@ def main(arguments):
         default='data/plot.jinja',
         help='location for the plot template [%(default)s]')
     parser.add_argument(
-        '--log',
+        '--log-in',
         help="output of 'deenurp filter_is_outs --log'",
         type=argparse.FileType('r'))
 
@@ -306,9 +306,9 @@ def main(arguments):
     except OSError:
         pass
 
-    if args.log:
+    if args.log_in:
         deenurp_args = {}
-        for line in args.log:
+        for line in args.log_in:
             spl = line.split('args: ')
             if spl[-1].startswith('{'):
                 deenurp_args = json.loads(spl[-1])
