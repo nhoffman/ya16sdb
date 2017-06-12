@@ -221,7 +221,6 @@ known_info, _ = env.Command(
     source=new_info,
     action=['taxit update_taxids '
             '--name-column organism '
-            '--taxid-classified '
             '--unknowns ${TARGETS[1]} '
             '--out ${TARGETS[0]} '
             '--schema ncbi '
