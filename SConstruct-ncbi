@@ -606,7 +606,7 @@ if release:
         action=SymLink())
 
     commit = env.Command(
-        target='$out/version.txt',
+        target='$out/git_version.txt',
         source='.git/objects',
         action='git describe --tags > $TARGET')
 
