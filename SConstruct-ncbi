@@ -310,16 +310,17 @@ types = env.Command(
             '-out $TARGET'))
 
 """
-Remove and re-append is_type column with sequences in:
+Remove and re-append is_type column with sequences per discussion:
 
-1) types set above
-2) sequences with 'ATCC' in description
-3) sequences with 'NR_' to start version number
+https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/14
 """
 types_appended_info = env.Command(
     target='$out/is_type_info.csv',
     source=[appended_info, types],
-    action='is_type.py $SOURCES $TARGET')
+    action=('is_type.py '
+            '--in-description '
+            'CCUG,CIP,DSM,JCM,LMG,BCCM,NBRC,NCTC,PCC,ATCC,ACUG '
+            '$SOURCES $TARGET'))
 
 """
 update tax_ids
