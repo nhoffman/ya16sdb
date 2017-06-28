@@ -322,7 +322,7 @@ types_appended_info = env.Command(
     action='is_type.py $SOURCES $TARGET')
 
 """
-update tax_ids and append taxid_classified column
+update tax_ids
 """
 update_all_info = env.Command(
     target='$out/seq_info.csv',
@@ -349,26 +349,25 @@ fa, seq_info = env.Command(
             '$SOURCES'))
 
 """
-Make general classified taxtable
+Make general valid taxtable with all ranks included
 """
 tax = env.Command(
-    target='$out/1200bp/classified/taxonomy.csv',
+    target='$out/1200bp/valid/taxonomy.csv',
     source=seq_info,
     action=('taxit -v taxtable '
             '--seq-info $SOURCE '
             '--clade-ids 2 '  # Bacteria
             '--valid '
-            '--ranked '
             '--out $TARGET '
             '--schema ncbi '
             '$tax_url'))
 
 """
-pull classified sequences based on valid and ranked tax_ids
+pull valid sequences based on valid and ranked tax_ids
 """
-classified_fa, classified_info = env.Command(
-    target=['$out/1200bp/classified/seqs.fasta',
-            '$out/1200bp/classified/seq_info.csv'],
+valid_fa, valid_info = env.Command(
+    target=['$out/1200bp/valid/seqs.fasta',
+            '$out/1200bp/valid/seq_info.csv'],
     source=[tax, fa, seq_info],
     action=('partition_refs.py '
             '--tax-ids ${SOURCES[0]} '
@@ -380,22 +379,22 @@ classified_fa, classified_info = env.Command(
 Count reference sequences that can be used for classification filtering
 """
 env.Command(
-    target='$out/1200bp/classified/tax_counts.csv',
+    target='$out/1200bp/valid/tax_counts.csv',
     source=tax,
     action='taxit -v count_taxids --out $TARGET $SOURCE')
 
 """
-Create blast database classified seqs
+Create blast database valid seqs
 """
-blast_db(env, classified_fa, '$out/1200bp/classified/blast')
+blast_db(env, valid_fa, '$out/1200bp/valid/blast')
 
 """
 Partition type strains
 """
 types_fasta, types_info = env.Command(
-    target=['$out/1200bp/classified/types/seqs.fasta',
-            '$out/1200bp/classified/types/seq_info.csv'],
-    source=[classified_fa, classified_info],
+    target=['$out/1200bp/valid/types/seqs.fasta',
+            '$out/1200bp/valid/types/seq_info.csv'],
+    source=[valid_fa, valid_info],
     action=('partition_refs.py '
             '--types '
             '--out-fa ${TARGETS[0]} '
@@ -406,9 +405,10 @@ types_fasta, types_info = env.Command(
 Make type strain taxtable
 """
 types_tax = env.Command(
-    target='$out/1200bp/classified/types/taxonomy.csv',
+    target='$out/1200bp/valid/types/taxonomy.csv',
     source=[tax, types_info],
     action=('taxit -v taxtable '
+            '--ranked columns '
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
@@ -419,14 +419,14 @@ types_tax = env.Command(
 Count reference sequences that can be used for classification filtering
 """
 env.Command(
-    target='$out/1200bp/classified/types/tax_counts.csv',
+    target='$out/1200bp/valid/types/tax_counts.csv',
     source=types_tax,
     action='taxit -v count_taxids --out $TARGET $SOURCE')
 
 """
 Make type strain Blast database
 """
-blast_db(env, types_fasta, '$out/1200bp/classified/types/blast')
+blast_db(env, types_fasta, '$out/1200bp/valid/types/blast')
 
 """
 Deduplicate sequences by isolate (accession)
@@ -434,9 +434,9 @@ Deduplicate sequences by isolate (accession)
 Appends a weight column showing number of sequences being represented
 """
 dedup_fa, dedup_info = env.Command(
-    target=['$out/1200bp/classified/dedup/seqs.fasta',
-            '$out/1200bp/classified/dedup/seq_info.csv'],
-    source=[classified_fa, classified_info],
+    target=['$out/1200bp/valid/dedup/seqs.fasta',
+            '$out/1200bp/valid/dedup/seq_info.csv'],
+    source=[valid_fa, valid_info],
     action=('deenurp -v deduplicate_sequences '
             '--group-by accession '
             '--prefer-columns is_type '
@@ -450,9 +450,9 @@ NOTE: we might not need to do this anymore now that filter_outliers has enough
 resources to finish in a reasonable amount of time
 """
 # derep_fa, derep_info = env.Command(
-#     target=['$out/1200bp/classified/dedup/derep/seqs.fasta',
-#             '$out/1200bp/classified/dedup/derep/seq_info.csv',
-#             '$out/1200bp/classified/dedup/derep/map.csv'],
+#     target=['$out/1200bp/valid/dedup/derep/seqs.fasta',
+#             '$out/1200bp/valid/dedup/derep/seq_info.csv',
+#             '$out/1200bp/valid/dedup/derep/map.csv'],
 #     source=[dedup_fa, dedup_info, tax],
 #     action=('deenurp -v dereplicate_named '
 #             '--id 1.0 '
@@ -465,7 +465,7 @@ resources to finish in a reasonable amount of time
 
 filtered_details_in = env.Command(
     source='$base/filtered_details.csv',
-    target='$out/1200bp/classified/filtered/details_in.csv',
+    target='$out/1200bp/valid/filtered/details_in.csv',
     action='taxit update_taxids --schema ncbi --out $TARGET $SOURCE $tax_url')
 
 """
@@ -474,10 +474,10 @@ of processes - otherwise deenurp will use all of them!
 """
 filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
     source=[dedup_fa, dedup_info, tax, filtered_details_in],
-    target=['$out/1200bp/classified/filtered/seqs.fasta',
-            '$out/1200bp/classified/filtered/seq_info.csv',
-            '$out/1200bp/classified/filtered/details_out.csv',
-            '$out/1200bp/classified/filtered/deenurp.log'],
+    target=['$out/1200bp/valid/filtered/seqs.fasta',
+            '$out/1200bp/valid/filtered/seq_info.csv',
+            '$out/1200bp/valid/filtered/details_out.csv',
+            '$out/1200bp/valid/filtered/deenurp.log'],
     action=['deenurp -vvv filter_outliers '
             '--log ${TARGETS[3]} '
             '--filter-rank species '
@@ -501,9 +501,10 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
 Make filtered taxtable
 """
 filtered_tax = env.Command(
-    target='$out/1200bp/classified/filtered/taxonomy.csv',
+    target='$out/1200bp/valid/filtered/taxonomy.csv',
     source=[tax, filtered_info],
     action=('taxit -v taxtable '
+            '--ranked columns '
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
@@ -517,7 +518,7 @@ take --maxaccepts 2 so we can filter out hits where the query and target
 sequences are the same
 '''
 type_hits = env.Command(
-    target='$out/1200bp/classified/filtered/vsearch.blast6out',
+    target='$out/1200bp/valid/filtered/vsearch.blast6out',
     source=[dedup_fa, types_fasta],
     action=('vsearch --usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
@@ -540,8 +541,8 @@ TODO: include derep_map.csv to input for
 "dereplicated" sequence counts per accession
 '''
 env.Command(
-    target=['$out/1200bp/classified/filtered/index.html',
-            '$out/1200bp/classified/filtered/plots/map.csv'],
+    target=['$out/1200bp/valid/filtered/index.html',
+            '$out/1200bp/valid/filtered/plots/map.csv'],
     source=[filtered_details, tax, type_hits, types_info, deenurp_log],
     action=('plot_details.py ${SOURCES[:4]} '
             '--param strategy:cluster '
@@ -550,18 +551,18 @@ env.Command(
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
             '--log-in ${SOURCES[4]} '
-            '--plot-dir $out/1200bp/classified/filtered/plots '
+            '--plot-dir $out/1200bp/valid/filtered/plots '
             '--plot-map ${TARGETS[1]} '
             '--plot-index ${TARGETS[0]}'
             ))
 
-blast_db(env, filtered_fa, '$out/1200bp/classified/filtered/blast')
+blast_db(env, filtered_fa, '$out/1200bp/valid/filtered/blast')
 
 """
 Count reference sequences that can be used for classification filtering
 """
 env.Command(
-    target='$out/1200bp/classified/filtered/tax_counts.csv',
+    target='$out/1200bp/valid/filtered/tax_counts.csv',
     source=filtered_tax,
     action='taxit -v count_taxids --out $TARGET $SOURCE')
 
