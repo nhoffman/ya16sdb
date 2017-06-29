@@ -47,7 +47,7 @@ TABLE_WIDTHS = {
 }
 
 TABLE_HEADER = {
-    'dist': 'distance from centroid',
+    'dist': 'distance to centroid',
 }
 
 
@@ -82,7 +82,7 @@ def paired_plots(data, title=None, text_cols=['seqname']):
         plot_height=600,
         tools=tools,
         x_axis_label='rank order',
-        y_axis_label='distance from centroid (%)',
+        y_axis_label='distance to centroid (%)',
     )
 
     # underlying markers are visible only when selected
