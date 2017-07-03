@@ -31,9 +31,6 @@ if [[ ! -d $DEENURP ]]; then
 fi
 
 ${DEENURP}/bin/bootstrap.sh $venv
-
-# install Python3
-python3.6 -m venv --copies $venv
 source $venv/bin/activate
 
 if [[ ! -f $venv/bin/makeblastdb ]]; then
@@ -58,4 +55,9 @@ fi
 
 # set PIP_FIND_LINKS to use wheels https://pip.pypa.io/en/latest/user_guide.html#environment-variables
 pip2 install --requirement ${MKREFPKG_DIR}/requirements2.txt
-pip3 install --requirement ${MKREFPKG_DIR}/requirements3.txt
+
+# install Python3
+python3.6 -m venv --copies $venv
+# wget --quiet --output-document src/get-pip.py https://bootstrap.pypa.io/get-pip.py
+# python3 src/get-pip.py
+$venv/bin/pip3 install --requirement ${MKREFPKG_DIR}/requirements3.txt
