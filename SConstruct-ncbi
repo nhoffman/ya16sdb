@@ -223,7 +223,7 @@ known_info, _ = env.Command(
             '--name-column organism '
             '--unknowns ${TARGETS[1]} '
             '--out ${TARGETS[0]} '
-            '--schema ncbi '
+            '--schema ncbi_taxonomy '
             '$SOURCES $tax_url'])
 
 """
@@ -331,7 +331,7 @@ update_all_info = env.Command(
     action=['taxit -v update_taxids '
             '--name-column organism '
             '--out $TARGET '
-            '--schema ncbi '
+            '--schema ncbi_taxonomy '
             '$SOURCE $tax_url',
             Copy('$seq_info_cache', '$TARGET')])
 
@@ -360,7 +360,7 @@ tax = env.Command(
             '--clade-ids 2 '  # Bacteria
             '--valid '
             '--out $TARGET '
-            '--schema ncbi '
+            '--schema ncbi_taxonomy '
             '$tax_url'))
 
 """
@@ -413,7 +413,7 @@ types_tax = env.Command(
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
-            '--schema ncbi '
+            '--schema ncbi_taxonomy '
             '$tax_url'))
 
 """
@@ -467,7 +467,10 @@ resources to finish in a reasonable amount of time
 filtered_details_in = env.Command(
     source='$base/filtered_details.csv',
     target='$out/1200bp/valid/filtered/details_in.csv',
-    action='taxit update_taxids --schema ncbi --out $TARGET $SOURCE $tax_url')
+    action=('taxit update_taxids '
+            '--schema ncbi_taxonomy '
+            '--out $TARGET '
+            '$SOURCE $tax_url'))
 
 """
 Filter sequences. Use --threads if you need to to limit the number
@@ -509,7 +512,7 @@ filtered_tax = env.Command(
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
-            '--schema ncbi '
+            '--schema ncbi_taxonomy '
             '$tax_url'))
 
 '''
