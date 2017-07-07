@@ -500,7 +500,7 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             '--distance-percentile 90.0 '
             '--min-distance 0.01 '
             '--max-distance 0.02 '
-            '--min-seqs-for-filtering 10 '
+            '--min-seqs-for-filtering 5 '
             '${SOURCES[:3]}',
             # cache this
             Copy('$base/filtered_details.csv', '${TARGETS[2]}')])
