@@ -32,6 +32,10 @@ vrs.Add(
     default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
     help='database url')
 vrs.Add(
+    'schema',
+    default='ncbi_taxonomy',
+    help='postgres database schema')
+vrs.Add(
     'out',
     help='Path to dated output directory',
     default=os.path.join('$base', '{:%Y%m%d}'.format(datetime.date.today())))
@@ -223,7 +227,7 @@ known_info, _ = env.Command(
             '--name-column organism '
             '--unknowns ${TARGETS[1]} '
             '--out ${TARGETS[0]} '
-            '--schema ncbi_taxonomy '
+            '--schema $schema '
             '$SOURCES $tax_url'])
 
 """
@@ -331,7 +335,7 @@ update_all_info = env.Command(
     action=['taxit -v update_taxids '
             '--name-column organism '
             '--out $TARGET '
-            '--schema ncbi_taxonomy '
+            '--schema $schema '
             '$SOURCE $tax_url',
             Copy('$seq_info_cache', '$TARGET')])
 
@@ -360,7 +364,7 @@ tax = env.Command(
             '--clade-ids 2 '  # Bacteria
             '--valid '
             '--out $TARGET '
-            '--schema ncbi_taxonomy '
+            '--schema $schema '
             '$tax_url'))
 
 """
@@ -413,7 +417,7 @@ types_tax = env.Command(
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
-            '--schema ncbi_taxonomy '
+            '--schema $schema '
             '$tax_url'))
 
 """
@@ -468,7 +472,7 @@ filtered_details_in = env.Command(
     source='$base/filtered_details.csv',
     target='$out/1200bp/valid/filtered/details_in.csv',
     action=('taxit update_taxids '
-            '--schema ncbi_taxonomy '
+            '--schema $schema '
             '--out $TARGET '
             '$SOURCE $tax_url'))
 
@@ -512,7 +516,7 @@ filtered_tax = env.Command(
             '--taxtable ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
             '--out $TARGET '
-            '--schema ncbi_taxonomy '
+            '--schema $schema '
             '$tax_url'))
 
 '''
