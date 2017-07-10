@@ -10,8 +10,7 @@ import sys
 from bioscons.slurm import SlurmEnvironment
 
 # requirements installed in the virtualenv
-from SCons.Script import (
-    Variables, PathVariable, BoolVariable, ARGUMENTS, Help, Copy)
+from SCons.Script import Variables, BoolVariable, ARGUMENTS, Help, Copy
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
@@ -24,7 +23,8 @@ vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nproc', ('Number of concurrent processes '), 14)
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 3)
+# nreq should be set to 3 during weekdays
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
 vrs.Add('base', help='Path to base output directory', default='output-ncbi')
 vrs.Add(
@@ -39,12 +39,6 @@ vrs.Add(
     'out',
     help='Path to dated output directory',
     default=os.path.join('$base', '{:%Y%m%d}'.format(datetime.date.today())))
-vrs.Add(PathVariable('training_set',
-                     'path to type strain training set',
-                     'data/rdp_16s_type_strains.fasta.bz2'))
-vrs.Add(PathVariable('blacklist',
-                     'path to custom accession blacklist',
-                     'data/blacklist.txt'))
 
 # cache
 vrs.Add('seqs_cache', default='$base/seqs.fasta')
@@ -143,21 +137,16 @@ ncbi = env.Command(
             '-out $TARGET'))
 
 """
-A grep diff between sequences we have, the blacklist and what
-ncbi returns.  This will give us accession (versions) that are
-not present to pass to entrez.py for download.
+Do not download records accessions in the ignore list or
+that have equivalent RefSeq records
 """
 versions = env.Command(
     target='$out/new/versions.txt',
-    source=['data/blacklist.txt', ncbi],
-    action=['cat $versions_cache ${SOURCES[0]} | '
-            'grep '
-            '--invert-match '
-            '--fixed-strings '
-            '--file /dev/stdin '
-            '${SOURCES[1]} > $TARGET '
-            # avoid the grep no match exit code 1 that scons hates
-            '|| true'])
+    source=[ncbi, '$versions_cache', 'data/ignore.txt', '$seq_info_cache'],
+    action=['ignore.py '
+            '--out $TARGET '
+            '--refseq-originals ${SOURCES[3]} '
+            '${SOURCES[:3]}'])
 
 """
 Download records
@@ -185,6 +174,7 @@ new_fasta, new_info, new_pubmed_ids, new_references = env.Command(
             '-proc $nreq | '
             'ftract -feature rrna::16s | '   # extract 16s features
             'mefetch '  # download genbank records
+            '-vv '
             '-email $email '
             '-retmax 1 '
             '-csv '
@@ -197,6 +187,10 @@ new_fasta, new_info, new_pubmed_ids, new_references = env.Command(
             '--pubmed_ids ${TARGETS[2]} '
             '--references ${TARGETS[3]} '
             '${SOURCES[2]} ${TARGETS[:2]}'))
+
+"""
+TODO: save full genbank records
+"""
 
 """
 Record versions returned from esearch that had no actual 16s features
@@ -251,15 +245,16 @@ vsearch = env.Command(
             '--userout $TARGET'))
 
 """
-1) Fix sequence orientation of new sequences
-2) Remove sequences not in 16s region
-3) MOVED: Add is_type column
-4) Deduplicate pubmed_ids and references from
+1. Fix sequence orientation of new sequences
+2. Remove sequences not in 16s region
+3. Deduplicate pubmed_ids and references from
    multiple 16s regions per accession
-5) Append seqs, seq_info, pubmed_ids and references to previous data set
-7) drop seqnames missing eigher a sequence or row in seq_info, sequences
+4. Append seqs, seq_info, pubmed_ids and references to previous data set
+5. Drop NCBI removed records not in versions.txt file
+6. Drop seqnames missing eigher a sequence or row in seq_info, sequences
    filtered out of the vsearch 16s alignment or sequences with unknown tax_ids
-8) Copy full dataset back to base dir for next download
+7. Drop sequences that have a new refseq equavalent
+8. Copy full dataset back to base dir for next download
 
 NOTE: seqs that failed either the vsearch or taxit update_taxids will
 not be appended to the versions.txt file and will therefore be re-downloaded
@@ -276,8 +271,8 @@ all_fa, appended_info, pubmed_ids, references, _ = env.Command(
             new_pubmed_ids, '$pubmed_ids_cache',
             new_references, '$references_cache',
             no_features, '$versions_cache',
-            vsearch],
-    action=['annotate_and_append.py $SOURCES $TARGETS',
+            ncbi, vsearch],
+    action=['refresh.py $SOURCES $TARGETS',
             # cache for next download
             Copy('$seqs_cache', '${TARGETS[0]}'),
             Copy('$pubmed_ids_cache', '${TARGETS[2]}'),
