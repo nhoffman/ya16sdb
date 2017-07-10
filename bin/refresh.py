@@ -62,6 +62,9 @@ def main():
         help='list of previously downloaded record versions')
 
     p.add_argument(
+        'ncbi',
+        help='list of all the latest ncbi versions')
+    p.add_argument(
         'vsearch',
         help='alignments for orientation information')
 
@@ -120,6 +123,13 @@ def main():
     info = prev_info.append(new_info)[columns]
 
     assert(len(info['seqname']) == len(info['seqname'].drop_duplicates()))
+
+    # remove anything dropped in ncbi
+    ncbi = set(v.strip() for v in open(args.ncbi))
+    info = info[info['version'].isin(ncbi)]
+
+    # remove original records with refseq equivalent
+    info = info[~info['accession'].isin(info['original'])]
 
     """
     filter accession records if any record that
@@ -191,13 +201,21 @@ def main():
     refs.to_csv(args.references_out, index=False)
 
     '''
+    Filter the previous_versions with only existing records in ncbi. That way
+    if any previous records appear again in a future esearch
+    we can re-download.
+    '''
+    previous_versions = set(v.strip() for v in args.previous_versions)
+    previous_versions = set(v for v in previous_versions if v in ncbi)
+
+    '''
     output downloaded versions we do not want to download again. This
     includes records with no features and records that passed filtering
     up to this point
     '''
     versions = set(info['version'].tolist())
     versions |= set(n.strip() for n in args.no_features)
-    versions |= set(v.strip() for v in args.previous_versions)
+    versions |= previous_versions
 
     for v in sorted(versions):
         args.versions_out.write(v + '\n')
