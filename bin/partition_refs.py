@@ -67,7 +67,7 @@ def main():
              'length': int, 'description': str, 'accession': str,
              'seq_start': int, 'seq_stop': int, 'gi': str, 'name': str,
              'organism': str, 'date': str, 'keywords': str, 'seqname': str,
-             'source': str, 'version': str}
+             'source': str, 'version': str, 'original': str}
     seq_info = pandas.read_csv(args.seqinfo, dtype=dtype).set_index('seqname')
 
     # raw min_length filtering
