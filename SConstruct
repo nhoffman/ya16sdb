@@ -297,9 +297,9 @@ NOTE: seqs that failed either the vsearch or taxit update_taxids will
 not be appended to the versions.txt file and will therefore be re-downloaded
 the next time this pipeline is run
 """
-fa, annotations, pubmed_info, references, refseq_info, _ = env.Command(
+fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
     target=['$out/seqs.fasta',
-            '$out/appended_info.csv',
+            '$out/refresh/annotations.csv',
             '$out/pubmed_ids.csv',
             '$out/references.csv',
             '$out/versions.csv'],
@@ -329,6 +329,19 @@ env.Command(
     action='cat $SOURCE >> $genbank_cache')
 
 """
+update all tax_ids
+"""
+annotations = env.Command(
+    target='$out/annotations.csv',
+    source=refresh_annotations,
+    action=['taxit -v update_taxids '
+            '--name-column organism '
+            '--out $TARGET '
+            '--schema $schema '
+            '$SOURCE $tax_url',
+            Copy('$annotations_cache', '$TARGET')])
+
+"""
 Remove and re-append is_type column with sequences per discussion:
 
 https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/14
@@ -338,300 +351,270 @@ is_type = env.Command(
     source=[annotations, types],
     action=('is_type.py $SOURCES $TARGET'))
 
-# """
-# update tax_ids
-# """
-# update_all_info = env.Command(
-#     target='$out/seq_info.csv',
-#     source=types_appended_info,
-#     action=['taxit -v update_taxids '
-#             '--name-column organism '
-#             '--out $TARGET '
-#             '--schema $schema '
-#             '$SOURCE $tax_url',
-#             Copy('$annotations_cache', '$TARGET')])
-#
-# """
-# pull sequences at least 1200 bp and less than 1% ambiguous
-# """
-# fa, seq_info = env.Command(
-#     target=['$out/1200bp/seqs.fasta', '$out/1200bp/seq_info.csv'],
-#     source=[all_fa, update_all_info],
-#     action=('partition_refs.py '
-#             # filtering
-#             '--min-length 1200 '
-#             '--prop-ambig-cutoff 0.01 '
-#             '--out-fa ${TARGETS[0]} '
-#             '--out-info ${TARGETS[1]} '
-#             '$SOURCES'))
-#
-# """
-# Make general valid taxtable with all ranks included
-# """
-# tax = env.Command(
-#     target='$out/1200bp/valid/taxonomy.csv',
-#     source=seq_info,
-#     action=('taxit -v taxtable '
-#             '--seq-info $SOURCE '
-#             '--clade-ids 2 '  # Bacteria
-#             '--valid '
-#             '--out $TARGET '
-#             '--schema $schema '
-#             '$tax_url'))
-#
-# """
-# pull valid sequences based on valid and ranked tax_ids
-# """
-# valid_fa, valid_info = env.Command(
-#     target=['$out/1200bp/valid/seqs.fasta',
-#             '$out/1200bp/valid/seq_info.csv'],
-#     source=[tax, fa, seq_info],
-#     action=('partition_refs.py '
-#             '--tax-ids ${SOURCES[0]} '
-#             '--out-fa ${TARGETS[0]} '
-#             '--out-info ${TARGETS[1]} '
-#             '${SOURCES[1:]}'))
-#
-# """
-# Count reference sequences that can be used for classification filtering
-# """
-# env.Command(
-#     target='$out/1200bp/valid/tax_counts.csv',
-#     source=tax,
-#     action='taxit -v count_taxids --out $TARGET $SOURCE')
-#
-# """
-# Create blast database valid seqs
-# """
-# blast_db(env, valid_fa, '$out/1200bp/valid/blast')
-#
-# """
-# Partition type strains
-# """
-# types_fasta, types_info = env.Command(
-#     target=['$out/1200bp/valid/types/seqs.fasta',
-#             '$out/1200bp/valid/types/seq_info.csv'],
-#     source=[valid_fa, valid_info],
-#     action=('partition_refs.py '
-#             '--types '
-#             '--out-fa ${TARGETS[0]} '
-#             '--out-info ${TARGETS[1]} '
-#             '$SOURCES'))
-#
-# """
-# Make type strain taxtable
-# """
-# types_tax = env.Command(
-#     target='$out/1200bp/valid/types/taxonomy.csv',
-#     source=[tax, types_info],
-#     action=('taxit -v taxtable '
-#             '--ranked columns '
-#             '--taxtable ${SOURCES[0]} '
-#             '--seq-info ${SOURCES[1]} '
-#             '--out $TARGET '
-#             '--schema $schema '
-#             '$tax_url'))
-#
-# """
-# Count reference sequences that can be used for classification filtering
-# """
-# env.Command(
-#     target='$out/1200bp/valid/types/tax_counts.csv',
-#     source=types_tax,
-#     action='taxit -v count_taxids --out $TARGET $SOURCE')
-#
-# """
-# Make type strain Blast database
-# """
-# blast_db(env, types_fasta, '$out/1200bp/valid/types/blast')
-#
-# """
-# Deduplicate sequences by isolate (accession)
-#
-# Appends a weight column showing number of sequences being represented
-# """
-# dedup_fa, dedup_info = env.Command(
-#     target=['$out/1200bp/valid/dedup/seqs.fasta',
-#             '$out/1200bp/valid/dedup/seq_info.csv'],
-#     source=[valid_fa, valid_info],
-#     action=('deenurp -v deduplicate_sequences '
-#             '--group-by accession '
-#             '--prefer-columns is_type '
-#             '$SOURCES $TARGETS'))
-#
-# """
-# dereplicate sequences using vsearch clustering to reduce giant species
-# clusters like Bacilius genus and E. Coli
-#
-# NOTE: we might not need to do this anymore now that filter_outliers has enough
-# resources to finish in a reasonable amount of time
-# """
-# # derep_fa, derep_info = env.Command(
-# #     target=['$out/1200bp/valid/dedup/derep/seqs.fasta',
-# #             '$out/1200bp/valid/dedup/derep/seq_info.csv',
-# #             '$out/1200bp/valid/dedup/derep/map.csv'],
-# #     source=[dedup_fa, dedup_info, tax],
-# #     action=('deenurp -v dereplicate_named '
-# #             '--id 1.0 '
-# #             '--group-on species '
-# #             '--taxonomy ${SOURCES[2]} '
-# #             '--seqs-out ${TARGETS[0]} '
-# #             '--seq-info-out ${TARGETS[1]} '
-# #             '--derep-map-out ${TARGETS[2]} '
-# #             '${SOURCES[:2]}'))
-#
-# filtered_details_in = env.Command(
-#     source='$base/filtered_details.csv',
-#     target='$out/1200bp/valid/filtered/details_in.csv',
-#     action=('taxit update_taxids '
-#             '--schema $schema '
-#             '--out $TARGET '
-#             '$SOURCE $tax_url'))
-#
-# """
-# Filter sequences. Use --threads if you need to to limit the number
-# of processes - otherwise deenurp will use all of them!
-# """
-# filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
-#     source=[dedup_fa, dedup_info, tax, filtered_details_in],
-#     target=['$out/1200bp/valid/filtered/seqs.fasta',
-#             '$out/1200bp/valid/filtered/seq_info.csv',
-#             '$out/1200bp/valid/filtered/details_out.csv',
-#             '$out/1200bp/valid/filtered/deenurp.log'],
-#     action=['deenurp -vvv filter_outliers '
-#             '--log ${TARGETS[3]} '
-#             '--filter-rank species '
-#             '--threads-per-job 14 '
-#             '--jobs 1 '
-#             '--output-seqs ${TARGETS[0]}  '
-#             '--filtered-seqinfo ${TARGETS[1]} '
-#             '--detailed-seqinfo ${TARGETS[2]} '
-#             '--previous-details ${SOURCES[3]} '
-#             '--strategy cluster '
-#             '--cluster-type single '
-#             '--distance-percentile 90.0 '
-#             '--min-distance 0.01 '
-#             '--max-distance 0.02 '
-#             '--min-seqs-for-filtering 5 '
-#             '${SOURCES[:3]}',
-#             # cache this
-#             Copy('$base/filtered_details.csv', '${TARGETS[2]}')])
-#
-# """
-# Make filtered taxtable
-# """
-# filtered_tax = env.Command(
-#     target='$out/1200bp/valid/filtered/taxonomy.csv',
-#     source=[tax, filtered_info],
-#     action=('taxit -v taxtable '
-#             '--ranked columns '
-#             '--taxtable ${SOURCES[0]} '
-#             '--seq-info ${SOURCES[1]} '
-#             '--out $TARGET '
-#             '--schema $schema '
-#             '$tax_url'))
-#
-# '''
-# find top hit for each sequence among type strains
-#
-# take --maxaccepts 2 so we can filter out hits where the query and target
-# sequences are the same
-# '''
-# type_hits = env.Command(
-#     target='$out/1200bp/valid/filtered/vsearch.blast6out',
-#     source=[dedup_fa, types_fasta],
-#     action=('vsearch --usearch_global ${SOURCES[0]} '
-#             '--db ${SOURCES[1]} '
-#             '--blast6out $TARGET '
-#             '--id 0.75 '
-#             '--threads 14 '
-#             '--self '  # reject same sequence hits
-#             '--threads 12 '
-#             '--maxaccepts 1 '
-#             '--strand plus'))
-#
-# '''
-# bokeh plot filtered sequences
-#
-# hard coded: sort column 2 (records) desc
-#
-# FIXME: BokehDeprecationWarning 2> /dev/null
-#
-# TODO: include derep_map.csv to input for
-# "dereplicated" sequence counts per accession
-# '''
-# env.Command(
-#     target=['$out/1200bp/valid/filtered/index.html',
-#             '$out/1200bp/valid/filtered/plots/map.csv'],
-#     source=[filtered_details, tax, type_hits, types_info, deenurp_log],
-#     action=('plot_details.py ${SOURCES[:4]} '
-#             '--param strategy:cluster '
-#             '--param cluster_type:single '
-#             '--param distance_percentile:90.0 '
-#             '--param min_distance:0.01 '
-#             '--param max_distance:0.02 '
-#             '--log-in ${SOURCES[4]} '
-#             '--plot-dir $out/1200bp/valid/filtered/plots '
-#             '--plot-map ${TARGETS[1]} '
-#             '--plot-index ${TARGETS[0]}'
-#             ))
-#
-# blast_db(env, filtered_fa, '$out/1200bp/valid/filtered/blast')
-#
-# """
-# Count reference sequences that can be used for classification filtering
-# """
-# env.Command(
-#     target='$out/1200bp/valid/filtered/tax_counts.csv',
-#     source=filtered_tax,
-#     action='taxit -v count_taxids --out $TARGET $SOURCE')
-#
-# """
-# Append contributers
-# """
-# contributors = env.Command(
-#     source='.git/logs/HEAD',
-#     target='contributors.txt',
-#     action='git log --all --format="%cN <%cE>" | sort | uniq > $TARGET')
-#
-# """
-# release steps
-# """
-# if release:
-#     def SymLink(directory='.'):
-#         '''
-#         scons does not manage files outside its base directory so we work
-#         around that by passing the symlink directory as a separate argument not
-#         managed by scons
-#         '''
-#         def SymLinkAction(target, source, env):
-#             src = os.path.abspath(str(source[0]))
-#             targ = os.path.abspath(os.path.join(directory, str(target[0])))
-#             try:
-#                 os.symlink(src, targ)
-#             except OSError as e:
-#                 if e.errno == errno.EEXIST:
-#                     os.remove(targ)
-#                     os.symlink(src, targ)
-#                 else:
-#                     raise e
-#
-#         return SymLinkAction
-#
-#     '''
-#     create symbolic link LATEST on directory up to point to $out dir
-#     '''
-#     latest = env.Command(
-#         target=os.path.join('$base', 'LATEST'),
-#         source='$out',
-#         action=SymLink())
-#
-#     commit = env.Command(
-#         target='$out/git_version.txt',
-#         source='.git/objects',
-#         action='git describe --tags > $TARGET')
-#
-#     freeze = env.Command(
-#         target='$out/requirements.txt',
-#         source=venv,
-#         action='pip freeze > $TARGET')
+"""
+pull sequences at least 1200 bp and less than 1% ambiguous
+"""
+full_fa, full_annotations = env.Command(
+    target=['$out/1200bp/seqs.fasta', '$out/1200bp/seq_info.csv'],
+    source=[fa, is_type],
+    action=('partition_refs.py '
+            # filtering
+            '--min-length 1200 '
+            '--prop-ambig-cutoff 0.01 '
+            '--out-fa ${TARGETS[0]} '
+            '--out-info ${TARGETS[1]} '
+            '$SOURCES'))
+
+"""
+Make general valid taxtable with all ranks included
+"""
+valid_tax = env.Command(
+    target='$out/1200bp/valid/taxonomy.csv',
+    source=full_annotations,
+    action=('taxit -v taxtable '
+            '--seq-info $SOURCE '
+            '--clade-ids 2 '  # Bacteria
+            '--valid '
+            '--out $TARGET '
+            '--schema $schema '
+            '$tax_url'))
+
+"""
+pull valid sequences based on valid and ranked tax_ids
+"""
+valid_fa, valid_annotations = env.Command(
+    target=['$out/1200bp/valid/seqs.fasta',
+            '$out/1200bp/valid/seq_info.csv'],
+    source=[valid_tax, full_fa, full_annotations],
+    action=('partition_refs.py '
+            '--tax-ids ${SOURCES[0]} '
+            '--out-fa ${TARGETS[0]} '
+            '--out-info ${TARGETS[1]} '
+            '${SOURCES[1:]}'))
+
+"""
+Count reference sequences that can be used for classification filtering
+"""
+env.Command(
+    target='$out/1200bp/valid/tax_counts.csv',
+    source=valid_tax,
+    action='taxit -v count_taxids --out $TARGET $SOURCE')
+
+"""
+Create blast database valid seqs
+"""
+blast_db(env, valid_fa, '$out/1200bp/valid/blast')
+
+"""
+Partition type strains
+"""
+types_fasta, types_annotations = env.Command(
+    target=['$out/1200bp/valid/types/seqs.fasta',
+            '$out/1200bp/valid/types/seq_info.csv'],
+    source=[valid_fa, valid_annotations],
+    action=('partition_refs.py '
+            '--types '
+            '--out-fa ${TARGETS[0]} '
+            '--out-info ${TARGETS[1]} '
+            '$SOURCES'))
+
+"""
+Make type strain taxtable
+"""
+types_tax = env.Command(
+    target='$out/1200bp/valid/types/taxonomy.csv',
+    source=[valid_tax, types_annotations],
+    action=('taxit -v taxtable '
+            '--ranked columns '
+            '--taxtable ${SOURCES[0]} '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '--schema $schema '
+            '$tax_url'))
+
+"""
+Count reference sequences that can be used for classification filtering
+"""
+env.Command(
+    target='$out/1200bp/valid/types/tax_counts.csv',
+    source=types_tax,
+    action='taxit -v count_taxids --out $TARGET $SOURCE')
+
+"""
+Make type strain Blast database
+"""
+blast_db(env, types_fasta, '$out/1200bp/valid/types/blast')
+
+"""
+Deduplicate sequences by isolate (accession)
+
+Appends a weight column showing number of sequences being represented
+"""
+dedup_fa, dedup_info = env.Command(
+    target=['$out/1200bp/valid/dedup/seqs.fasta',
+            '$out/1200bp/valid/dedup/seq_info.csv'],
+    source=[valid_fa, valid_annotations],
+    action=('deenurp -v deduplicate_sequences '
+            '--group-by accession '
+            '--prefer-columns is_type '
+            '$SOURCES $TARGETS'))
+
+filtered_details_in = env.Command(
+    source='$base/filtered_details.csv',
+    target='$out/1200bp/valid/filtered/details_in.csv',
+    action=('taxit update_taxids '
+            '--schema $schema '
+            '--out $TARGET '
+            '$SOURCE $tax_url'))
+
+"""
+Filter sequences. Use --threads if you need to to limit the number
+of processes - otherwise deenurp will use all of them!
+"""
+filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
+    source=[dedup_fa, dedup_info, valid_tax, filtered_details_in],
+    target=['$out/1200bp/valid/filtered/seqs.fasta',
+            '$out/1200bp/valid/filtered/seq_info.csv',
+            '$out/1200bp/valid/filtered/details_out.csv',
+            '$out/1200bp/valid/filtered/deenurp.log'],
+    action=['deenurp -vvv filter_outliers '
+            '--log ${TARGETS[3]} '
+            '--filter-rank species '
+            '--threads-per-job 14 '
+            '--jobs 1 '
+            '--output-seqs ${TARGETS[0]}  '
+            '--filtered-seqinfo ${TARGETS[1]} '
+            '--detailed-seqinfo ${TARGETS[2]} '
+            '--previous-details ${SOURCES[3]} '
+            '--strategy cluster '
+            '--cluster-type single '
+            '--distance-percentile 90.0 '
+            '--min-distance 0.01 '
+            '--max-distance 0.02 '
+            '--min-seqs-for-filtering 5 '
+            '${SOURCES[:3]}',
+            # cache this
+            Copy('$base/filtered_details.csv', '${TARGETS[2]}')])
+
+"""
+Make filtered taxtable
+"""
+filtered_tax = env.Command(
+    target='$out/1200bp/valid/filtered/taxonomy.csv',
+    source=[valid_tax, filtered_info],
+    action=('taxit -v taxtable '
+            '--ranked columns '
+            '--taxtable ${SOURCES[0]} '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '--schema $schema '
+            '$tax_url'))
+
+'''
+find top hit for each sequence among type strains
+
+take --maxaccepts 2 so we can filter out hits where the query and target
+sequences are the same
+'''
+type_hits = env.Command(
+    target='$out/1200bp/valid/filtered/vsearch.blast6out',
+    source=[dedup_fa, types_fasta],
+    action=('vsearch --usearch_global ${SOURCES[0]} '
+            '--db ${SOURCES[1]} '
+            '--blast6out $TARGET '
+            '--id 0.75 '
+            '--threads 14 '
+            '--self '  # reject same sequence hits
+            '--threads 12 '
+            '--maxaccepts 1 '
+            '--strand plus'))
+
+'''
+bokeh plot filtered sequences
+
+hard coded: sort column 2 (records) desc
+
+FIXME: BokehDeprecationWarning 2> /dev/null
+
+TODO: include derep_map.csv to input for
+"dereplicated" sequence counts per accession
+'''
+env.Command(
+    target=['$out/1200bp/valid/filtered/index.html',
+            '$out/1200bp/valid/filtered/plots/map.csv'],
+    source=[filtered_details,
+            valid_tax,
+            type_hits,
+            types_annotations,
+            deenurp_log],
+    action=('plot_details.py ${SOURCES[:4]} '
+            '--param strategy:cluster '
+            '--param cluster_type:single '
+            '--param distance_percentile:90.0 '
+            '--param min_distance:0.01 '
+            '--param max_distance:0.02 '
+            '--log-in ${SOURCES[4]} '
+            '--plot-dir $out/1200bp/valid/filtered/plots '
+            '--plot-map ${TARGETS[1]} '
+            '--plot-index ${TARGETS[0]}'
+            ))
+
+blast_db(env, filtered_fa, '$out/1200bp/valid/filtered/blast')
+
+"""
+Count reference sequences that can be used for classification filtering
+"""
+env.Command(
+    target='$out/1200bp/valid/filtered/tax_counts.csv',
+    source=filtered_tax,
+    action='taxit -v count_taxids --out $TARGET $SOURCE')
+
+"""
+Append contributers
+"""
+contributors = env.Command(
+    source='.git/logs/HEAD',
+    target='contributors.txt',
+    action='git log --all --format="%cN <%cE>" | sort | uniq > $TARGET')
+
+"""
+release steps
+"""
+if release:
+    def SymLink(directory='.'):
+        '''
+        scons does not manage files outside its base directory so we work
+        around that by passing the symlink directory as a separate argument not
+        managed by scons
+        '''
+        def SymLinkAction(target, source, env):
+            src = os.path.abspath(str(source[0]))
+            targ = os.path.abspath(os.path.join(directory, str(target[0])))
+            try:
+                os.symlink(src, targ)
+            except OSError as e:
+                if e.errno == errno.EEXIST:
+                    os.remove(targ)
+                    os.symlink(src, targ)
+                else:
+                    raise e
+
+        return SymLinkAction
+
+    '''
+    create symbolic link LATEST on directory up to point to $out dir
+    '''
+    latest = env.Command(
+        target=os.path.join('$base', 'LATEST'),
+        source='$out',
+        action=SymLink())
+
+    commit = env.Command(
+        target='$out/git_version.txt',
+        source='.git/objects',
+        action='git describe --tags > $TARGET')
+
+    freeze = env.Command(
+        target='$out/requirements.txt',
+        source=venv,
+        action='pip freeze > $TARGET')
