@@ -2,13 +2,13 @@
 """
 Append new records with old records
 
-Sequences that have no_features or passed all filtering into the info_out
-are appended to the versions_out file.
+Sequences that have no_features or passed all filtering into the
+annotations_out are appended to the versions_out file.
 
 Sequences that did not pass the vsearch or tax_id update_taxids steps will be
-included in the versions_out file and consequently will be re-downloaded
+not included in the versions_out file and consequently will be re-downloaded
 
-Sequence id's in the fasta file are compared with the seq_info. If any seq.id
+Sequence ids in the fasta file are compared with the seq_info. If any seq.id
 or seqname not present in either source all records by accession associated
 will be dropped and re-downloaded at a later time.
 """
@@ -16,7 +16,7 @@ will be dropped and re-downloaded at a later time.
 import argparse
 import pandas
 
-from Bio import SeqIO, Alphabet
+from Bio import SeqIO
 
 
 def main():
@@ -25,25 +25,29 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
     p.add_argument(
-        'new_records',
-        help='records file in any Bio.SeqIO format')
-    p.add_argument(
-        'previous_records',
-        help='records file in any Bio.SeqIO format')
+        'ncbi',
+        help='list of all the latest ncbi versions')
 
     p.add_argument(
-        'new_info',
+        'new_fasta',
+        help='records file in fasta format')
+    p.add_argument(
+        'previous_fasta',
+        help='records file in fasta format')
+
+    p.add_argument(
+        'new_annos',
         help='records file in csv format')
     p.add_argument(
-        'previous_info',
+        'previous_annotations',
         help='records file in csv format')
 
     p.add_argument(
-        'new_pubmed_ids',
-        help='pubmed_ids file')
+        'new_pubmed_info',
+        help='pubmed_info file')
     p.add_argument(
-        'previous_pubmed_ids',
-        help='pubmed_ids file')
+        'previous_pubmed_info',
+        help='pubmed_info file')
 
     p.add_argument(
         'new_references',
@@ -62,21 +66,14 @@ def main():
         help='list of previously downloaded record versions')
 
     p.add_argument(
-        'ncbi',
-        help='list of all the latest ncbi versions')
-    p.add_argument(
-        'vsearch',
-        help='alignments for orientation information')
-
-    p.add_argument(
-        'records_out',
+        'fasta_out',
         type=argparse.FileType('w'),
         help='records file in same Bio.SeqIO format as input')
     p.add_argument(
-        'info_out',
+        'annotations_out',
         help='seq_info file to output')
     p.add_argument(
-        'pubmed_ids_out',
+        'pubmed_info_out',
         help='pubmed_ids file to output')
     p.add_argument(
         'references_out',
@@ -88,39 +85,29 @@ def main():
 
     args = p.parse_args()
 
-    '''
-    remove old seqnames that have been replaced
-    by the newly downloaded records (by accession)
-    '''
-    new_info = pandas.read_csv(args.new_info, dtype=str)
+    new_annos = pandas.read_csv(args.new_annos, dtype=str)
 
-    vsearch = pandas.read_table(
-        args.vsearch,
-        header=None,
-        names=['query', 'target', 'qstrand', 'id', 'tilo', 'tihi'],
-        dtype=str)
-    vsearch = vsearch[vsearch['target'] != '*']
-    vsearch = vsearch.set_index('query')['qstrand'].to_dict()
+    # sync fasta and annotations
+    new_seqs = (s.id for s in SeqIO.parse(args.new_fasta, 'fasta'))
+    new_seqs = (i for i in new_seqs if i in new_annos['seqnames'].values)
+    new_annos = new_annos[new_annos['seqname'].isin(new_seqs)]
 
-    # ignore sequences not in 16s region
-    new_info = new_info[new_info['seqname'].isin(vsearch)]
-
-    # sort records and take the latest in case of multiple versions
-    new_info['sort_date'] = pandas.to_datetime(new_info['date'])
-    new_info = new_info.sort_values(by='sort_date')
-    new_info = new_info.drop_duplicates(subset='seqname', keep='last')
-    new_info = new_info.drop('sort_date', axis=1)
+    # deduplicate records by version and modified date
+    new_annos = new_annos.sort_values(
+        by=['version_num', 'modified_date', 'download_date'],
+        ascending=True)
+    new_annos = new_annos.drop_duplicates(subset='seqname', keep='last')
 
     # read in prev_info ignoring any accessions in the new data set
-    prev_info = pandas.read_csv(args.previous_info, dtype=str)
-    prev_info = prev_info[~prev_info['accession'].isin(new_info['accession'])]
+    prev_info = pandas.read_csv(args.previous_annotations, dtype=str)
+    prev_info = prev_info[~prev_info['accession'].isin(new_annos['accession'])]
 
     # combine info files and retain column order
     columns = prev_info.columns.tolist()
-    for c in new_info.columns:
+    for c in new_annos.columns:
         if c not in columns:
             columns.append(c)
-    info = prev_info.append(new_info)[columns]
+    info = prev_info.append(new_annos)[columns]
 
     assert(len(info['seqname']) == len(info['seqname'].drop_duplicates()))
 
@@ -136,57 +123,47 @@ def main():
     is inconsistent or has illegal chars
     """
     info_names = set(info['seqname'].tolist())
-    valid = set()
-    invalid = set()
+    keep = set()
+    drop = set()
 
-    new_recs = SeqIO.parse(
-        args.new_records, 'fasta', Alphabet.IUPAC.ambiguous_dna)
-    for r in new_recs:
-        if r.id in info_names and Alphabet._verify_alphabet(r.seq):
-            valid.add(r.id)
-        else:
-            invalid.add(r.id)
-    for r in SeqIO.parse(args.previous_records, 'fasta'):
+    for r in SeqIO.parse(args.new_fasta, 'fasta'):
         if r.id in info_names:
-            valid.add(r.id)
+            keep.add(r.id)
         else:
-            invalid.add(r.id)
+            drop.add(r.id)
+    for r in SeqIO.parse(args.previous_fasta, 'fasta'):
+        if r.id in info_names:
+            keep.add(r.id)
+        else:
+            drop.add(r.id)
 
-    # drop all invalid seq accessions, keep all valid seqnames
-    invalid_acc = info[info['seqname'].isin(invalid)]['accession']
+    # drop and keep seqnames by accession
+    invalid_acc = info[info['seqname'].isin(drop)]['accession']
     info = info[~info['accession'].isin(invalid_acc)]
-    info = info[info['seqname'].isin(valid)]
+    info = info[info['seqname'].isin(keep)]
 
     '''
-    * Write sequences in info starting with new sequences
-    * Reverse complement new sequences in '-' orientation
-    * Drop records that can exist between versions favoring newer recs
+    Second pass:
+    1. Write sequences in info starting with new sequences
+    2. Drop records that can exist between versions favoring newer recs
     '''
     seqnames = set(info['seqname'].tolist())
-    new_recs = SeqIO.parse(
-        args.new_records, 'fasta', Alphabet.IUPAC.ambiguous_dna)
-    for r in new_recs:
+    for r in SeqIO.parse(args.new_fasta, 'fasta'):
         if r.id in seqnames:
-            if vsearch.get(r.id, None) == '-':
-                r.seq = r.seq.reverse_complement()
-            SeqIO.write(r, args.records_out, 'fasta')
-            seqnames.remove(r.id)
-    for r in SeqIO.parse(args.previous_records, 'fasta'):
-        if r.id in seqnames:
-            SeqIO.write(r, args.records_out, 'fasta')
+            SeqIO.write(r, args.fasta_out, 'fasta')
             seqnames.remove(r.id)
 
-    info.to_csv(args.info_out, index=False)
+    info.to_csv(args.annotations_out, index=False)
 
     '''
     just like with the seq_info, replace old pubmed_ids with newly
     downloaded pubmed_ids, by accession
     '''
-    new_pubmed = pandas.read_csv(args.new_pubmed_ids, dtype=str)
-    prev_pubmed = pandas.read_csv(args.previous_pubmed_ids, dtype=str)
+    new_pubmed = pandas.read_csv(args.new_pubmed_info, dtype=str)
+    prev_pubmed = pandas.read_csv(args.previous_pubmed_info, dtype=str)
     prev_pubmed = prev_pubmed[~prev_pubmed.isin(prev_pubmed['accession'])]
     pubmed_ids = prev_pubmed.append(new_pubmed).drop_duplicates()
-    pubmed_ids.to_csv(args.pubmed_ids_out, index=False)
+    pubmed_ids.to_csv(args.pubmed_info_out, index=False)
 
     '''
     append new references. Use latest pubmed_ids and

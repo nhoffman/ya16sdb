@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 """
-Parses Genbank records into csv format
-
-Returns all sequences in the Plus, Forward, 5' - 3' orientation
+Extract Genbank records into csv and fasta formats
 """
 import argparse
 import csv
-import logging
 import re
 import sys
 
 from Bio import SeqIO
 
-log = logging.getLogger(__name__)
+# columns of output files
+ANNOTATION_COLS = ['seqname', 'version', 'accession', 'name',
+                   'description', 'tax_id', 'modified_date', 'download_date',
+                   'version_num', 'source', 'keywords', 'organism', 'length',
+                   'ambig_count', 'strain', 'mol_type', 'isolate',
+                   'isolation_source', 'seq_start', 'seq_stop']
 
-seq_info_columns = ['seqname', 'version', 'accession', 'name',
-                    'description', 'gi', 'tax_id', 'date', 'source',
-                    'keywords', 'organism', 'length', 'ambig_count',
-                    'seq_start', 'seq_stop']
+PUBMED_COLS = ['pubmed_id', 'version', 'accession']
 
-reference_columns = ['pubmed_id', 'medline_id', 'title',
-                     'authors', 'journal', 'consrtm', 'comment']
+REFERENCE_COLS = ['pubmed_id', 'title', 'authors',
+                  'journal', 'consrtm', 'comment']
 
-pubmed_columns = ['pubmed_id', 'version', 'accession']
+REFSEQ_INFO_COLS = ['seqname', 'accession', 'gi', 'seq_start', 'seq_stop']
+
+REGION_COORDINATES = re.compile('(?P<seq_start>\d+)..(?P<seq_stop>\d+)')
+
+REFSEQ_SOURCE = re.compile('(?P<accession>[A-Z]{1,4}\d{5,8})'
+                           ':?(?P<seq_start>\d+)?-?(?P<seq_stop>\d+)?')
+
+GI_SOURCE = re.compile('gi:(?P<gi>\d+)')
 
 ACGT = frozenset('ACGT')
-COORDINATES = re.compile('(?P<seq_start>\d+)..(?P<seq_stop>\d+)')
 
 
 def build_parser():
@@ -41,127 +46,140 @@ def build_parser():
         nargs='?',
         help='genbank record(s)')
 
+    parser.add_argument(
+        'download_date',
+        help='date records were extracted were downloaded %%d-%%b-%%Y')
+
     # outs
     parser.add_argument(
-        'fasta_out',
-        metavar='fasta',
+        'fasta',
         type=argparse.FileType('w'),
-        help='sequence file')
+        help='sequences')
     parser.add_argument(
-        'info_out',
-        type=argparse.FileType('w'),
-        metavar='csv',
-        help='write seq_info file')
+        'annotations',
+        type=dictwriter(ANNOTATION_COLS),
+        help=str(ANNOTATION_COLS))
     parser.add_argument(
-        '--pubmed_ids',
-        type=argparse.FileType('w'),
-        metavar='csv',
-        help=('csv with columns '
-              '[version, accession, pubmed_id]'))
+        'pubmed_info',
+        type=dictwriter(PUBMED_COLS),
+        help=str(PUBMED_COLS))
     parser.add_argument(
-        '--references',
-        type=argparse.FileType('w'),
-        metavar='csv',
-        help=('reference details'))
+        'references',
+        type=dictwriter(REFERENCE_COLS),
+        help=str(REFERENCE_COLS))
+    parser.add_argument(
+        'refseq_info',
+        type=dictwriter(REFSEQ_INFO_COLS),
+        help=str(REFSEQ_INFO_COLS))
 
     return parser
 
 
-def tax_of_genbank(gb):
-    """
-    Get the tax id from a genbank record,
-    returning None if no taxonomy is present
-    """
-    # Check for bad name
-    try:
-        source = next(i for i in gb.features if i.type == 'source')
-        taxon = next(i[6:] for i in source.qualifiers.get('db_xref', [])
-                     if i.startswith('taxon:'))
-        return taxon
-    except StopIteration:
-        return
+def dictwriter(columns):
+    def writer(filename):
+        out = csv.DictWriter(
+            open(filename, 'w'),
+            fieldnames=columns,
+            extrasaction='ignore')
+        out.writeheader()
+        return out
+    return writer
 
 
-def accession_version_of_genbank(record):
-    """
-    Return the accession and version of a Bio.SeqRecord.SeqRecord
-    """
-    annotations = record.annotations
-    accession = annotations.get('accessions', [''])[0]
-    if accession:
-        if 'sequence_version' in annotations:
-            version = int(annotations.get('sequence_version'))
-        elif record.id.startswith(accession + '.'):
-            version = int(record.id.split('.', 1)[1])
-        else:
-            version = 1
-        version = '{}.{}'.format(accession, version)
-    else:
-        version = ''
-    return accession, version
+def main():
+    args = build_parser().parse_args()
 
+    references = []
 
-def count_ambiguous(seq):
-    return sum(i not in ACGT for i in seq)
+    for i, g in enumerate(SeqIO.parse(args.genbank, 'genbank')):
+        sys.stderr.write('\rprocessing record ' + str(i))
 
+        try:
+            record = parse_record(g)
+            record.update({'download_date': args.download_date})
 
-def is_type(record):
-    """
-    Returns a boolean indicating whether a sequence is a member of a type
-    strain, as indicated by the presence of the string '(T)' within the
-    record description.
+            refs = parse_references(g)
+            for r in refs:
+                r.update({
+                    'version': record['version'],
+                    'accession': record['accession']})
+            references.extend(refs)
 
-    Note: NOT YET USED
-    """
-    type_keywords = ['(T)', 'ATCC', 'NCTC', 'NBRC', 'CCUG',
-                     'DSM', 'JCM', 'NCDO', 'NCIB', 'CIP']
+            args.annotations.writerow(record)
 
-    for t in type_keywords:
-        if t in record.description:
-            return True
+            # refseqs
+            if '_' in record['accession']:
+                row = parse_refseq_source(g)
+                row.update({'seqname': record['seqname']})
+                args.refseq_info.writerow(row)
 
-    return False
+            args.fasta.write('>{}\n{}\n'.format(record['seqname'], g.seq))
+        except Exception as e:
+            print(g)
+            raise(e)
 
+    # deduplicate and write references and pubmed_info
+    ref_set = set(tuple(r[c] for c in REFERENCE_COLS) for r in references)
+    args.references.writerows([dict(zip(REFERENCE_COLS, r)) for r in ref_set])
 
-def parse_record(record):
-    accession, version = accession_version_of_genbank(record)
-    organism = record.annotations['organism']
-
-    tax_id = tax_of_genbank(record)
-    seq_start, seq_stop = parse_coordinates(record)
-
-    if None not in (seq_start, seq_stop):
-        seq_id = '{}_{}_{}'.format(accession, seq_start, seq_stop)
-    else:
-        seq_id = record.id
-
-    info = dict(accession=accession,
-                ambig_count=count_ambiguous(record.seq),
-                date=record.annotations['date'],
-                description=record.description,
-                gi=record.annotations.get('gi', ''),
-                keywords=';'.join(record.annotations.get('keywords', [])),
-                length=len(record),
-                name=record.name,
-                organism=organism,
-                seq_start=seq_start,
-                seq_stop=seq_stop,
-                seqname=seq_id,
-                source=record.annotations['source'],
-                tax_id=tax_id,
-                version=version)
-    return info
+    pub_set = set(tuple(r[c] for c in PUBMED_COLS) for r in references)
+    args.pubmed_info.writerows([dict(zip(PUBMED_COLS, r)) for r in pub_set])
 
 
 def parse_coordinates(record):
     accessions = record.annotations['accessions']
     if 'REGION:' in accessions:
         coordinates = accessions[accessions.index('REGION:') + 1]
-        match = re.search(COORDINATES, coordinates)
+        match = re.search(REGION_COORDINATES, coordinates)
         seq_start, seq_stop = match.group('seq_start'), match.group('seq_stop')
     else:
         seq_start, seq_stop = 1, len(record.seq)
     return seq_start, seq_stop
+
+
+def parse_record(record):
+    version, accession, version_num = parse_version(record)
+
+    source = next(i for i in record.features if i.type == 'source')
+    quals = source.qualifiers
+
+    # get tax_id
+    if 'db_xref' in quals:
+        for i in quals.get('db_xref', []):
+            if i.startswith('taxon:'):
+                tax_id = i[6:]
+                break
+    # occasionally, tax_ids are missing
+    else:
+        tax_id = ''
+
+    seq_start, seq_stop = parse_coordinates(record)
+    if all([seq_start, seq_stop]):
+        seq_id = '{}_{}_{}'.format(accession, seq_start, seq_stop)
+    else:
+        seq_id = record.id
+
+    info = dict(accession=accession,
+                ambig_count=sum(1 for b in record.seq if b not in ACGT),
+                modified_date=record.annotations['date'],
+                description=record.description,
+                keywords=';'.join(record.annotations.get('keywords', [])),
+                length=len(record),
+                name=record.name,
+                organism=record.annotations['organism'],
+                seq_start=seq_start,
+                seq_stop=seq_stop,
+                seqname=seq_id,
+                source=record.annotations['source'],
+                mol_type=';'.join(quals.get('mol_type', '')),
+                strain=';'.join(quals.get('strain', '')),
+                isolate=';'.join(quals.get('isolate', '')),
+                isolation_source=';'.join(quals.get('isolation_source', '')),
+                tax_id=tax_id,
+                version=version,
+                version_num=version_num)
+
+    return info
 
 
 def parse_references(record):
@@ -178,53 +196,43 @@ def parse_references(record):
                      comment=r.comment,
                      consrtm=r.consrtm,
                      journal=r.journal,
-                     medline_id=r.medline_id,
                      pubmed_id=r.pubmed_id))
     return references
 
 
-def main():
-    args = build_parser().parse_args()
+def parse_refseq_source(record):
+    acc = re.search(REFSEQ_SOURCE, record.annotations['comment'])
+    gi = re.search(GI_SOURCE, record.annotations['comment'])
 
-    # setup csv output files
-    info_out = csv.DictWriter(
-        args.info_out,
-        fieldnames=seq_info_columns,
-        extrasaction='ignore')
-    info_out.writeheader()
+    if not acc and not gi:
+        raise ValueError('Cannot parse record')
 
-    if args.pubmed_ids:
-        pubmed_ids_out = csv.DictWriter(
-            args.pubmed_ids,
-            fieldnames=pubmed_columns,
-            extrasaction='ignore')
-        pubmed_ids_out.writeheader()
+    result = {}
+    if acc:
+        result.update(acc.groupdict())
+    if gi:
+        result.update(gi.groupdict())
+
+    return result
+
+
+def parse_version(record):
+    """
+    Return the accession and version of a Bio.SeqRecord.SeqRecord
+    """
+    annotations = record.annotations
+    accession = annotations.get('accessions', [''])[0]
+    if accession:
+        if 'sequence_version' in annotations:
+            version_num = str(annotations.get('sequence_version'))
+        elif record.id.startswith(accession + '.'):
+            version_num = record.id.split('.', 1)[1]
+        else:
+            version_num = '1'
+        version = accession + '.' + version_num
     else:
-        pubmed_ids_out = None
-
-    if args.references:
-        references_out = csv.DictWriter(
-            args.references,
-            fieldnames=reference_columns,
-            extrasaction='ignore')
-        references_out.writeheader()
-    else:
-        references_out = None
-
-    for g in SeqIO.parse(args.genbank, 'genbank'):
-        record = parse_record(g)
-        args.fasta_out.write('>{}\n{}\n'.format(record['seqname'], g.seq))
-        info_out.writerow(record)
-
-        if pubmed_ids_out:
-            references = parse_references(g)
-            for r in references:
-                pubmed_ids_out.writerow(
-                    {'version': record['version'],
-                     'accession': record['accession'],
-                     'pubmed_id': r['pubmed_id']})
-            if references_out:
-                references_out.writerows(references)
+        version = ''
+    return version, accession, version_num
 
 
 if __name__ == '__main__':

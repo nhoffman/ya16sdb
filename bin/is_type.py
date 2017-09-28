@@ -54,10 +54,6 @@ def main():
         desc_types = info['description'].apply(lambda x: t in x)
         info.loc[desc_types, 'is_type'] = True
 
-    print('marking NR_ accessions')
-    nr_types = info['version'].apply(lambda x: x.startswith('NR_'))
-    info.loc[nr_types, 'is_type'] = True
-
     info.to_csv(args.out, index=False, columns=columns)
 
 
