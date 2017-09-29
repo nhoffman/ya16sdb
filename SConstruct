@@ -302,6 +302,7 @@ fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
             '$out/refresh/annotations.csv',
             '$out/pubmed_ids.csv',
             '$out/references.csv',
+            '$out/refseq_info.csv',
             '$out/versions.csv'],
     source=[records,
             vsearch_fa, '$seqs_cache',
@@ -318,16 +319,6 @@ fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
             Copy('$refseq_info', '${TARGETS[4]}'),
             Copy('$versions_cache', '$TARGETS[5]')])
 
-'''
-append new records to global list
-
-NOTE: see bin/dedup_gb.py for global genbank record maintenance
-'''
-env.Command(
-    target=None,
-    source=gbs,
-    action='cat $SOURCE >> $genbank_cache')
-
 """
 update all tax_ids
 """
@@ -340,6 +331,16 @@ annotations = env.Command(
             '--schema $schema '
             '$SOURCE $tax_url',
             Copy('$annotations_cache', '$TARGET')])
+
+'''
+append new records to global list
+
+NOTE: see bin/dedup_gb.py for global genbank record maintenance
+'''
+env.Command(
+    target=None,
+    source=gbs,
+    action='cat $SOURCE >> $genbank_cache')
 
 """
 Remove and re-append is_type column with sequences per discussion:
@@ -362,19 +363,25 @@ full_fa, full_annotations = env.Command(
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '--out-fa ${TARGETS[0]} '
-            '--out-info ${TARGETS[1]} '
+            '--out-annotations ${TARGETS[1]} '
             '$SOURCES'))
+
+"""
+filter for valid annotations
+"""
+valid_annotations = env.Command(
+    target='$out/1200bp/valid/annotations.csv',
+    source=full_annotations,
+    action='is_valid.py --out $TARGET  --schema $schema $SOURCE $tax_url')
 
 """
 Make general valid taxtable with all ranks included
 """
 valid_tax = env.Command(
     target='$out/1200bp/valid/taxonomy.csv',
-    source=full_annotations,
+    source=valid_annotations,
     action=('taxit -v taxtable '
             '--seq-info $SOURCE '
-            '--clade-ids 2 '  # Bacteria
-            '--valid '
             '--out $TARGET '
             '--schema $schema '
             '$tax_url'))
@@ -382,15 +389,13 @@ valid_tax = env.Command(
 """
 pull valid sequences based on valid and ranked tax_ids
 """
-valid_fa, valid_annotations = env.Command(
-    target=['$out/1200bp/valid/seqs.fasta',
-            '$out/1200bp/valid/seq_info.csv'],
-    source=[valid_tax, full_fa, full_annotations],
+valid_fa = env.Command(
+    target='$out/1200bp/valid/seqs.fasta',
+    source=[full_fa, valid_annotations],
     action=('partition_refs.py '
-            '--tax-ids ${SOURCES[0]} '
-            '--out-fa ${TARGETS[0]} '
-            '--out-info ${TARGETS[1]} '
-            '${SOURCES[1:]}'))
+            '--tax-ids ${SOURCES[1]} '
+            '--out-fa $TARGET '
+            '${SOURCES[0]}'))
 
 """
 Count reference sequences that can be used for classification filtering
@@ -415,7 +420,7 @@ types_fasta, types_annotations = env.Command(
     action=('partition_refs.py '
             '--types '
             '--out-fa ${TARGETS[0]} '
-            '--out-info ${TARGETS[1]} '
+            '--out-annotations ${TARGETS[1]} '
             '$SOURCES'))
 
 """
