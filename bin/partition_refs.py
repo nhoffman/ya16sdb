@@ -20,13 +20,13 @@ def build_parser():
         help="""sequence file""",
         type=argparse.FileType('r'))
     p.add_argument(
-        'seqinfo',
+        'annotations',
         metavar='CSV',
         help="""Sequence metadata""")
 
     # outputs
     p.add_argument(
-        '--out-info',
+        '--out-annotations',
         metavar='CSV',
         type=argparse.FileType('w'),
         help='seq info out')
@@ -50,7 +50,7 @@ def build_parser():
     flt.add_argument(
         '--types',
         action='store_true',
-        help='select is_type == TRUE')
+        help='select is_type is True')
     flt.add_argument(
         '--tax-ids',
         help='column tax_id')
@@ -61,39 +61,39 @@ def build_parser():
 def main():
     args = build_parser().parse_args()
 
-    seqs = SeqIO.parse(args.fasta, 'fasta')
-    dtype = {'tax_id': str, 'gi': str, 'species': str,
-             'ambig_count': float, 'is_type': bool,
-             'length': int, 'description': str, 'accession': str,
-             'seq_start': int, 'seq_stop': int, 'gi': str, 'name': str,
-             'organism': str, 'date': str, 'keywords': str, 'seqname': str,
-             'source': str, 'version': str, 'original': str}
-    seq_info = pandas.read_csv(args.seqinfo, dtype=dtype).set_index('seqname')
+    annotations = pandas.read_csv(args.annotations, dtype=str)
+    annotations = annotations.set_index('seqname')
 
     # raw min_length filtering
     if args.min_length:
-        seq_info = seq_info[seq_info['length'] > args.min_length]
+        annotations['length'] = annotations['length'].astype(int)
+        annotations = annotations[annotations['length'] > args.min_length]
 
     # raw prop_ambig filtering
     if args.prop_ambig_cutoff:
-        seq_info['prop_ambig'] = seq_info['ambig_count'] / seq_info['length']
-        seq_info = seq_info[seq_info['prop_ambig'] < args.prop_ambig_cutoff]
-        seq_info = seq_info.drop('prop_ambig', axis=1)
+        annotations['ambig_count'] = annotations['ambig_count'].astype(int)
+        annotations['length'] = annotations['length'].astype(int)
+        annotations['prop_ambig'] = (
+            annotations['ambig_count'] / annotations['length'])
+        annotations = (
+            annotations[annotations['prop_ambig'] < args.prop_ambig_cutoff])
+        annotations = annotations.drop('prop_ambig', axis=1)
 
     if args.types:
-        seq_info = seq_info[seq_info['is_type']]
+        annotations = annotations[annotations['is_type'].str.lower() == 'true']
 
     if args.tax_ids:
         tax_ids = pandas.read_csv(
             args.tax_ids, usecols=['tax_id'], squeeze=True, dtype=str)
-        seq_info = seq_info[seq_info['tax_id'].isin(tax_ids)]
+        annotations = annotations[annotations['tax_id'].isin(tax_ids)]
 
     if args.out_fa:
-        seqs = (s for s in seqs if s.id in seq_info.index)
+        seqs = SeqIO.parse(args.fasta, 'fasta')
+        seqs = (s for s in seqs if s.id in annotations.index)
         SeqIO.write(seqs, args.out_fa, 'fasta')
 
-    if args.out_info:
-        seq_info.to_csv(args.out_info)
+    if args.out_annotations:
+        annotations.to_csv(args.out_annotations)
 
 
 if __name__ == '__main__':
