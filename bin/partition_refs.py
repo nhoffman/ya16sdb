@@ -13,16 +13,16 @@ def build_parser():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    # inputs
-    p.add_argument(
-        'fasta',
-        metavar='FASTA',
-        help="""sequence file""",
-        type=argparse.FileType('r'))
     p.add_argument(
         'annotations',
         metavar='CSV',
         help="""Sequence metadata""")
+    # inputs
+    p.add_argument(
+        '--fasta',
+        metavar='FASTA',
+        help="""sequence file""",
+        type=argparse.FileType('r'))
 
     # outputs
     p.add_argument(
@@ -30,12 +30,10 @@ def build_parser():
         metavar='CSV',
         type=argparse.FileType('w'),
         help='seq info out')
-
     p.add_argument(
         '--out-fa',
         type=argparse.FileType('w'),
         help='fasta out')
-
     # filtering switches
     flt = p.add_argument_group('filtering options')
     flt.add_argument(
@@ -47,10 +45,6 @@ def build_parser():
         '--min-length',
         type=int,
         help='Minimum sequence length')
-    flt.add_argument(
-        '--types',
-        action='store_true',
-        help='select is_type is True')
     flt.add_argument(
         '--tax-ids',
         help='column tax_id')
