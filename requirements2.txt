@@ -1,0 +1,5 @@
+# also see bin/bootsrap.sh for full environment setup
+psycopg2
+bokeh>=0.12.5
+git+https://github.com/google/google-visualization-python.git
+git+https://github.com/fhcrc/taxtastic

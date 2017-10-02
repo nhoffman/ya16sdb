@@ -1,0 +1,3 @@
+pandas
+scons
+git+https://github.com/crosenth/medirect.git

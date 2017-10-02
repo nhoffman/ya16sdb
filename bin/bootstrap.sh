@@ -30,8 +30,13 @@ if [[ ! -d $DEENURP ]]; then
     git clone -b "$DEENURP_BRANCH" git@github.com:fhcrc/deenurp.git $DEENURP
 fi
 
+# install python envs
+python3 -m venv $venv
+virtualenv --quiet --python python2 $venv
 ${DEENURP}/bin/bootstrap.sh $venv
 source $venv/bin/activate
+$venv/bin/pip2 install --requirement ${MKREFPKG_DIR}/requirements2.txt
+$venv/bin/pip3 install --requirement ${MKREFPKG_DIR}/requirements3.txt
 
 if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
@@ -53,11 +58,4 @@ else
   echo "esearch already installed: $(esearch -version)"
 fi
 
-# set PIP_FIND_LINKS to use wheels https://pip.pypa.io/en/latest/user_guide.html#environment-variables
-pip2 install --requirement ${MKREFPKG_DIR}/requirements2.txt
-
-# install Python3
-python3.6 -m venv --copies $venv
-# wget --quiet --output-document src/get-pip.py https://bootstrap.pypa.io/get-pip.py
-# python3 src/get-pip.py
-$venv/bin/pip3 install --requirement ${MKREFPKG_DIR}/requirements3.txt
+echo 'All done!'
