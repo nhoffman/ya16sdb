@@ -175,7 +175,13 @@ types = env.Command(
             ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
 
 if test:
-    records = 'testfiles/esearch.txt'
+    tax_ids = (i.strip() for i in open('testfiles/tax_ids.txt') if i)
+    tax_ids = ('txid' + i + '[Organism]' for i in tax_ids)
+    records = env.Command(
+        target='$out/esearch.txt',
+        source='testfiles/tax_ids.txt',
+        action=('esearch -db nucleotide -query "' + rrna_16s +
+                ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
 else:
     """
     concat our download set
