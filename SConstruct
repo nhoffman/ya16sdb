@@ -57,13 +57,21 @@ if not venv:
 
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
+test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
 
 vrs = Variables(None, ARGUMENTS)
+if test:
+    vrs.Add('base', help='Path to output directory', default='test_output')
+else:
+    vrs.Add('base', help='Path to output directory', default='output')
+vrs.Add(
+    'out',
+    help='Path to dated output sub directory',
+    default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
-vrs.Add('base', help='Path to base output directory', default='output')
 vrs.Add(
     'tax_url',
     default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
@@ -72,10 +80,6 @@ vrs.Add(
     'schema',
     default='ncbi_taxonomy',
     help='postgres database schema')
-vrs.Add(
-    'out',
-    help='Path to dated output directory',
-    default=os.path.join('$base', time.strftime('%Y%m%d')))
 
 # cache vars
 vrs.Add(PathVariable(
@@ -170,16 +174,16 @@ types = env.Command(
     action=('esearch -db nucleotide -query "' + rrna_16s +
             ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
 
-"""
-concat our download set
-"""
-records = env.Command(
-    source=[classified, tm7],
-    target='$out/esearch.txt',
-    action='cat $SOURCES > $TARGET')
-
-# testing
-records = 'testfiles/esearch.txt'
+if test:
+    records = 'testfiles/esearch.txt'
+else:
+    """
+    concat our download set
+    """
+    records = env.Command(
+        source=[classified, tm7],
+        target='$out/esearch.txt',
+        action='cat $SOURCES > $TARGET')
 
 """
 Do not download record accessions in the ignore list or
