@@ -35,8 +35,7 @@ python3 -m venv $venv
 virtualenv --quiet --python python2 $venv
 ${DEENURP}/bin/bootstrap.sh $venv
 source $venv/bin/activate
-$venv/bin/pip2 install --requirement ${MKREFPKG_DIR}/requirements2.txt
-$venv/bin/pip3 install --requirement ${MKREFPKG_DIR}/requirements3.txt
+$venv/bin/pip3 install --requirement ${MKREFPKG_DIR}/requirements.txt
 
 if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
