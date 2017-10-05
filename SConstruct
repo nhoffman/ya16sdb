@@ -191,7 +191,8 @@ records = 'testfiles/esearch.txt'
 
 """
 Do not download record accessions in the ignore list or
-that have been previously downloaded in the records_cache
+that have been previously downloaded in the records_cache.
+Exit script if no new records exist.
 """
 new = env.Command(
     target='$out/new/records.txt',
@@ -202,8 +203,7 @@ new = env.Command(
             '--fixed-strings '
             '--file /dev/stdin '
             '${SOURCES[0]} > $TARGET '
-            # avoid the grep no match exit code 1 that scons hates
-            '|| true'])
+            '|| (echo "No new records" && exit 1)'])
 
 gbs = env.Command(
     target='$out/new/records.gb',
@@ -271,7 +271,7 @@ known_info, _ = env.Command(
             '--unknowns ${TARGETS[1]} '
             '--outfile ${TARGETS[0]} '
             '--schema $schema '
-            '$SOURCES $tax_url'])
+            '$SOURCE $tax_url'])
 
 """
 vsearch new sequences with training set to test sequence orientation
@@ -407,6 +407,8 @@ valid_tax = env.Command(
             '--schema $schema '
             '$tax_url'))
 
+blast_db(env, valid_fa, '$out/1200bp/valid/blast')
+
 """
 Remove and re-append is_type column with sequences per discussion:
 
@@ -489,15 +491,16 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             # cache it
             Copy('$filter_outliers_cache', '${TARGETS[2]}')])
 
-blast_db(env, filtered_fa, '$out/1200bp/valid/filtered/blast')
+blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/blast')
 
 """
-Make filtered taxtable
+Make filtered taxtable with ranked columns and no_rank rows
 """
 filtered_tax = env.Command(
     target='$out/1200bp/valid/dedup/filtered/taxonomy.csv',
-    source=[valid_tax, filtered_info],
-    action='subset.py --out $TARGET $SOURCES')
+    source=filtered_info,
+    action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url '
+            '| ranked.py --columns --out $TARGET'))
 
 '''
 find top hit for each sequence among type strains
@@ -542,7 +545,7 @@ env.Command(
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
             '--log-in ${SOURCES[5]} '
-            '--plot-dir $out/1200bp/valid/filtered/plots '
+            '--plot-dir $out/1200bp/valid/dedup/filtered/plots '
             '--plot-map ${TARGETS[1]} '
             '--plot-index ${TARGETS[0]}'))
 
