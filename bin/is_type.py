@@ -37,6 +37,7 @@ def main():
     header = next(info)
     version = header.index('version')
     writer = csv.writer(args.out)
+    writer.writerow(header)
     writer.writerows(i for i in info if i[version] in types)
 
 

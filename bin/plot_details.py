@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 """
 generates plots of species level sequence filtering
@@ -13,7 +13,6 @@ import itertools
 import gviz_api
 import jinja2
 import json
-import logging
 import os
 import pandas as pd
 import sys
@@ -25,15 +24,6 @@ from bokeh.models import CustomJS
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import gridplot
 from bokeh.resources import CSSResources, JSResources
-
-# from bokeh import colors
-
-logging.basicConfig(
-    file=sys.stdout,
-    format='%(levelname)s %(module)s %(lineno)s %(message)s',
-    level=logging.WARNING)
-
-log = logging
 
 # total pixel width = 1220
 TABLE_WIDTHS = {
@@ -246,14 +236,17 @@ def main(arguments):
         'details',
         help="details of filtering results")
     parser.add_argument(
-        'taxonomy',
-        help="taxonomy in csv format")
-    parser.add_argument(
         'hits',
         help="output of annotate_hits.py")
     parser.add_argument(
-        'hits_seq_info',
-        help='seq_info for reference seqs')
+        'annotations',
+        help="extra annotations for type strains and filter_outliers details")
+    parser.add_argument(
+        'taxonomy',
+        help="taxonomy in csv format")
+    parser.add_argument(
+        'type_strains',
+        help='text file of type strain versions')
     parser.add_argument(
         '--param',
         action='append',
@@ -335,26 +328,25 @@ def main(arguments):
         usecols=['seqname', 'hit', 'pct_id'])
     hits = hits.set_index('seqname')
 
-    hit_info = pd.read_csv(
-        args.hits_seq_info,
-        dtype=str,
-        usecols=['seqname', 'tax_id', 'version'])
-    hit_info = hit_info.set_index('seqname')
+    annos = pd.read_csv(
+        args.annotations,
+        usecols=['seqname', 'tax_id', 'description', 'version'],
+        dtype=str).set_index('seqname')
+    types = set(t.strip() for t in open(args.type_strains) if t)
+    annos['is_type'] = annos['version'].apply(lambda x: x in types)
 
-    cols = ['seqname', 'tax_id', 'ambig_count', 'centroid',
-            'version', 'cluster', 'dist', 'is_out', 'species',
-            'x', 'y', 'is_type', 'description']
     details = pd.read_csv(
         args.details,
-        usecols=cols,
-        dtype={
-            'species': str,
-            'tax_id': str,
-            'version': str,
-            'dist': float})
-    details = details.set_index('seqname')
+        usecols=['seqname', 'tax_id', 'centroid', 'cluster',
+                 'dist', 'is_out', 'x', 'y'],
+        dtype={'seqname': str, 'tax_id': str, 'centroid': str, 'is_out': bool,
+               'cluster': str, 'dist': float, 'x': float, 'y': float})
 
-    hits = hits.join(hit_info, on='hit')  # get tax_id
+    details = details.set_index('seqname')
+    details = details.join(taxonomy['species'], on='tax_id')  # get species_id
+    details = details.join(annos[['description', 'version', 'is_type']])
+
+    hits = hits.join(annos[['tax_id', 'version']], on='hit')  # get tax_id
     hits = hits.join(taxonomy['species'], on='tax_id')  # get species_id
     hits = hits.join(species, on='species')  # get species tax name
     hits = hits.rename(
@@ -427,8 +419,7 @@ def main(arguments):
                 'dist',
                 'outlier',
                 'type strain hit',
-                'identity'
-            ])
+                'identity'])
 
         html = file_html(
             gridplot([[step_plt, pca_plt], [tab]]),
@@ -442,7 +433,7 @@ def main(arguments):
         if args.plot_map:
             map_out.writerow([species_id, filename])
 
-        n_out = sum(species['is_out'])
+        n_out = int(sum(species['is_out']))
         pct_out = (100.0 * n_out) / len(species)
         clustered = not (species.cluster == -1).all()
 
@@ -453,8 +444,7 @@ def main(arguments):
             len(species),
             clustered,
             n_out if clustered else None,
-            (pct_out, '%.01f%%' % pct_out) if clustered else None,
-        ])
+            (pct_out, '%.01f%%' % pct_out) if clustered else None])
 
     with open(os.path.join(plot_dir, json_data_file), 'w') as fout:
         table.AppendData(table_data)

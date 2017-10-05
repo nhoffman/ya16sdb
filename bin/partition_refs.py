@@ -73,9 +73,6 @@ def main():
             annotations[annotations['prop_ambig'] < args.prop_ambig_cutoff])
         annotations = annotations.drop('prop_ambig', axis=1)
 
-    if args.types:
-        annotations = annotations[annotations['is_type'].str.lower() == 'true']
-
     if args.tax_ids:
         tax_ids = pandas.read_csv(
             args.tax_ids, usecols=['tax_id'], squeeze=True, dtype=str)

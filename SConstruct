@@ -10,73 +10,22 @@ import sys
 import time
 
 # requirements installed in the virtualenv
+import SCons
 from SCons.Script import (
-    Variables, BoolVariable, ARGUMENTS, Help, Copy, Environment)
+    Variables, ARGUMENTS, Help, Copy, Environment, PathVariable)
 
-venv = os.environ.get('VIRTUAL_ENV')
-if not venv:
-    sys.exit('--> an active virtualenv is required'.format(venv))
 
-true_vals = ['t', 'y', '1']
-release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
-
-vrs = Variables(None, ARGUMENTS)
-vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
-vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('nproc', ('Number of concurrent processes '), 14)
-# nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
-vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
-vrs.Add('base', help='Path to base output directory', default='output-ncbi')
-vrs.Add(
-    'tax_url',
-    default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
-    help='database url')
-vrs.Add(
-    'schema',
-    default='ncbi_taxonomy',
-    help='postgres database schema')
-vrs.Add(
-    'out',
-    help='Path to dated output directory',
-    default=os.path.join('$base', time.strftime('%Y%m%d')))
-
-# cache
-vrs.Add('genbank_cache', default='$base/records.gb')
-vrs.Add('seqs_cache', default='$base/seqs.fasta')
-vrs.Add('annotations_cache', default='$base/annotations.csv')
-vrs.Add('tax_ids_cache', default='$base/tax_ids.csv')
-vrs.Add('pubmed_info', default='$base/pubmed_info.csv')
-vrs.Add('references_cache', default='$base/references.csv')
-vrs.Add('versions_cache', default='$base/versions.txt')
-vrs.Add('refseq_info_cache', default='$base/refseq_info.csv')
-
-# Provides access to options prior to instantiation of env object
-# below; it's better to access variables through the env object.
-varargs = dict({opt.key: opt.default for opt in vrs.options}, **vrs.args)
-truevals = {True, 'yes', 'y', 'True', 'true', 't'}
-nproc = varargs['nproc']
-
-environment_variables = dict(
-    os.environ,
-    PATH=':'.join([
-        'bin',
-        os.path.join(venv, 'bin'),
-        '/usr/local/bin',
-        '/usr/bin',
-        '/bin']),
-)
-
-env = Environment(
-    ENV=environment_variables,
-    variables=vrs,
-    shell='bash',
-    time=False
-)
-
-env.Decider('MD5')
-
-Help(vrs.GenerateHelpText(env))
+def PathIsFileCreate(key, val, env):
+    """Validator to check if Path is a cache file,
+    creating it if it does not exist."""
+    if os.path.isdir(val):
+        m = 'Path for option %s is a directory, not a file: %s'
+        raise SCons.Errors.UserError(m % (key, val))
+    if not os.path.exists(val):
+        d = os.path.dirname(val)
+        if not os.path.exists(d):
+            os.makedirs(d)
+        open(val, 'w').close()
 
 
 def blast_db(env, sequence_file, output_base, dbtype='nucl'):
@@ -102,6 +51,84 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
     return blast_out
 
 
+venv = os.environ.get('VIRTUAL_ENV')
+if not venv:
+    sys.exit('--> an active virtualenv is required'.format(venv))
+
+true_vals = ['t', 'y', '1']
+release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
+
+vrs = Variables(None, ARGUMENTS)
+vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
+vrs.Add('retry', 'ncbi retry milliseconds', '60000')
+vrs.Add('nproc', ('Number of concurrent processes '), 14)
+# nreq should be set to 3 during weekdays
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
+vrs.Add('base', help='Path to base output directory', default='output-ncbi')
+vrs.Add(
+    'tax_url',
+    default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
+    help='database url')
+vrs.Add(
+    'schema',
+    default='ncbi_taxonomy',
+    help='postgres database schema')
+vrs.Add(
+    'out',
+    help='Path to dated output directory',
+    default=os.path.join('$base', time.strftime('%Y%m%d')))
+
+# cache
+vrs.Add(PathVariable(
+    'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'seqs_cache', '', '$base/seqs.fasta', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'annotations_cache', '', '$base/annotations.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'pubmed_info_cache', '', '$base/pubmed_info.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'references_cache', '', '$base/references.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'records_cache', '', '$base/records.txt', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'refseq_info_cache', '', '$base/refseq_info.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'filter_outliers_cache', '',
+    '$base/filter_outliers.csv', PathIsFileCreate))
+
+# Provides access to options prior to instantiation of env object
+# below; it's better to access variables through the env object.
+varargs = dict({opt.key: opt.default for opt in vrs.options}, **vrs.args)
+truevals = {True, 'yes', 'y', 'True', 'true', 't'}
+nproc = varargs['nproc']
+
+environment_variables = dict(
+    os.environ,
+    PATH=':'.join([
+        'bin',
+        os.path.join(venv, 'bin'),
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin']),
+)
+
+env = Environment(
+    ENV=environment_variables,
+    variables=vrs,
+    shell='bash',
+    time=False,
+    taxit=(
+        'singularity exec '
+        '--bind $$(pwd$)):$$(pwd$)) '
+        '--workdir $$(pwd$)) '
+        '/molmicro/common/singularity/taxtastic-0.8.2.img taxit')
+)
+
+env.Decider('MD5')
+
+Help(vrs.GenerateHelpText(env))
+
 rrna_16s = ('16s[All Fields] '
             'AND rRNA[Feature Key] '
             'AND Bacteria[Organism] '
@@ -126,7 +153,7 @@ execution of this step.
 """
 classified = env.Command(
     source=None,
-    target='$out/classified.txt',
+    target='$out/esearch/classified.txt',
     action=('esearch -db nucleotide -query "' + rrna_16s +
             'NOT(environmental samples[Organism] '
             'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
@@ -136,7 +163,7 @@ Download TM7 accessions
 """
 tm7 = env.Command(
     source=None,
-    target='$out/tm7.txt',
+    target='$out/esearch/tm7.txt',
     action=('esearch -db nucleotide -query "' + rrna_16s +
             ' AND Candidatus Saccharibacteria[Organism]" | ' + mefetch_acc))
 
@@ -147,7 +174,7 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 """
 types = env.Command(
     source=None,
-    target='$out/1200bp/valid/types/records.txt',
+    target='$out/1200bp/valid/types/esearch.txt',
     action=('esearch -db nucleotide -query "' + rrna_16s +
             ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
 
@@ -156,20 +183,20 @@ concat our download set
 """
 records = env.Command(
     source=[classified, tm7],
-    target='$out/records.txt',
+    target='$out/esearch.txt',
     action='cat $SOURCES > $TARGET')
 
 # testing
-records = 'testfiles/versions.txt'
+records = 'testfiles/esearch.txt'
 
 """
 Do not download record accessions in the ignore list or
-that have been previously downloaded in the versions_cache
+that have been previously downloaded in the records_cache
 """
 new = env.Command(
-    target='$out/new/versions.txt',
-    source=[records, '$versions_cache', 'data/ignore.txt'],
-    action=['cat ${SOURCES[-2]} | '
+    target='$out/new/records.txt',
+    source=[records, '$records_cache', 'data/ignore.txt'],
+    action=['cat ${SOURCES[-2:]} | '
             'grep '
             '--invert-match '
             '--fixed-strings '
@@ -200,7 +227,7 @@ gbs = env.Command(
             '-format gbwithparts '
             '-log $out/ncbi.log '
             '-proc $nreq '
-            '-retry $retry'])
+            '-retry $retry > $TARGET'])
 
 """
 extract
@@ -240,9 +267,9 @@ the ncbi taxonomy pipeline is out of sync with the latest 16s records
 known_info, _ = env.Command(
     target=['$out/new/taxit/annotations.csv', '$out/new/taxit/unknown.csv'],
     source=new_annotations,
-    action=['taxit update_taxids '
+    action=['$taxit update_taxids '
             '--unknowns ${TARGETS[1]} '
-            '--out ${TARGETS[0]} '
+            '--outfile ${TARGETS[0]} '
             '--schema $schema '
             '$SOURCES $tax_url'])
 
@@ -272,8 +299,8 @@ These records are rare and we want to be able to re-download later
 them when the 16s training set updates.
 """
 vsearch_fa, _ = env.Command(
-    target=['$out/new/vsearch/unknown.fa',
-            '$out/new/vsearch/invalid.fa'],
+    target=['$out/new/vsearch/seqs.fa',
+            '$out/new/vsearch/unknown.fa'],
     source=[vsearch, new_fa],
     action='vsearch.py --unknowns ${TARGETS[1]} --out ${TARGETS[0]} $SOURCES')
 
@@ -289,7 +316,7 @@ Append with older records
 6. Copy full dataset back to base dir for next download
 
 NOTE: seqs that failed either the vsearch or taxit update_taxids will
-not be appended to the versions.txt file and will therefore be re-downloaded
+not be appended to the records.txt file and will therefore be re-downloaded
 the next time this pipeline is run
 """
 fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
@@ -298,21 +325,21 @@ fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
             '$out/pubmed_ids.csv',
             '$out/references.csv',
             '$out/refseq_info.csv',
-            '$out/versions.csv'],
+            '$out/records.txt'],
     source=[records,
             vsearch_fa, '$seqs_cache',
             known_info, '$annotations_cache',
-            new_pub_info, '$pubmed_info',
+            new_pub_info, '$pubmed_info_cache',
             new_refs, '$references_cache',
-            new_refseq_info, '$refseq_map_cache',
-            no_features, '$versions_cache'],
+            new_refseq_info, '$refseq_info_cache',
+            no_features, '$records_cache'],
     action=['refresh.py $SOURCES $TARGETS',
             # cache
             Copy('$seqs_cache', '${TARGETS[0]}'),
-            Copy('$pubmed_info', '${TARGETS[2]}'),
+            Copy('$pubmed_info_cache', '${TARGETS[2]}'),
             Copy('$references_cache', '${TARGETS[3]}'),
-            Copy('$refseq_info', '${TARGETS[4]}'),
-            Copy('$versions_cache', '$TARGETS[5]')])
+            Copy('$refseq_info_cache', '${TARGETS[4]}'),
+            Copy('$records_cache', '${TARGETS[5]}')])
 
 """
 append new records to global list
@@ -330,8 +357,7 @@ update all tax_ids
 annotations = env.Command(
     target='$out/annotations.csv',
     source=refresh_annotations,
-    action=['taxit -v update_taxids '
-            '--name-column organism '
+    action=['$taxit -v update_taxids '
             '--out $TARGET '
             '--schema $schema '
             '$SOURCE $tax_url',
@@ -347,7 +373,7 @@ full_annotations = env.Command(
             # filtering
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
-            '--out-info $TARGET '
+            '--out-annotations $TARGET '
             '$SOURCE'))
 
 """
@@ -365,7 +391,6 @@ valid_fa = env.Command(
     target='$out/1200bp/valid/seqs.fasta',
     source=[fa, valid_annotations],
     action=('partition_refs.py '
-            '--tax-ids ${SOURCES[1]} '
             '--fasta ${SOURCES[0]} '
             '--out-fa $TARGET '
             '${SOURCES[1]}'))
@@ -376,7 +401,7 @@ Make general valid taxtable with all ranks included
 valid_tax = env.Command(
     target='$out/1200bp/valid/taxonomy.csv',
     source=valid_annotations,
-    action=('taxit -v taxtable '
+    action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
             '--out $TARGET '
             '--schema $schema '
@@ -400,7 +425,7 @@ type_fa = env.Command(
     source=[valid_fa, type_annotations],
     action=('partition_refs.py '
             '--out-fa $TARGET '
-            '--fasta ${SOURCE[0]} '
+            '--fasta ${SOURCES[0]} '
             '${SOURCES[1]}'))
 
 """
@@ -414,7 +439,6 @@ dedup_fa, dedup_annotations = env.Command(
     source=[valid_fa, valid_annotations],
     action=('deenurp -v deduplicate_sequences '
             '--group-by accession '
-            '--prefer-columns is_type '
             '$SOURCES $TARGETS'))
 
 """
@@ -429,11 +453,11 @@ dedup_info = env.Command(
 update tax_ids in details_in cache
 """
 filtered_details_in = env.Command(
-    source='$base/filtered_details.csv',
+    source='$filter_outliers_cache',
     target='$out/1200bp/valid/dedup/filtered/details_in.csv',
-    action=('taxit update_taxids '
+    action=('$taxit update_taxids '
             '--schema $schema '
-            '--out $TARGET '
+            '--outfile $TARGET '
             '$SOURCE $tax_url'))
 
 """
@@ -462,8 +486,8 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             '--max-distance 0.02 '
             '--min-seqs-for-filtering 5 '
             '${SOURCES[:3]}',
-            # cache this
-            Copy('$base/filtered_details.csv', '${TARGETS[2]}')])
+            # cache it
+            Copy('$filter_outliers_cache', '${TARGETS[2]}')])
 
 blast_db(env, filtered_fa, '$out/1200bp/valid/filtered/blast')
 
@@ -506,21 +530,21 @@ env.Command(
     target=['$out/1200bp/valid/dedup/filtered/index.html',
             '$out/1200bp/valid/dedup/filtered/plots/map.csv'],
     source=[filtered_details,
-            valid_tax,
             type_hits,
             annotations,
+            valid_tax,
+            types,
             deenurp_log],
-    action=('plot_details.py ${SOURCES[:4]} '
+    action=('plot_details.py ${SOURCES[:5]} '
             '--param strategy:cluster '
             '--param cluster_type:single '
             '--param distance_percentile:90.0 '
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
-            '--log-in ${SOURCES[4]} '
+            '--log-in ${SOURCES[5]} '
             '--plot-dir $out/1200bp/valid/filtered/plots '
             '--plot-map ${TARGETS[1]} '
-            '--plot-index ${TARGETS[0]}'
-            ))
+            '--plot-index ${TARGETS[0]}'))
 
 """
 Append contributers

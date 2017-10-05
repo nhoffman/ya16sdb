@@ -37,13 +37,15 @@ def main():
     vsearch = (row.split('\t') for row in open(args.vsearch))
     vsearch = {row[0]: row[2] for row in vsearch if row[1] != '*'}
 
-    for r in SeqIO.parse(args.fasta, 'fasta', Alphabet.IUPAC.ambiguous_dna):
-        if r.id in vsearch and Alphabet._verify_alphabet(r.seq):
-            if vsearch[r.id] == '-':
-                r.seq = r.seq.reverse_complement()
-            SeqIO.write(r, args.out, 'fasta')
-        else:
-            SeqIO.write(r, args.unknowns, 'fasta')
+    with open(args.out, 'w') as out, open(args.unknowns, 'w') as unknowns:
+        seqs = SeqIO.parse(args.fasta, 'fasta', Alphabet.IUPAC.ambiguous_dna)
+        for s in seqs:
+            if s.id in vsearch and Alphabet._verify_alphabet(s.seq):
+                if vsearch[s.id] == '-':
+                    s.seq = s.seq.reverse_complement()
+                SeqIO.write(s, out, 'fasta')
+            else:
+                SeqIO.write(s, unknowns, 'fasta')
 
 
 if __name__ == '__main__':
