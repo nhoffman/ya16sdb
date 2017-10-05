@@ -64,7 +64,7 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nproc', ('Number of concurrent processes '), 14)
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
-vrs.Add('base', help='Path to base output directory', default='output-ncbi')
+vrs.Add('base', help='Path to base output directory', default='output')
 vrs.Add(
     'tax_url',
     default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
