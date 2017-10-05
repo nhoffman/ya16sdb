@@ -61,7 +61,6 @@ release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('nproc', ('Number of concurrent processes '), 14)
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add('base', help='Path to base output directory', default='output')
@@ -78,7 +77,7 @@ vrs.Add(
     help='Path to dated output directory',
     default=os.path.join('$base', time.strftime('%Y%m%d')))
 
-# cache
+# cache vars
 vrs.Add(PathVariable(
     'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
 vrs.Add(PathVariable(
@@ -94,14 +93,7 @@ vrs.Add(PathVariable(
 vrs.Add(PathVariable(
     'refseq_info_cache', '', '$base/refseq_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'filter_outliers_cache', '',
-    '$base/filter_outliers.csv', PathIsFileCreate))
-
-# Provides access to options prior to instantiation of env object
-# below; it's better to access variables through the env object.
-varargs = dict({opt.key: opt.default for opt in vrs.options}, **vrs.args)
-truevals = {True, 'yes', 'y', 'True', 'true', 't'}
-nproc = varargs['nproc']
+    'outliers_cache', '', '$base/filter_outliers.csv', PathIsFileCreate))
 
 environment_variables = dict(
     os.environ,
@@ -125,7 +117,7 @@ env = Environment(
         '/molmicro/common/singularity/taxtastic-0.8.2.img taxit')
 )
 
-env.Decider('MD5')
+env.Decider('MD5-timestamp')
 
 Help(vrs.GenerateHelpText(env))
 
@@ -307,13 +299,13 @@ vsearch_fa, _ = env.Command(
 """
 Append with older records
 
-1. Drop seqnames missing eigher a sequence or row in seq_info, sequences
+1. Drop seqnames missing either a sequence or row in seq_info, sequences
    filtered out of the vsearch 16s alignment or sequences with unknown tax_ids
 2. Append seqs, seq_info, pubmed_ids and references to previous data set
 3. Drop records not in records.txt file
 4. Drop sequences that have a refseq equivalent
 5. Deduplicate pubmeds and references
-6. Copy full dataset back to base dir for next download
+6. Copy and cache full dataset
 
 NOTE: seqs that failed either the vsearch or taxit update_taxids will
 not be appended to the records.txt file and will therefore be re-downloaded
@@ -345,6 +337,7 @@ fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
 append new records to global list
 
 NOTE: see bin/dedup_gb.py for genbank record cache maintenance
+TODO: create bin/dedup_gb.py
 """
 env.Command(
     target=None,
@@ -455,7 +448,7 @@ dedup_info = env.Command(
 update tax_ids in details_in cache
 """
 filtered_details_in = env.Command(
-    source='$filter_outliers_cache',
+    source='$outliers_cache',
     target='$out/1200bp/valid/dedup/filtered/details_in.csv',
     action=('$taxit update_taxids '
             '--schema $schema '
@@ -489,9 +482,7 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             '--min-seqs-for-filtering 5 '
             '${SOURCES[:3]}',
             # cache it
-            Copy('$filter_outliers_cache', '${TARGETS[2]}')])
-
-blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/blast')
+            Copy('$outliers_cache', '${TARGETS[2]}')])
 
 """
 Make filtered taxtable with ranked columns and no_rank rows
@@ -502,11 +493,10 @@ filtered_tax = env.Command(
     action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url '
             '| ranked.py --columns --out $TARGET'))
 
+blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/blast')
+
 '''
 find top hit for each sequence among type strains
-
-take --maxaccepts 2 so we can filter out hits where the query and target
-sequences are the same
 '''
 type_hits = env.Command(
     target='$out/1200bp/valid/dedup/filtered/vsearch.blast6out',
@@ -525,9 +515,6 @@ type_hits = env.Command(
 bokeh plot filtered sequences
 
 hard coded: sort column 2 (records) desc
-
-TODO: include derep_map.csv to input for
-"dereplicated" sequence counts per accession
 '''
 env.Command(
     target=['$out/1200bp/valid/dedup/filtered/index.html',
