@@ -130,7 +130,7 @@ rrna_16s = ('16s[All Fields] '
             'AND Bacteria[Organism] '
             'AND 500 : 99999999999[Sequence Length]')
 
-mefetch_acc = ('mefetch '
+mefetch_acc = ('mefetch -vv '
                '-email $email '
                '-mode text '
                '-format acc '
@@ -210,7 +210,7 @@ new = env.Command(
 gbs = env.Command(
     target='$out/new/records.gb',
     source=new,
-    action=['mefetch '  # download feature tables
+    action=['mefetch -vv '  # download feature tables
             '-email $email '
             '-retry $retry '
             '-id $SOURCE '
@@ -270,6 +270,7 @@ known_info, _ = env.Command(
     target=['$out/new/taxit/annotations.csv', '$out/new/taxit/unknown.csv'],
     source=new_annotations,
     action=['$taxit update_taxids '
+            '--unknown-action drop '
             '--unknowns ${TARGETS[1]} '
             '--outfile ${TARGETS[0]} '
             '--schema $schema '
@@ -311,7 +312,7 @@ Append with older records
 
 1. Drop seqnames missing either a sequence or row in seq_info, sequences
    filtered out of the vsearch 16s alignment or sequences with unknown tax_ids
-2. Append seqs, seq_info, pubmed_ids and references to previous data set
+2. Append seqs, seq_info, pubmed_info and references to previous data set
 3. Drop records not in records.txt file
 4. Drop sequences that have a refseq equivalent
 5. Deduplicate pubmeds and references
@@ -324,7 +325,7 @@ the next time this pipeline is run
 fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
     target=['$out/seqs.fasta',
             '$out/refresh/annotations.csv',
-            '$out/pubmed_ids.csv',
+            '$out/pubmed_info.csv',
             '$out/references.csv',
             '$out/refseq_info.csv',
             '$out/records.txt'],
