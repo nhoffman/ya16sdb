@@ -23,8 +23,6 @@ REFERENCE_COLS = ['pubmed_id', 'title', 'authors',
 
 REFSEQ_INFO_COLS = ['seqname', 'accession', 'gi', 'seq_start', 'seq_stop']
 
-REGION_COORDINATES = re.compile('(?P<seq_start>\d+)..(?P<seq_stop>\d+)')
-
 REFSEQ_SOURCE = re.compile('(?P<accession>[A-Z]{1,4}\d{5,8})'
                            ':?(?P<seq_start>\d+)?-?(?P<seq_stop>\d+)?')
 
@@ -130,8 +128,12 @@ def parse_coordinates(record):
     accessions = record.annotations['accessions']
     if 'REGION:' in accessions:
         coordinates = accessions[accessions.index('REGION:') + 1]
-        match = re.search(REGION_COORDINATES, coordinates)
-        seq_start, seq_stop = match.group('seq_start'), match.group('seq_stop')
+        matches = re.findall('\d+', coordinates)
+        if len(matches) == 1:
+            # some records are strange...
+            seq_start, seq_stop = matches[0], len(record.seq)
+        else:
+            seq_start, seq_stop = matches
     else:
         seq_start, seq_stop = 1, len(record.seq)
     return seq_start, seq_stop
