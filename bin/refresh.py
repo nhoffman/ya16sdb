@@ -138,25 +138,32 @@ def main():
         ~prev_refseqs['seqname'].isin(new_refseq_info['seqname'])]
     refseqs = new_refseq_info.append(prev_refseqs)
     refseqs = refseqs[refseqs['seqname'].isin(annos['seqname'])]
+    assert(len(refseqs) == len(refseqs['seqname'].drop_duplicates()))
     refseqs.to_csv(args.refseq_info_out, index=False)
 
+    # for dropping refseq duplicates and concating with all versions later
+    refseqs_acc = refseqs[~refseqs['accession'].isnull()]
+    refseqs_acc_set = set(a for a in refseqs_acc['accession'].tolist())
+
     # remove annotations with refseq duplicates
-    annos = annos[~annos['accession'].isin(refseqs['accession'])]
+    annos = annos[~annos['accession'].isin(refseqs_acc_set)]
 
     assert(len(annos['seqname']) == len(annos['seqname'].drop_duplicates()))
 
     """
     deduplicate and write fasta
     """
-    written = set()
+    print('appending fasta')
+    to_write = set(annos['seqname'].values)
     new_fa = SeqIO.parse(args.new_fasta, 'fasta')
     prev_fa = SeqIO.parse(args.previous_fasta, 'fasta')
     for r in itertools.chain(new_fa, prev_fa):
-        if r.id in annos['seqname'].values and r.id not in written:
-            written.add(r.id)
+        if r.id in to_write:
             SeqIO.write(r, args.fasta_out, 'fasta')
+            to_write.remove(r.id)
 
     # write annotations
+    print('appending annotations')
     annos.to_csv(args.annotations_out, index=False, date_format='%d-%b-%Y')
 
     '''
@@ -202,12 +209,13 @@ def main():
     up to this point
     '''
     versions = set(annos['version'].tolist())
-    versions |= set(refseqs['accession'].tolist())
     versions |= set(n.strip() for n in args.no_features)
+    versions |= refseqs_acc_set
     versions |= previous_versions
 
     for v in sorted(versions):
-        args.versions_out.write(v + '\n')
+        if v:
+            args.versions_out.write(v + '\n')
 
 
 if __name__ == '__main__':
