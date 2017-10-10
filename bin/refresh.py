@@ -3,10 +3,10 @@
 Append new records with old records
 
 Sequences that have no_features or passed all filtering into the
-annotations_out are appended to the versions_out file.
+annotations_out are appended to the records_out file.
 
 Sequences that did not pass the vsearch or tax_id update_taxids steps will be
-not included in the versions_out file and consequently will be re-downloaded
+not included in the records_out file and consequently will be re-downloaded
 
 Sequence ids in the fasta file are compared with the seq_annos. If any seq.id
 or seqname not present in either source all records by accession associated
@@ -74,7 +74,7 @@ def main():
         type=argparse.FileType('r'),
         help='list of versions downloaded with no 16s regions')
     p.add_argument(
-        'previous_versions',
+        'previous_records',
         type=argparse.FileType('r'),
         help='list of previously downloaded record versions')
 
@@ -95,7 +95,7 @@ def main():
         'refseq_info_out',
         help='refseqs output')
     p.add_argument(
-        'versions_out',
+        'records_out',
         type=argparse.FileType('w'),
         help='list of all version downloaded')
 
@@ -128,6 +128,9 @@ def main():
     ncbi = set(v.strip() for v in open(args.ncbi))
     annos = annos[annos['version'].isin(ncbi)]
 
+    # include with records_out
+    current_records = set(v for v in annos['version'].tolist())
+
     # read refseqs and append to old refseq list
     new_refseq_info = pandas.read_csv(args.new_refseq_info, dtype=str)
     if os.path.getsize(args.previous_refseq_info) == 0:
@@ -141,12 +144,9 @@ def main():
     assert(len(refseqs) == len(refseqs['seqname'].drop_duplicates()))
     refseqs.to_csv(args.refseq_info_out, index=False)
 
-    # for dropping refseq duplicates and concating with all versions later
-    refseqs_acc = refseqs[~refseqs['accession'].isnull()]
-    refseqs_acc_set = set(a for a in refseqs_acc['accession'].tolist())
-
     # remove annotations with refseq duplicates
-    annos = annos[~annos['accession'].isin(refseqs_acc_set)]
+    refseqs_acc = refseqs[~refseqs['accession'].isnull()]
+    annos = annos[~annos['accession'].isin(refseqs_acc)]
 
     assert(len(annos['seqname']) == len(annos['seqname'].drop_duplicates()))
 
@@ -196,12 +196,12 @@ def main():
     refs.to_csv(args.references_out, index=False)
 
     '''
-    Filter the previous_versions with only existing records in ncbi. That way
+    Filter the previous_records with only existing records in ncbi. That way
     if any previous records appear again in a future esearch
     we can re-download.
     '''
-    previous_versions = set(v.strip() for v in args.previous_versions)
-    previous_versions = set(v for v in previous_versions if v in ncbi)
+    previous_records = set(v.strip() for v in args.previous_records)
+    previous_records = set(v for v in previous_records if v in ncbi)
 
     '''
     output downloaded versions we do not want to download again. This
@@ -210,12 +210,12 @@ def main():
     '''
     versions = set(annos['version'].tolist())
     versions |= set(n.strip() for n in args.no_features)
-    versions |= refseqs_acc_set
-    versions |= previous_versions
+    versions |= current_records
+    versions |= previous_records
 
     for v in sorted(versions):
         if v:
-            args.versions_out.write(v + '\n')
+            args.records_out.write(v + '\n')
 
 
 if __name__ == '__main__':
