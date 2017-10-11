@@ -469,7 +469,9 @@ filtered_details_in = env.Command(
     action=('$taxit update_taxids '
             '--schema $schema '
             '--outfile $TARGET '
-            '$SOURCE $tax_url'))
+            '$SOURCE $tax_url'
+            # continue if filter_outliers cache is empty
+            ' || true'))
 
 """
 Filter sequences. Use --threads if you need to to limit the number
