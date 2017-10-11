@@ -1,14 +1,6 @@
 #!/bin/bash
 
-# set up a virtualenv
-
-# `DEENURP_BRANCH` optionally defines the git branch to check out from
-# the deenurp repository (default master)
-
-# `PIP_FIND_LINKS` optionally provides a path or url containing python
-# wheels https://pip.pypa.io/en/latest/user_guide.html#environment-variables
-
-set -e
+set -ex
 
 if [[ -n "$1" ]]; then
     venv="$1"
@@ -18,24 +10,12 @@ else
   venv=$(pwd)/$(basename $(pwd))-env
 fi
 
-MKREFPKG_DIR=$(cd $(dirname $BASH_SOURCE) && cd .. && pwd)
-DEENURP=src/deenurp
-mkdir -p src
-
-if [[ -z "$DEENURP_BRANCH" ]]; then
-    DEENURP_BRANCH=master
-fi
-
-if [[ ! -d $DEENURP ]]; then
-    git clone -b "$DEENURP_BRANCH" git@github.com:fhcrc/deenurp.git $DEENURP
-fi
-
 # install python envs
 python3 -m venv $venv
-virtualenv --quiet --python python2 $venv
-${DEENURP}/bin/bootstrap.sh $venv
 source $venv/bin/activate
-$venv/bin/pip3 install --requirement ${MKREFPKG_DIR}/requirements.txt
+$venv/bin/pip3 install --requirement requirements.txt
+
+mkdir src
 
 if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
@@ -56,5 +36,16 @@ if [[ ! -f $venv/bin/esearch ]]; then
 else
   echo "esearch already installed: $(esearch -version)"
 fi
+
+if [[ ! -f $venv/bin/vsearch ]]; then
+  (cd src &&
+   wget https://github.com/torognes/vsearch/releases/download/v2.5.0/vsearch-2.5.0-linux-x86_64.tar.gz &&
+   tar tzf vsearch-2.5.0-linux-x86_64.tar.gz |
+   grep bin/vsearch | xargs tar xzf vsearch-2.5.0-linux-x86_64.tar.gz --strip-components 2 --directory $venv/bin)
+else
+  echo "vsearch already installed: v2.5.0"
+fi
+
+rm -rf src
 
 echo 'All done!'
