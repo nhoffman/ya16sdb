@@ -113,12 +113,17 @@ env = Environment(
     ENV=environment_variables,
     variables=vrs,
     shell='bash',
-    time=False,
     taxit=(
         'singularity exec '
         '--bind $$(pwd$)):$$(pwd$)) '
         '--workdir $$(pwd$)) '
-        '/molmicro/common/singularity/taxtastic-0.8.2.img taxit')
+        '/molmicro/common/singularity/taxtastic-0.8.2.img taxit'),
+    deenurp=(
+        'singularity exec '
+        '--bind $$(pwd$)):$$(pwd$)) '
+        '--workdir $$(pwd$)) '
+        '/molmicro/common/singularity/deenurp-v0.2.0.img deenurp')
+
 )
 
 env.Decider('MD5-timestamp')
@@ -443,7 +448,7 @@ dedup_fa, dedup_annotations = env.Command(
     target=['$out/1200bp/valid/dedup/seqs.fasta',
             '$out/1200bp/valid/dedup/annotations.csv'],
     source=[valid_fa, valid_annotations],
-    action=('deenurp -v deduplicate_sequences '
+    action=('$deenurp -v deduplicate_sequences '
             '--group-by accession '
             '$SOURCES $TARGETS'))
 
@@ -476,7 +481,7 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             '$out/1200bp/valid/dedup/filtered/seq_info.csv',
             '$out/1200bp/valid/dedup/filtered/details_out.csv',
             '$out/1200bp/valid/dedup/filtered/deenurp.log'],
-    action=['deenurp -vvv filter_outliers '
+    action=['$deenurp -vvv filter_outliers '
             '--log ${TARGETS[3]} '
             '--filter-rank species '
             '--threads-per-job 14 '
