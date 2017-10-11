@@ -471,7 +471,7 @@ filtered_details_in = env.Command(
             '--outfile $TARGET '
             '$SOURCE $tax_url'
             # continue if filter_outliers cache is empty
-            ' || true'))
+            ' || echo "Continuing without filter_outliers cache"'))
 
 """
 Filter sequences. Use --threads if you need to to limit the number
