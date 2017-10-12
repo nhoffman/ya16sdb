@@ -14,6 +14,10 @@ import SCons
 from SCons.Script import (
     Variables, ARGUMENTS, Help, Copy, Environment, PathVariable)
 
+venv = os.environ.get('VIRTUAL_ENV')
+if not venv:
+    sys.exit('--> an active virtualenv is required'.format(venv))
+
 
 def PathIsFileCreate(key, val, env):
     """Validator to check if Path is a cache file,
@@ -50,10 +54,6 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
 
     return blast_out
 
-
-venv = os.environ.get('VIRTUAL_ENV')
-if not venv:
-    sys.exit('--> an active virtualenv is required'.format(venv))
 
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
