@@ -190,6 +190,9 @@ if test:
 else:
     """
     concat our download set
+
+    TODO: generalize a `for` loop to do this concatinization
+    TODO: add a sort | uniq
     """
     records = env.Command(
         source=[classified, tm7],
@@ -284,6 +287,8 @@ known_info, _ = env.Command(
 """
 vsearch new sequences with training set to test sequence orientation
 and 16s region
+
+TODO: evaluate performance with cmalign - Will cmalign see orientations?
 """
 vsearch = env.Command(
     target='$out/new/vsearch.csv',
