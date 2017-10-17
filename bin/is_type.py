@@ -32,7 +32,8 @@ def main():
         help='list of all version downloaded')
 
     args = p.parse_args()
-    types = set(t.strip() for t in args.types if t)
+    types = (t.strip() for t in args.types)
+    types = set(t for t in types if t)
     info = csv.reader(args.seq_info, quotechar='"')
     header = next(info)
     version = header.index('version')
