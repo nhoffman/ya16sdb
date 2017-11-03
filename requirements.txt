@@ -1,0 +1,8 @@
+pandas
+scons
+git+https://github.com/crosenth/medirect.git
+sqlalchemy
+psycopg2
+bokeh==0.12.5
+git+https://github.com/google/google-visualization-python.git
+psycopg2

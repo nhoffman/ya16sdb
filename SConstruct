@@ -1,88 +1,35 @@
 """
 Download and curate the NCBI 16S rRNA sequences
+
+TODO: download records updated before last download
 """
 
-import datetime
 import errno
 import os
 import sys
-
-from bioscons.slurm import SlurmEnvironment
+import time
 
 # requirements installed in the virtualenv
-from SCons.Script import Variables, BoolVariable, ARGUMENTS, Help, Copy
+import SCons
+from SCons.Script import (
+    Variables, ARGUMENTS, Help, Copy, Environment, PathVariable)
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
 
-true_vals = ['t', 'y', '1']
-release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 
-vrs = Variables(None, ARGUMENTS)
-vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
-vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('nproc', ('Number of concurrent processes '), 14)
-# nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
-vrs.Add(BoolVariable('use_cluster', 'Use slurm', False))
-vrs.Add('base', help='Path to base output directory', default='output-ncbi')
-vrs.Add(
-    'tax_url',
-    default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
-    help='database url')
-vrs.Add(
-    'schema',
-    default='ncbi_taxonomy',
-    help='postgres database schema')
-vrs.Add(
-    'out',
-    help='Path to dated output directory',
-    default=os.path.join('$base', '{:%Y%m%d}'.format(datetime.date.today())))
-
-# cache
-vrs.Add('seqs_cache', default='$base/seqs.fasta')
-vrs.Add('seq_info_cache', default='$base/seq_info.csv')
-vrs.Add('pubmed_ids_cache', default='$base/pubmed_ids.csv')
-vrs.Add('references_cache', default='$base/references.csv')
-vrs.Add('versions_cache', default='$base/versions.txt')
-
-# Provides access to options prior to instantiation of env object
-# below; it's better to access variables through the env object.
-varargs = dict({opt.key: opt.default for opt in vrs.options}, **vrs.args)
-truevals = {True, 'yes', 'y', 'True', 'true', 't'}
-nproc = varargs['nproc']
-use_cluster = varargs['use_cluster'] in truevals
-
-"""
-Explicitly define PATH, giving preference to local executables; it's
-best to use absolute paths for non-local executables rather than add
-paths here to avoid accidental introduction of external
-dependencies. Environment variables are inherited from the parent
-shell from which scons is run and updated with the PATH defined
-below, plus any additional environment variables in settings.conf
-(all caps options only).
-"""
-environment_variables = dict(
-    os.environ,
-    PATH=':'.join([
-        'bin',
-        os.path.join(venv, 'bin'),
-        '/usr/local/bin', '/usr/bin', '/bin']),
-    OMP_NUM_THREADS=nproc,  # for FastTree
-)
-
-env = SlurmEnvironment(
-    ENV=environment_variables,
-    variables=vrs,
-    use_cluster=use_cluster,
-    shell='bash',
-    time=False
-)
-
-env.Decider('MD5')
-
-Help(vrs.GenerateHelpText(env))
+def PathIsFileCreate(key, val, env):
+    """Validator to check if Path is a cache file,
+    creating it if it does not exist."""
+    if os.path.isdir(val):
+        m = 'Path for option %s is a directory, not a file: %s'
+        raise SCons.Errors.UserError(m % (key, val))
+    if not os.path.exists(val):
+        d = os.path.dirname(val)
+        if not os.path.exists(d):
+            os.makedirs(d)
+        open(val, 'w').close()
 
 
 def blast_db(env, sequence_file, output_base, dbtype='nucl'):
@@ -100,7 +47,7 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
                 '-in $SOURCE '
                 '-out {1}'.format(dbtype, output_base)))
 
-    env.Local(
+    env.Command(
         target=output_base,
         source=blast_out,
         action=('md5sum $SOURCES > $TARGET'))
@@ -108,62 +55,170 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
     return blast_out
 
 
+true_vals = ['t', 'y', '1']
+release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
+test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
+
+vrs = Variables(None, ARGUMENTS)
+if test:
+    vrs.Add('base', help='Path to output directory', default='test_output')
+else:
+    vrs.Add('base', help='Path to output directory', default='output')
+vrs.Add(
+    'out',
+    help='Path to dated output sub directory',
+    default=os.path.join('$base', time.strftime('%Y%m%d')))
+vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
+vrs.Add('retry', 'ncbi retry milliseconds', '60000')
+# nreq should be set to 3 during weekdays
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
+vrs.Add(
+    'tax_url',
+    default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
+    help='database url')
+vrs.Add(
+    'schema',
+    default='ncbi_taxonomy',
+    help='postgres database schema')
+
+# cache vars
+vrs.Add(PathVariable(
+    'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'seqs_cache', '', '$base/seqs.fasta', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'annotations_cache', '', '$base/annotations.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'pubmed_info_cache', '', '$base/pubmed_info.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'references_cache', '', '$base/references.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'records_cache', '', '$base/records.txt', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'refseq_info_cache', '', '$base/refseq_info.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'outliers_cache', '', '$base/filter_outliers.csv', PathIsFileCreate))
+
+environment_variables = dict(
+    os.environ,
+    PATH=':'.join([
+        'bin',
+        os.path.join(venv, 'bin'),
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin']),
+)
+
+env = Environment(
+    ENV=environment_variables,
+    variables=vrs,
+    shell='bash',
+    taxit=(
+        'singularity exec '
+        '--bind $$(pwd$)):$$(pwd$)) '
+        '--workdir $$(pwd$)) '
+        '/molmicro/common/singularity/taxtastic-0.8.2.img taxit'),
+    deenurp=(
+        'singularity exec '
+        '--bind $$(pwd$)):$$(pwd$)) '
+        '--workdir $$(pwd$)) '
+        '/molmicro/common/singularity/deenurp-v0.2.0.img deenurp')
+
+)
+
+env.Decider('MD5-timestamp')
+
+Help(vrs.GenerateHelpText(env))
+
+rrna_16s = ('16s[All Fields] '
+            'AND rRNA[Feature Key] '
+            'AND Bacteria[Organism] '
+            'AND 500 : 99999999999[Sequence Length]')
+
+mefetch_acc = ('mefetch -vv '
+               '-email $email '
+               '-mode text '
+               '-format acc '
+               '-retry $retry '
+               '-proc $nreq '
+               '-log $out/ncbi.log '
+               '-out $TARGET')
+
 """
-get accessions (versions) of records with rrna 16s annotations from ncbi
+Download accessions for bacteria with 16s rrna annotations
+NOT environmental or unclassified
 
 TODO: Limit to a recent date frame as initial search.  If latest records
 are not found then run the whole thing in full.  This will save time in
 execution of this step.
 """
-ncbi = env.Command(
+classified = env.Command(
     source=None,
-    target='$out/ncbi.txt',
-    action=('esearch '
-            '-db nucleotide '
-            '-query "16s[All Fields] AND '
-            'rRNA[Feature Key] AND '
-            'Bacteria[Organism] '
+    target='$out/esearch/classified.txt',
+    action=('esearch -db nucleotide -query "' + rrna_16s +
             'NOT(environmental samples[Organism] '
-            'OR metagenomes[Organism] '
-            'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]" | '
-            'mefetch '
-            '-email $email '
-            '-mode text '
-            '-format acc '
-            '-retry $retry '
-            '-proc $nreq '
-            '-log $out/ncbi.log '
-            '-out $TARGET'))
+            'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
 
 """
-Do not download records accessions in the ignore list or
-that have equivalent RefSeq records
+Download TM7 accessions
 """
-versions = env.Command(
-    target='$out/new/versions.txt',
-    source=[ncbi, '$versions_cache', 'data/ignore.txt', '$seq_info_cache'],
-    action=['ignore.py '
-            '--out $TARGET '
-            '--refseq-originals ${SOURCES[3]} '
-            '${SOURCES[:3]}'])
+tm7 = env.Command(
+    source=None,
+    target='$out/esearch/tm7.txt',
+    action=('esearch -db nucleotide -query "' + rrna_16s +
+            ' AND Candidatus Saccharibacteria[Organism]" | ' + mefetch_acc))
 
 """
-Download records
-
-1) input as accessions
-2) mefetch feature tables
-3) ftract 16s rrna features
-4) mefetch gb records
-5) write fasta, seq_info, references and pubmed_ids
+get accessions (versions) of records considered type strains
+NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 """
-new_fasta, new_info, new_pubmed_ids, new_references = env.Command(
-    target=['$out/new/seqs.fasta',
-            '$out/new/seq_info.csv',
-            '$out/new/pubmed_ids.csv',
-            '$out/new/references.csv'],
-    source=versions,
-    action=('mefetch '  # download feature tables
+types = env.Command(
+    source=None,
+    target='$out/1200bp/valid/types/esearch.txt',
+    action=('esearch -db nucleotide -query "' + rrna_16s +
+            ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
+
+if test:
+    tax_ids = (i.strip() for i in open('testfiles/tax_ids.txt') if i)
+    tax_ids = ('txid' + i + '[Organism]' for i in tax_ids)
+    records = env.Command(
+        target='$out/esearch.txt',
+        source='testfiles/tax_ids.txt',
+        action=('esearch -db nucleotide -query "' + rrna_16s +
+                ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
+else:
+    """
+    concat our download set
+
+    TODO: generalize a `for` loop to do this concatinization
+    TODO: add a sort | uniq
+    """
+    records = env.Command(
+        source=[classified, tm7],
+        target='$out/esearch.txt',
+        action='cat $SOURCES > $TARGET')
+
+"""
+Do not download record accessions in the ignore list or
+that have been previously downloaded in the records_cache.
+Exit script if no new records exist.
+"""
+new = env.Command(
+    target='$out/new/records.txt',
+    source=[records, '$records_cache', 'data/ignore.txt'],
+    action=['cat ${SOURCES[-2:]} | '
+            'grep '
+            '--invert-match '
+            '--fixed-strings '
+            '--file /dev/stdin '
+            '${SOURCES[0]} > $TARGET '
+            '|| (echo "No new records" && exit 1)'])
+
+gbs = env.Command(
+    target='$out/new/records.gb',
+    source=new,
+    action=['mefetch -vv '  # download feature tables
             '-email $email '
             '-retry $retry '
             '-id $SOURCE '
@@ -182,22 +237,27 @@ new_fasta, new_info, new_pubmed_ids, new_references = env.Command(
             '-format gbwithparts '
             '-log $out/ncbi.log '
             '-proc $nreq '
-            '-retry $retry | '
-            'extract_genbank.py '  # extract genbank info into csv
-            '--pubmed_ids ${TARGETS[2]} '
-            '--references ${TARGETS[3]} '
-            '${SOURCES[2]} ${TARGETS[:2]}'))
+            '-retry $retry > $TARGET'])
 
 """
-TODO: save full genbank records
+extract
 """
+today = time.strftime('%d-%b-%Y')
+new_fa, new_annotations, new_pub_info, new_refs, new_refseq_info = env.Command(
+    target=['$out/new/seqs.fasta',
+            '$out/new/annotations.csv',
+            '$out/new/pubmed_info.csv',
+            '$out/new/references.csv',
+            '$out/new/refseq_info.csv'],
+    source=gbs,
+    action='extract_genbank.py $SOURCE ' + today + ' $TARGETS')
 
 """
 Record versions returned from esearch that had no actual 16s features
 """
 no_features = env.Command(
     target='$out/new/no_features.txt',
-    source=[new_info, versions],
+    source=[new_annotations, new],
     action=('csvcut.py --columns version ${SOURCES[0]} | '
             'tail -n +2 | '
             'grep '
@@ -215,22 +275,24 @@ Do nothing with the unknown records for now because it might simply mean
 the ncbi taxonomy pipeline is out of sync with the latest 16s records
 """
 known_info, _ = env.Command(
-    target=['$out/new/valid/seq_info.csv', '$out/new/invalid/seq_info.csv'],
-    source=new_info,
-    action=['taxit update_taxids '
-            '--name-column organism '
+    target=['$out/new/taxit/annotations.csv', '$out/new/taxit/unknown.csv'],
+    source=new_annotations,
+    action=['$taxit update_taxids '
+            '--unknown-action drop '
             '--unknowns ${TARGETS[1]} '
-            '--out ${TARGETS[0]} '
+            '--outfile ${TARGETS[0]} '
             '--schema $schema '
-            '$SOURCES $tax_url'])
+            '$SOURCE $tax_url'])
 
 """
 vsearch new sequences with training set to test sequence orientation
 and 16s region
+
+TODO: evaluate performance with cmalign - Will cmalign see orientations?
 """
 vsearch = env.Command(
     target='$out/new/vsearch.csv',
-    source=[new_fasta, 'data/rdp_16s_type_strains.fasta.bz2'],
+    source=[new_fa, 'data/rdp_16s_type_strains.fasta.bz2'],
     action=('vsearch '
             '--usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
@@ -245,243 +307,188 @@ vsearch = env.Command(
             '--userout $TARGET'))
 
 """
-1. Fix sequence orientation of new sequences
-2. Remove sequences not in 16s region
-3. Deduplicate pubmed_ids and references from
-   multiple 16s regions per accession
-4. Append seqs, seq_info, pubmed_ids and references to previous data set
-5. Drop NCBI removed records not in versions.txt file
-6. Drop seqnames missing eigher a sequence or row in seq_info, sequences
+Fix record orientation.  Drop sequences with no alignments.
+These records are rare and we want to be able to re-download later
+them when the 16s training set updates.
+"""
+vsearch_fa, _ = env.Command(
+    target=['$out/new/vsearch/seqs.fa',
+            '$out/new/vsearch/unknown.fa'],
+    source=[vsearch, new_fa],
+    action='vsearch.py --unknowns ${TARGETS[1]} --out ${TARGETS[0]} $SOURCES')
+
+"""
+Append with older records
+
+1. Drop seqnames missing either a sequence or row in seq_info, sequences
    filtered out of the vsearch 16s alignment or sequences with unknown tax_ids
-7. Drop sequences that have a new refseq equavalent
-8. Copy full dataset back to base dir for next download
+2. Append seqs, seq_info, pubmed_info and references to previous data set
+3. Drop records not in records.txt file
+4. Drop sequences that have a refseq equivalent
+5. Deduplicate pubmeds and references
+6. Copy and cache full dataset
 
 NOTE: seqs that failed either the vsearch or taxit update_taxids will
-not be appended to the versions.txt file and will therefore be re-downloaded
+not be appended to the records.txt file and will therefore be re-downloaded
 the next time this pipeline is run
 """
-all_fa, appended_info, pubmed_ids, references, _ = env.Command(
+fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
     target=['$out/seqs.fasta',
-            '$out/appended_info.csv',
-            '$out/pubmed_ids.csv',
+            '$out/refresh/annotations.csv',
+            '$out/pubmed_info.csv',
             '$out/references.csv',
-            '$out/versions.txt'],
-    source=[new_fasta, '$seqs_cache',
-            known_info, '$seq_info_cache',
-            new_pubmed_ids, '$pubmed_ids_cache',
-            new_references, '$references_cache',
-            no_features, '$versions_cache',
-            ncbi, vsearch],
+            '$out/refseq_info.csv',
+            '$out/records.txt'],
+    source=[records,
+            vsearch_fa, '$seqs_cache',
+            known_info, '$annotations_cache',
+            new_pub_info, '$pubmed_info_cache',
+            new_refs, '$references_cache',
+            new_refseq_info, '$refseq_info_cache',
+            no_features, '$records_cache'],
     action=['refresh.py $SOURCES $TARGETS',
-            # cache for next download
+            # cache
             Copy('$seqs_cache', '${TARGETS[0]}'),
-            Copy('$pubmed_ids_cache', '${TARGETS[2]}'),
+            Copy('$pubmed_info_cache', '${TARGETS[2]}'),
             Copy('$references_cache', '${TARGETS[3]}'),
-            Copy('$versions_cache', '${TARGETS[4]}')])
+            Copy('$refseq_info_cache', '${TARGETS[4]}'),
+            Copy('$records_cache', '${TARGETS[5]}')])
 
 """
-get accessions (versions) of records considered type strains
-NCBI web blast uses `sequence_from_type[Filter]` so we will use that
-http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+append new records to global list
 
-NOTE: type_material[Filter] == sequence_from_type[Filter]
+NOTE: see bin/dedup_gb.py for genbank record cache maintenance
+TODO: create bin/dedup_gb.py
 """
-types = env.Command(
-    source=ncbi,
-    target='$out/types.txt',
-    action=('esearch '
-            '-db nucleotide '
-            '-query "sequence_from_type[Filter] AND '
-            '16s[All Fields] AND '
-            'rRNA[Feature Key] AND '
-            'Bacteria[Organism] '
-            'NOT(environmental samples[Organism] '
-            'OR metagenomes[Organism] '
-            'OR txid32644[Organism]) '
-            'AND 500 : 999999999[Sequence Length]" | '
-            'mefetch '
-            '-email $email '
-            '-mode text '
-            '-format acc '
-            '-proc $nreq '
-            '-retry $retry '
-            '-log $out/ncbi.log '
-            '-out $TARGET'))
+env.Command(
+    target=None,
+    source=gbs,
+    action='cat $SOURCE >> $genbank_cache')
+
+"""
+update all tax_ids
+"""
+annotations = env.Command(
+    target='$out/annotations.csv',
+    source=refresh_annotations,
+    action=['$taxit -v update_taxids '
+            '--out $TARGET '
+            '--schema $schema '
+            '$SOURCE $tax_url',
+            Copy('$annotations_cache', '$TARGET')])
+
+"""
+pull sequences at least 1200 bp and less than 1% ambiguous
+"""
+full_annotations = env.Command(
+    target='$out/1200bp/annotations.csv',
+    source=annotations,
+    action=('partition_refs.py '
+            # filtering
+            '--min-length 1200 '
+            '--prop-ambig-cutoff 0.01 '
+            '--out-annotations $TARGET '
+            '$SOURCE'))
+
+"""
+filter for valid annotations
+"""
+valid_annotations = env.Command(
+    target='$out/1200bp/valid/annotations.csv',
+    source=full_annotations,
+    action='is_valid.py --out $TARGET  --schema $schema $SOURCE $tax_url')
+
+"""
+pull valid sequences
+"""
+valid_fa = env.Command(
+    target='$out/1200bp/valid/seqs.fasta',
+    source=[fa, valid_annotations],
+    action=('partition_refs.py '
+            '--fasta ${SOURCES[0]} '
+            '--out-fa $TARGET '
+            '${SOURCES[1]}'))
+
+"""
+Make general valid taxtable with all ranks included
+"""
+valid_tax = env.Command(
+    target='$out/1200bp/valid/taxonomy.csv',
+    source=valid_annotations,
+    action=('$taxit -v taxtable '
+            '--seq-info $SOURCE '
+            '--out $TARGET '
+            '--schema $schema '
+            '$tax_url'))
+
+blast_db(env, valid_fa, '$out/1200bp/valid/blast')
 
 """
 Remove and re-append is_type column with sequences per discussion:
 
 https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/14
 """
-types_appended_info = env.Command(
-    target='$out/is_type_info.csv',
-    source=[appended_info, types],
-    action=('is_type.py '
-            '--in-description '
-            'CCUG,CIP,DSM,JCM,LMG,BCCM,NBRC,NCTC,PCC,ATCC,ACUG '
-            '$SOURCES $TARGET'))
+type_annotations = env.Command(
+    target='$out/1200bp/valid/types/annotations.csv',
+    source=[valid_annotations, types],
+    action='is_type.py $SOURCES $TARGET')
 
 """
-update tax_ids
+pull type sequences
 """
-update_all_info = env.Command(
-    target='$out/seq_info.csv',
-    source=types_appended_info,
-    action=['taxit -v update_taxids '
-            '--name-column organism '
-            '--out $TARGET '
-            '--schema $schema '
-            '$SOURCE $tax_url',
-            Copy('$seq_info_cache', '$TARGET')])
-
-"""
-pull sequences at least 1200 bp and less than 1% ambiguous
-"""
-fa, seq_info = env.Command(
-    target=['$out/1200bp/seqs.fasta', '$out/1200bp/seq_info.csv'],
-    source=[all_fa, update_all_info],
+type_fa = env.Command(
+    target='$out/1200bp/valid/types/seqs.fasta',
+    source=[valid_fa, type_annotations],
     action=('partition_refs.py '
-            # filtering
-            '--min-length 1200 '
-            '--prop-ambig-cutoff 0.01 '
-            '--out-fa ${TARGETS[0]} '
-            '--out-info ${TARGETS[1]} '
-            '$SOURCES'))
-
-"""
-Make general valid taxtable with all ranks included
-"""
-tax = env.Command(
-    target='$out/1200bp/valid/taxonomy.csv',
-    source=seq_info,
-    action=('taxit -v taxtable '
-            '--seq-info $SOURCE '
-            '--clade-ids 2 '  # Bacteria
-            '--valid '
-            '--out $TARGET '
-            '--schema $schema '
-            '$tax_url'))
-
-"""
-pull valid sequences based on valid and ranked tax_ids
-"""
-valid_fa, valid_info = env.Command(
-    target=['$out/1200bp/valid/seqs.fasta',
-            '$out/1200bp/valid/seq_info.csv'],
-    source=[tax, fa, seq_info],
-    action=('partition_refs.py '
-            '--tax-ids ${SOURCES[0]} '
-            '--out-fa ${TARGETS[0]} '
-            '--out-info ${TARGETS[1]} '
-            '${SOURCES[1:]}'))
-
-"""
-Count reference sequences that can be used for classification filtering
-"""
-env.Command(
-    target='$out/1200bp/valid/tax_counts.csv',
-    source=tax,
-    action='taxit -v count_taxids --out $TARGET $SOURCE')
-
-"""
-Create blast database valid seqs
-"""
-blast_db(env, valid_fa, '$out/1200bp/valid/blast')
-
-"""
-Partition type strains
-"""
-types_fasta, types_info = env.Command(
-    target=['$out/1200bp/valid/types/seqs.fasta',
-            '$out/1200bp/valid/types/seq_info.csv'],
-    source=[valid_fa, valid_info],
-    action=('partition_refs.py '
-            '--types '
-            '--out-fa ${TARGETS[0]} '
-            '--out-info ${TARGETS[1]} '
-            '$SOURCES'))
-
-"""
-Make type strain taxtable
-"""
-types_tax = env.Command(
-    target='$out/1200bp/valid/types/taxonomy.csv',
-    source=[tax, types_info],
-    action=('taxit -v taxtable '
-            '--ranked columns '
-            '--taxtable ${SOURCES[0]} '
-            '--seq-info ${SOURCES[1]} '
-            '--out $TARGET '
-            '--schema $schema '
-            '$tax_url'))
-
-"""
-Count reference sequences that can be used for classification filtering
-"""
-env.Command(
-    target='$out/1200bp/valid/types/tax_counts.csv',
-    source=types_tax,
-    action='taxit -v count_taxids --out $TARGET $SOURCE')
-
-"""
-Make type strain Blast database
-"""
-blast_db(env, types_fasta, '$out/1200bp/valid/types/blast')
+            '--out-fa $TARGET '
+            '--fasta ${SOURCES[0]} '
+            '${SOURCES[1]}'))
 
 """
 Deduplicate sequences by isolate (accession)
 
 Appends a weight column showing number of sequences being represented
 """
-dedup_fa, dedup_info = env.Command(
+dedup_fa, dedup_annotations = env.Command(
     target=['$out/1200bp/valid/dedup/seqs.fasta',
-            '$out/1200bp/valid/dedup/seq_info.csv'],
-    source=[valid_fa, valid_info],
-    action=('deenurp -v deduplicate_sequences '
+            '$out/1200bp/valid/dedup/annotations.csv'],
+    source=[valid_fa, valid_annotations],
+    action=('$deenurp -v deduplicate_sequences '
             '--group-by accession '
-            '--prefer-columns is_type '
             '$SOURCES $TARGETS'))
 
 """
-dereplicate sequences using vsearch clustering to reduce giant species
-clusters like Bacilius genus and E. Coli
-
-NOTE: we might not need to do this anymore now that filter_outliers has enough
-resources to finish in a reasonable amount of time
+dedup info file for filter_outliers
 """
-# derep_fa, derep_info = env.Command(
-#     target=['$out/1200bp/valid/dedup/derep/seqs.fasta',
-#             '$out/1200bp/valid/dedup/derep/seq_info.csv',
-#             '$out/1200bp/valid/dedup/derep/map.csv'],
-#     source=[dedup_fa, dedup_info, tax],
-#     action=('deenurp -v dereplicate_named '
-#             '--id 1.0 '
-#             '--group-on species '
-#             '--taxonomy ${SOURCES[2]} '
-#             '--seqs-out ${TARGETS[0]} '
-#             '--seq-info-out ${TARGETS[1]} '
-#             '--derep-map-out ${TARGETS[2]} '
-#             '${SOURCES[:2]}'))
+dedup_info = env.Command(
+    target='$out/1200bp/valid/dedup/seq_info.csv',
+    source=dedup_annotations,
+    action='csvcut.py --columns seqname,tax_id --out $TARGET $SOURCE')
 
+"""
+update tax_ids in details_in cache
+"""
 filtered_details_in = env.Command(
-    source='$base/filtered_details.csv',
-    target='$out/1200bp/valid/filtered/details_in.csv',
-    action=('taxit update_taxids '
+    source='$outliers_cache',
+    target='$out/1200bp/valid/dedup/filtered/details_in.csv',
+    action=('$taxit update_taxids '
             '--schema $schema '
-            '--out $TARGET '
-            '$SOURCE $tax_url'))
+            '--outfile $TARGET '
+            '$SOURCE $tax_url'
+            # continue if filter_outliers cache is empty
+            ' || echo "Continuing without filter_outliers cache"'))
 
 """
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
 filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
-    source=[dedup_fa, dedup_info, tax, filtered_details_in],
-    target=['$out/1200bp/valid/filtered/seqs.fasta',
-            '$out/1200bp/valid/filtered/seq_info.csv',
-            '$out/1200bp/valid/filtered/details_out.csv',
-            '$out/1200bp/valid/filtered/deenurp.log'],
-    action=['deenurp -vvv filter_outliers '
+    source=[dedup_fa, dedup_info, valid_tax, filtered_details_in],
+    target=['$out/1200bp/valid/dedup/filtered/seqs.fasta',
+            '$out/1200bp/valid/dedup/filtered/seq_info.csv',
+            '$out/1200bp/valid/dedup/filtered/details_out.csv',
+            '$out/1200bp/valid/dedup/filtered/deenurp.log'],
+    action=['$deenurp -vvv filter_outliers '
             '--log ${TARGETS[3]} '
             '--filter-rank species '
             '--threads-per-job 14 '
@@ -497,32 +504,26 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             '--max-distance 0.02 '
             '--min-seqs-for-filtering 5 '
             '${SOURCES[:3]}',
-            # cache this
-            Copy('$base/filtered_details.csv', '${TARGETS[2]}')])
+            # cache it
+            Copy('$outliers_cache', '${TARGETS[2]}')])
 
 """
-Make filtered taxtable
+Make filtered taxtable with ranked columns and no_rank rows
 """
 filtered_tax = env.Command(
-    target='$out/1200bp/valid/filtered/taxonomy.csv',
-    source=[tax, filtered_info],
-    action=('taxit -v taxtable '
-            '--ranked columns '
-            '--taxtable ${SOURCES[0]} '
-            '--seq-info ${SOURCES[1]} '
-            '--out $TARGET '
-            '--schema $schema '
-            '$tax_url'))
+    target='$out/1200bp/valid/dedup/filtered/taxonomy.csv',
+    source=filtered_info,
+    action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url '
+            '| ranked.py --columns --out $TARGET'))
+
+blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/blast')
 
 '''
 find top hit for each sequence among type strains
-
-take --maxaccepts 2 so we can filter out hits where the query and target
-sequences are the same
 '''
 type_hits = env.Command(
-    target='$out/1200bp/valid/filtered/vsearch.blast6out',
-    source=[dedup_fa, types_fasta],
+    target='$out/1200bp/valid/dedup/filtered/vsearch.blast6out',
+    source=[dedup_fa, type_fa],
     action=('vsearch --usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
             '--blast6out $TARGET '
@@ -537,37 +538,26 @@ type_hits = env.Command(
 bokeh plot filtered sequences
 
 hard coded: sort column 2 (records) desc
-
-FIXME: BokehDeprecationWarning 2> /dev/null
-
-TODO: include derep_map.csv to input for
-"dereplicated" sequence counts per accession
 '''
 env.Command(
-    target=['$out/1200bp/valid/filtered/index.html',
-            '$out/1200bp/valid/filtered/plots/map.csv'],
-    source=[filtered_details, tax, type_hits, types_info, deenurp_log],
-    action=('plot_details.py ${SOURCES[:4]} '
+    target=['$out/1200bp/valid/dedup/filtered/index.html',
+            '$out/1200bp/valid/dedup/filtered/plots/map.csv'],
+    source=[filtered_details,
+            type_hits,
+            annotations,
+            valid_tax,
+            types,
+            deenurp_log],
+    action=('plot_details.py ${SOURCES[:5]} '
             '--param strategy:cluster '
             '--param cluster_type:single '
             '--param distance_percentile:90.0 '
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
-            '--log-in ${SOURCES[4]} '
-            '--plot-dir $out/1200bp/valid/filtered/plots '
+            '--log-in ${SOURCES[5]} '
+            '--plot-dir $out/1200bp/valid/dedup/filtered/plots '
             '--plot-map ${TARGETS[1]} '
-            '--plot-index ${TARGETS[0]}'
-            ))
-
-blast_db(env, filtered_fa, '$out/1200bp/valid/filtered/blast')
-
-"""
-Count reference sequences that can be used for classification filtering
-"""
-env.Command(
-    target='$out/1200bp/valid/filtered/tax_counts.csv',
-    source=filtered_tax,
-    action='taxit -v count_taxids --out $TARGET $SOURCE')
+            '--plot-index ${TARGETS[0]}'))
 
 """
 Append contributers
