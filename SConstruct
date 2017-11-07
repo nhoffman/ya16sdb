@@ -115,15 +115,14 @@ env = Environment(
     shell='bash',
     taxit=(
         'singularity exec '
-        '--bind $$(pwd$)):$$(pwd$)) '
-        '--workdir $$(pwd$)) '
-        '/molmicro/common/singularity/taxtastic-0.8.2.img taxit'),
+        '--bind $$(readlink -f $$(pwd$))$)) '
+        '--pwd $$(readlink -f $$(pwd$))$)) '
+        '/molmicro/common/singularity/taxtastic-0.8.3.img taxit'),
     deenurp=(
         'singularity exec '
-        '--bind $$(pwd$)):$$(pwd$)) '
-        '--workdir $$(pwd$)) '
-        '/molmicro/common/singularity/deenurp-v0.2.0.img deenurp')
-
+        '--bind $$(readlink -f $$(pwd$))$)) '
+        '--pwd $$(readlink -f $$(pwd$))$)) '
+        '/molmicro/common/singularity/deenurp-v0.2.2-singularity2.3.img deenurp')
 )
 
 env.Decider('MD5-timestamp')
@@ -275,7 +274,8 @@ Do nothing with the unknown records for now because it might simply mean
 the ncbi taxonomy pipeline is out of sync with the latest 16s records
 """
 known_info, _ = env.Command(
-    target=['$out/new/taxit/annotations.csv', '$out/new/taxit/unknown.csv'],
+    target=['$out/new/taxit/annotations.csv',
+            '$out/new/taxit/unknown.csv'],
     source=new_annotations,
     action=['$taxit update_taxids '
             '--unknown-action drop '
