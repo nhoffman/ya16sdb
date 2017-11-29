@@ -122,7 +122,8 @@ env = Environment(
         'singularity exec '
         '--bind $$(readlink -f $$(pwd$))$)) '
         '--pwd $$(readlink -f $$(pwd$))$)) '
-        '/molmicro/common/singularity/deenurp-v0.2.2-singularity2.3.img deenurp')
+        '/molmicro/common/singularity/deenurp-v0.2.2-singularity2.3.img '
+        'deenurp')
 )
 
 env.Decider('MD5-timestamp')
@@ -138,6 +139,7 @@ mefetch_acc = ('mefetch -vv '
                '-email $email '
                '-mode text '
                '-format acc '
+               '-max-retry -1 '  # continuous retries
                '-retry $retry '
                '-proc $nreq '
                '-log $out/ncbi.log '
@@ -224,12 +226,16 @@ gbs = env.Command(
             '-db nucleotide '
             '-format ft '
             '-retmax 1 '
+            '-max-retry -1 '  # continuous retry
             '-log $out/ncbi.log '
             '-proc $nreq | '
-            'ftract -feature rrna::16s | '   # extract 16s features
+            # extract 16s features
+            'ftract -feature "rrna:product:16S ribosomal RNA" | '
+            'accession_version.py | '  # parse accession.version from id column
             'mefetch '  # download genbank records
             '-vv '
             '-email $email '
+            '-max-retry -1 '  # continuous retry
             '-retmax 1 '
             '-csv '
             '-db nucleotide '
