@@ -183,22 +183,27 @@ types = env.Command(
 if test:
     tax_ids = (i.strip() for i in open('testfiles/tax_ids.txt') if i)
     tax_ids = ('txid' + i + '[Organism]' for i in tax_ids)
-    records = env.Command(
-        target='$out/esearch.txt',
+    esearch = env.Command(
+        target='$out/esearch/records.txt',
         source='testfiles/tax_ids.txt',
         action=('esearch -db nucleotide -query "' + rrna_16s +
                 ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
 else:
     """
     concat our download set
-
-    TODO: generalize a `for` loop to do this concatinization
-    TODO: add a sort | uniq
     """
-    records = env.Command(
+    esearch = env.Command(
         source=[classified, tm7],
-        target='$out/esearch.txt',
+        target='$out/esearch/records.txt',
         action='cat $SOURCES > $TARGET')
+
+'''
+filter out ignored accessions
+'''
+esearch = env.Command(
+    source=['data/ignore.txt', esearch],
+    target='$out/esearch.txt',
+    action='grep --invert-match --file $SOURCES > $TARGET')
 
 """
 Do not download record accessions in the ignore list or
@@ -207,8 +212,8 @@ Exit script if no new records exist.
 """
 new = env.Command(
     target='$out/new/records.txt',
-    source=[records, '$records_cache', 'data/ignore.txt'],
-    action=['cat ${SOURCES[-2:]} | '
+    source=[esearch, '$records_cache'],
+    action=['cat ${SOURCES[1]} | '
             'grep '
             '--invert-match '
             '--fixed-strings '
@@ -345,7 +350,7 @@ fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
             '$out/references.csv',
             '$out/refseq_info.csv',
             '$out/records.txt'],
-    source=[records,
+    source=[esearch,
             vsearch_fa, '$seqs_cache',
             known_info, '$annotations_cache',
             new_pub_info, '$pubmed_info_cache',
@@ -514,21 +519,34 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             Copy('$outliers_cache', '${TARGETS[2]}')])
 
 """
+labmed do-not-trust filtering
+"""
+trusted_fa, trusted_info, trusted_details = env.Command(
+    target=['$out/1200bp/valid/dedup/filtered/trusted/seqs.fasta',
+            '$out/1200bp/valid/dedup/filtered/trusted/seq_info.csv',
+            '$out/1200bp/valid/dedup/filtered/trusted/details_out.csv'],
+    source=['data/do_not_trust.txt',
+            filtered_fa,
+            dedup_annotations,
+            filtered_details],
+    action='do_not_trust.py $SOURCES $TARGETS')
+
+"""
 Make filtered taxtable with ranked columns and no_rank rows
 """
-filtered_tax = env.Command(
-    target='$out/1200bp/valid/dedup/filtered/taxonomy.csv',
+trusted_tax = env.Command(
+    target='$out/1200bp/valid/dedup/filtered/trusted/taxonomy.csv',
     source=filtered_info,
     action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url '
             '| ranked.py --columns --out $TARGET'))
 
-blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/blast')
+blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/trusted/blast')
 
 '''
 find top hit for each sequence among type strains
 '''
 type_hits = env.Command(
-    target='$out/1200bp/valid/dedup/filtered/vsearch.blast6out',
+    target='$out/1200bp/valid/dedup/vsearch.tsv',
     source=[dedup_fa, type_fa],
     action=('vsearch --usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
@@ -546,9 +564,9 @@ bokeh plot filtered sequences
 hard coded: sort column 2 (records) desc
 '''
 env.Command(
-    target=['$out/1200bp/valid/dedup/filtered/index.html',
-            '$out/1200bp/valid/dedup/filtered/plots/map.csv'],
-    source=[filtered_details,
+    target=['$out/1200bp/valid/dedup/filtered/trusted/index.html',
+            '$out/1200bp/valid/dedup/filtered/trusted/plots/map.csv'],
+    source=[trusted_details,
             type_hits,
             annotations,
             valid_tax,
