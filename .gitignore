@@ -1,4 +1,4 @@
 .sconsign.dblite
 *-env
-output
+output*
 test_output
