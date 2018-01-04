@@ -71,7 +71,7 @@ vrs.Add(
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 32)
 vrs.Add(
     'tax_url',
     default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
@@ -146,30 +146,6 @@ mefetch_acc = ('mefetch -vv '
                '-out $TARGET')
 
 """
-Download accessions for bacteria with 16s rrna annotations
-NOT environmental or unclassified
-
-TODO: Limit to a recent date frame as initial search.  If latest records
-are not found then run the whole thing in full.  This will save time in
-execution of this step.
-"""
-classified = env.Command(
-    source=None,
-    target='$out/esearch/classified.txt',
-    action=('esearch -db nucleotide -query "' + rrna_16s +
-            'NOT(environmental samples[Organism] '
-            'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
-
-"""
-Download TM7 accessions
-"""
-tm7 = env.Command(
-    source=None,
-    target='$out/esearch/tm7.txt',
-    action=('esearch -db nucleotide -query "' + rrna_16s +
-            ' AND Candidatus Saccharibacteria[Organism]" | ' + mefetch_acc))
-
-"""
 get accessions (versions) of records considered type strains
 NCBI web blast uses `sequence_from_type[Filter]` so we will use that
 http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
@@ -189,6 +165,31 @@ if test:
         action=('esearch -db nucleotide -query "' + rrna_16s +
                 ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
 else:
+    """
+    Download accessions for bacteria with 16s rrna annotations
+    NOT environmental or unclassified
+
+    TODO: Limit to a recent date frame as initial search.  If latest records
+    are not found then run the whole thing in full.  This will save time in
+    execution of this step.
+    """
+    classified = env.Command(
+        source=None,
+        target='$out/esearch/classified.txt',
+        action=('esearch -db nucleotide -query "' + rrna_16s +
+                'NOT(environmental samples[Organism] '
+                'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
+
+    """
+    Download TM7 accessions
+    """
+    tm7 = env.Command(
+        source=None,
+        target='$out/esearch/tm7.txt',
+        action=('esearch -db nucleotide -query "' + rrna_16s +
+                ' AND Candidatus Saccharibacteria[Organism]" | '
+                '' + mefetch_acc))
+
     """
     concat our download set
     """
