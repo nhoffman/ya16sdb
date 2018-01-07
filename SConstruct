@@ -236,7 +236,8 @@ gbs = env.Command(
             '-log $out/ncbi.log '
             '-proc $nreq | '
             # extract 16s features
-            'ftract -feature "rrna:product:16S ribosomal RNA" | '
+            'ftract -feature "rrna:product:16S ribosomal RNA" '
+            '-log $out/ncbi.log -on-error continue | '
             'accession_version.py | '  # parse accession.version from id column
             'mefetch '  # download genbank records
             '-vv '
