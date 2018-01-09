@@ -145,15 +145,14 @@ def main():
     refseqs.to_csv(args.refseq_info_out, index=False)
 
     # remove annotations with refseq duplicates
-    refseqs_acc = refseqs[~refseqs['accession'].isnull()]
-    annos = annos[~annos['accession'].isin(refseqs_acc)]
+    refseqs = refseqs[~refseqs['accession'].isnull()]  # avoid Null TypeError
+    annos = annos[~annos['accession'].isin(refseqs['accession'])]
 
     assert(len(annos['seqname']) == len(annos['seqname'].drop_duplicates()))
 
     """
     deduplicate and write fasta
     """
-    print('appending fasta')
     to_write = set(annos['seqname'].values)
     new_fa = SeqIO.parse(args.new_fasta, 'fasta')
     prev_fa = SeqIO.parse(args.previous_fasta, 'fasta')
@@ -163,7 +162,6 @@ def main():
             to_write.remove(r.id)
 
     # write annotations
-    print('appending annotations')
     annos.to_csv(args.annotations_out, index=False, date_format='%d-%b-%Y')
 
     '''
