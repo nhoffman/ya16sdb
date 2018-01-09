@@ -71,7 +71,7 @@ vrs.Add(
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 32)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add(
     'tax_url',
     default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
@@ -528,8 +528,9 @@ trusted_fa, trusted_info, trusted_details = env.Command(
             '$out/1200bp/valid/dedup/filtered/trusted/seq_info.csv',
             '$out/1200bp/valid/dedup/filtered/trusted/details_out.csv'],
     source=['data/do_not_trust.txt',
-            filtered_fa,
             dedup_annotations,
+            filtered_fa,
+            filtered_info,
             filtered_details],
     action='do_not_trust.py $SOURCES $TARGETS')
 
