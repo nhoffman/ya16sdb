@@ -115,13 +115,13 @@ env = Environment(
     shell='bash',
     taxit=(
         'singularity exec '
-        '--bind $$(readlink -f $$(pwd$))$)) '
-        '--pwd $$(readlink -f $$(pwd$))$)) '
+        '--bind $$(readlink -f $$(pwd)) '
+        '--pwd $$(readlink -f $$(pwd)) '
         '/molmicro/common/singularity/taxtastic-0.8.3.img taxit'),
     deenurp=(
         'singularity exec '
-        '--bind $$(readlink -f $$(pwd$))$)) '
-        '--pwd $$(readlink -f $$(pwd$))$)) '
+        '--bind $$(readlink -f $$(pwd)) '
+        '--pwd $$(readlink -f $$(pwd)) '
         '/molmicro/common/singularity/deenurp-v0.2.2-singularity2.3.img '
         'deenurp')
 )
