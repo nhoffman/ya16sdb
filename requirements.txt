@@ -1,6 +1,6 @@
 pandas
 scons
-git+https://github.com/crosenth/medirect.git
+git+https://github.com/crosenth/medirect.git@0.8.0
 sqlalchemy
 psycopg2
 bokeh==0.12.5
