@@ -567,9 +567,9 @@ bokeh plot filtered sequences
 hard coded: sort column 2 (records) desc
 '''
 env.Command(
-    target=['$out/1200bp/valid/dedup/filtered/trusted/index.html',
-            '$out/1200bp/valid/dedup/filtered/trusted/plots/map.csv'],
-    source=[trusted_details,
+    target=['$out/1200bp/valid/dedup/filtered/index.html',
+            '$out/1200bp/valid/dedup/filtered/plots/map.csv'],
+    source=[filtered_details,
             type_hits,
             annotations,
             valid_tax,
