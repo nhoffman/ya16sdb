@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Filter csv by tax_id validity
+output all valid tax_ids in database
 """
 
 import argparse
-import csv
 import sqlalchemy
 import sys
 
@@ -13,10 +12,6 @@ def main():
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument(
-        'csv',
-        type=argparse.FileType('r'),
-        help='file csv with column tax_id')
     p.add_argument(
         'url',
         help='Database string URI or filename.')
@@ -35,14 +30,9 @@ def main():
 
     args = p.parse_args()
     cur = sqlalchemy.create_engine(args.url).raw_connection().cursor()
-    cur.execute('select tax_id, is_valid from ' + args.schema + 'nodes')
-    is_valid = dict(cur.fetchall())
-    reader = csv.reader(args.csv, delimiter=',', quotechar='"')
-    header = next(reader)
-    tax_id = header.index('tax_id')
-    writer = csv.writer(args.out)
-    writer.writerow(header)
-    writer.writerows(r for r in reader if is_valid[r[tax_id]])
+    cur.execute('select tax_id from ' + args.schema + 'nodes where is_valid')
+    for i in cur.fetchall():
+        args.out.write(i[0] + '\n')
 
 
 if __name__ == '__main__':
