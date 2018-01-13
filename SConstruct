@@ -20,7 +20,7 @@ if not venv:
 
 
 def PathIsFileCreate(key, val, env):
-    """Validator to check if Path is a cache file,
+    """namedator to check if Path is a cache file,
     creating it if it does not exist."""
     if os.path.isdir(val):
         m = 'Path for option %s is a directory, not a file: %s'
@@ -87,7 +87,7 @@ vrs.Add(PathVariable(
 vrs.Add(PathVariable(
     'seqs_cache', '', '$base/seqs.fasta', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'annotations_cache', '', '$base/annotations.csv', PathIsFileCreate))
+    'seq_info_cache', '', '$base/seq_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
     'pubmed_info_cache', '', '$base/pubmed_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
@@ -122,7 +122,7 @@ env = Environment(
         'singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '/molmicro/common/singularity/deenurp-v0.2.2-singularity2.3.img '
+        '/molmicro/common/singularity/deenurp-v0.2.4-singularity2.4.img '
         'deenurp')
 )
 
@@ -152,7 +152,7 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 """
 types = env.Command(
     source=None,
-    target='$out/1200bp/valid/types/esearch.txt',
+    target='$out/dedup/1200bp/types/esearch.txt',
     action=('esearch -db nucleotide -query "' + rrna_16s +
             ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
 
@@ -166,7 +166,7 @@ if test:
                 ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
 else:
     """
-    Download accessions for bacteria with 16s rrna annotations
+    Download accessions for bacteria with 16s rrna seq_info
     NOT environmental or unclassified
 
     TODO: Limit to a recent date frame as initial search.  If latest records
@@ -255,9 +255,9 @@ gbs = env.Command(
 extract
 """
 today = time.strftime('%d-%b-%Y')
-new_fa, new_annotations, new_pub_info, new_refs, new_refseq_info = env.Command(
+new_fa, new_info, new_pub_info, new_refs, new_refseq_info = env.Command(
     target=['$out/new/seqs.fasta',
-            '$out/new/annotations.csv',
+            '$out/new/seq_info.csv',
             '$out/new/pubmed_info.csv',
             '$out/new/references.csv',
             '$out/new/refseq_info.csv'],
@@ -269,7 +269,7 @@ Record versions returned from esearch that had no actual 16s features
 """
 no_features = env.Command(
     target='$out/new/no_features.txt',
-    source=[new_annotations, new],
+    source=[new_info, new],
     action=('csvcut.py --columns version ${SOURCES[0]} | '
             'tail -n +2 | '
             'grep '
@@ -281,15 +281,15 @@ no_features = env.Command(
             '|| true'))
 
 """
-filter invalid tax_ids
+filter innamed tax_ids
 
 Do nothing with the unknown records for now because it might simply mean
 the ncbi taxonomy pipeline is out of sync with the latest 16s records
 """
 known_info, _ = env.Command(
-    target=['$out/new/taxit/annotations.csv',
+    target=['$out/new/taxit/seq_info.csv',
             '$out/new/taxit/unknown.csv'],
-    source=new_annotations,
+    source=new_info,
     action=['$taxit update_taxids '
             '--unknown-action drop '
             '--unknowns ${TARGETS[1]} '
@@ -301,7 +301,7 @@ known_info, _ = env.Command(
 vsearch new sequences with training set to test sequence orientation
 and 16s region
 
-TODO: evaluate performance with cmalign - Will cmalign see orientations?
+TODO: move to cmsearch
 """
 vsearch = env.Command(
     target='$out/new/vsearch.csv',
@@ -345,16 +345,16 @@ NOTE: seqs that failed either the vsearch or taxit update_taxids will
 not be appended to the records.txt file and will therefore be re-downloaded
 the next time this pipeline is run
 """
-fa, refresh_annotations, pubmed_info, references, refseq_info, _ = env.Command(
+fa, refresh_info, pubmed_info, references, refseq_info, _ = env.Command(
     target=['$out/seqs.fasta',
-            '$out/refresh/annotations.csv',
+            '$out/refresh/seq_info.csv',
             '$out/pubmed_info.csv',
             '$out/references.csv',
             '$out/refseq_info.csv',
             '$out/records.txt'],
     source=[esearch,
             vsearch_fa, '$seqs_cache',
-            known_info, '$annotations_cache',
+            known_info, '$seq_info_cache',
             new_pub_info, '$pubmed_info_cache',
             new_refs, '$references_cache',
             new_refseq_info, '$refseq_info_cache',
@@ -381,101 +381,93 @@ env.Command(
 """
 update all tax_ids
 """
-annotations = env.Command(
-    target='$out/annotations.csv',
-    source=refresh_annotations,
+seq_info = env.Command(
+    target='$out/seq_info.csv',
+    source=refresh_info,
     action=['$taxit -v update_taxids '
             '--out $TARGET '
             '--schema $schema '
             '$SOURCE $tax_url',
-            Copy('$annotations_cache', '$TARGET')])
-
-"""
-pull sequences at least 1200 bp and less than 1% ambiguous
-"""
-full_annotations = env.Command(
-    target='$out/1200bp/annotations.csv',
-    source=annotations,
-    action=('partition_refs.py '
-            # filtering
-            '--min-length 1200 '
-            '--prop-ambig-cutoff 0.01 '
-            '--out-annotations $TARGET '
-            '$SOURCE'))
-
-"""
-filter for valid annotations
-"""
-valid_annotations = env.Command(
-    target='$out/1200bp/valid/annotations.csv',
-    source=full_annotations,
-    action='is_valid.py --out $TARGET  --schema $schema $SOURCE $tax_url')
-
-"""
-pull valid sequences
-"""
-valid_fa = env.Command(
-    target='$out/1200bp/valid/seqs.fasta',
-    source=[fa, valid_annotations],
-    action=('partition_refs.py '
-            '--fasta ${SOURCES[0]} '
-            '--out-fa $TARGET '
-            '${SOURCES[1]}'))
-
-"""
-Make general valid taxtable with all ranks included
-"""
-valid_tax = env.Command(
-    target='$out/1200bp/valid/taxonomy.csv',
-    source=valid_annotations,
-    action=('$taxit -v taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '--schema $schema '
-            '$tax_url'))
-
-blast_db(env, valid_fa, '$out/1200bp/valid/blast')
-
-"""
-Remove and re-append is_type column with sequences per discussion:
-
-https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/14
-"""
-type_annotations = env.Command(
-    target='$out/1200bp/valid/types/annotations.csv',
-    source=[valid_annotations, types],
-    action='is_type.py $SOURCES $TARGET')
-
-"""
-pull type sequences
-"""
-type_fa = env.Command(
-    target='$out/1200bp/valid/types/seqs.fasta',
-    source=[valid_fa, type_annotations],
-    action=('partition_refs.py '
-            '--out-fa $TARGET '
-            '--fasta ${SOURCES[0]} '
-            '${SOURCES[1]}'))
+            Copy('$seq_info_cache', '$TARGET')])
 
 """
 Deduplicate sequences by isolate (accession)
 
-Appends a weight column showing number of sequences being represented
+Weight column is meaningless and removed to avoid confusion
 """
-dedup_fa, dedup_annotations = env.Command(
-    target=['$out/1200bp/valid/dedup/seqs.fasta',
-            '$out/1200bp/valid/dedup/annotations.csv'],
-    source=[valid_fa, valid_annotations],
-    action=('$deenurp -v deduplicate_sequences '
+dedup_fa, dedup_info = env.Command(
+    target=['$out/dedup/seqs.fasta', '$out/dedup/seq_info.csv'],
+    source=[fa, seq_info],
+    action=('$deenurp deduplicate_sequences '
             '--group-by accession '
-            '$SOURCES $TARGETS'))
+            '$SOURCES ${TARGETS[0]} /dev/stdout | '
+            # remove weight column because it is meaningless
+            'csvcut.py --not-columns weight --out ${TARGETS[1]}'))
 
 """
-dedup info file for filter_outliers
+pull sequences at least 1200 bp and less than 1% ambiguous
 """
-dedup_info = env.Command(
-    target='$out/1200bp/valid/dedup/seq_info.csv',
-    source=dedup_annotations,
+full_fa, full_seq_info = env.Command(
+    target=['$out/dedup/1200bp/seqs.fasta',
+            '$out/dedup/1200bp/seq_info.csv'],
+    source=[dedup_fa, dedup_info, types],
+    action=('partition_refs.py '
+            '--min-length 1200 '
+            '--prop-ambig-cutoff 0.01 '
+            '--types ${SOURCES[2]} '
+            '${SOURCES[:2]} $TARGETS'))
+
+"""
+pull type sequences
+"""
+type_fa, type_info = env.Command(
+    target=['$out/dedup/1200bp/types/seqs.fasta',
+            '$out/dedup/1200bp/types/seq_info.csv'],
+    source=[fa, full_seq_info],
+    action='partition_refs.py --is_type $SOURCES $TARGETS')
+
+"""
+Make sequence_from_type taxtable with all ranks included
+"""
+type_tax = env.Command(
+    target='$out/dedup/1200bp/types/taxonomy.csv',
+    source=type_info,
+    action=('$taxit -v taxtable '
+            '--seq-info $SOURCE '
+            '--schema $schema '
+            '$tax_url | '
+            'ranked.py --columns --out $TARGET'))
+
+blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
+
+"""
+filter for named seqs and seq_info
+"""
+named_fa, named_info = env.Command(
+    target=['$out/dedup/1200bp/named/seqs.fasta',
+            '$out/dedup/1200bp/named/seq_info.csv'],
+    source=[fa, full_seq_info],
+    action=('named.py --schema $schema $tax_url | '
+            'partition_refs.py --tax-ids /dev/stdin $SOURCES $TARGETS'))
+
+"""
+Make general named taxtable with all ranks included for filter_outliers
+"""
+named_tax = env.Command(
+    target='$out/dedup/1200bp/named/taxonomy.csv',
+    source=named_info,
+    action=('$taxit -v taxtable '
+            '--seq-info $SOURCE '
+            '--schema $schema '
+            '--out $TARGET '
+            '$tax_url'))
+
+"""
+Trimmed seqname,tax_id map file that can be easily cached by filter_outliers
+"""
+named_taxid_map = env.Command(
+    target='$out/dedup/1200bp/named/tax_id_map.csv',
+    source=named_info,
     action='csvcut.py --columns seqname,tax_id --out $TARGET $SOURCE')
 
 """
@@ -483,7 +475,7 @@ update tax_ids in details_in cache
 """
 filtered_details_in = env.Command(
     source='$outliers_cache',
-    target='$out/1200bp/valid/dedup/filtered/details_in.csv',
+    target='$out/dedup/1200bp/named/filtered/details_in.csv',
     action=('$taxit update_taxids '
             '--schema $schema '
             '--outfile $TARGET '
@@ -496,11 +488,11 @@ Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
 filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
-    source=[dedup_fa, dedup_info, valid_tax, filtered_details_in],
-    target=['$out/1200bp/valid/dedup/filtered/seqs.fasta',
-            '$out/1200bp/valid/dedup/filtered/seq_info.csv',
-            '$out/1200bp/valid/dedup/filtered/details_out.csv',
-            '$out/1200bp/valid/dedup/filtered/deenurp.log'],
+    source=[named_fa, named_taxid_map, named_tax, filtered_details_in],
+    target=['$out/dedup/1200bp/named/filtered/seqs.fasta',
+            '$out/dedup/1200bp/named/filtered/seq_info.csv',
+            '$out/dedup/1200bp/named/filtered/details_out.csv',
+            '$out/dedup/1200bp/named/filtered/deenurp.log'],
     action=['$deenurp -vvv filter_outliers '
             '--log ${TARGETS[3]} '
             '--filter-rank species '
@@ -521,14 +513,26 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             Copy('$outliers_cache', '${TARGETS[2]}')])
 
 """
+Make general named taxtable with all ranks included for filter_outliers
+"""
+filtered_tax = env.Command(
+    target='$out/dedup/1200bp/named/filtered/taxonomy.csv',
+    source=filtered_info,
+    action=('$taxit -v taxtable '
+            '--seq-info $SOURCE '
+            '--schema $schema '
+            '$tax_url | '
+            'ranked.py --columns --out $TARGET'))
+
+"""
 labmed do-not-trust filtering
 """
 trusted_fa, trusted_info, trusted_details = env.Command(
-    target=['$out/1200bp/valid/dedup/filtered/trusted/seqs.fasta',
-            '$out/1200bp/valid/dedup/filtered/trusted/seq_info.csv',
-            '$out/1200bp/valid/dedup/filtered/trusted/details_out.csv'],
+    target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
+            '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv',
+            '$out/dedup/1200bp/named/filtered/trusted/details_out.csv'],
     source=['data/do_not_trust.txt',
-            dedup_annotations,
+            dedup_info,
             filtered_fa,
             filtered_info,
             filtered_details],
@@ -538,19 +542,19 @@ trusted_fa, trusted_info, trusted_details = env.Command(
 Make filtered taxtable with ranked columns and no_rank rows
 """
 trusted_tax = env.Command(
-    target='$out/1200bp/valid/dedup/filtered/trusted/taxonomy.csv',
+    target='$out/dedup/1200bp/named/filtered/trusted/taxonomy.csv',
     source=filtered_info,
-    action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url '
-            '| ranked.py --columns --out $TARGET'))
+    action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url | '
+            'ranked.py --columns --out $TARGET'))
 
-blast_db(env, filtered_fa, '$out/1200bp/valid/dedup/filtered/trusted/blast')
+blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
 
 '''
 find top hit for each sequence among type strains
 '''
 type_hits = env.Command(
-    target='$out/1200bp/valid/dedup/vsearch.tsv',
-    source=[dedup_fa, type_fa],
+    target='$out/dedup/1200bp/named/vsearch.tsv',
+    source=[named_fa, type_fa],
     action=('vsearch --usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
             '--blast6out $TARGET '
@@ -567,12 +571,12 @@ bokeh plot filtered sequences
 hard coded: sort column 2 (records) desc
 '''
 env.Command(
-    target=['$out/1200bp/valid/dedup/filtered/index.html',
-            '$out/1200bp/valid/dedup/filtered/plots/map.csv'],
+    target=['$out/dedup/1200bp/named/filtered/index.html',
+            '$out/dedup/1200bp/named/filtered/plots/map.csv'],
     source=[filtered_details,
             type_hits,
-            annotations,
-            valid_tax,
+            seq_info,
+            named_tax,
             types,
             deenurp_log],
     action=('plot_details.py ${SOURCES[:5]} '
@@ -582,7 +586,7 @@ env.Command(
             '--param min_distance:0.01 '
             '--param max_distance:0.02 '
             '--log-in ${SOURCES[5]} '
-            '--plot-dir $out/1200bp/valid/dedup/filtered/plots '
+            '--plot-dir $out/dedup/1200bp/named/filtered/plots '
             '--plot-map ${TARGETS[1]} '
             '--plot-index ${TARGETS[0]}'))
 
