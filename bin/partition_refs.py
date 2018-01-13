@@ -12,30 +12,37 @@ def build_parser():
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-
+    # inputs
+    p.add_argument(
+        'fasta',
+        metavar='FASTA',
+        help="""sequence file""",
+        type=argparse.FileType('r'))
     p.add_argument(
         'annotations',
         metavar='CSV',
         help="""Sequence metadata""")
-    # inputs
-    p.add_argument(
-        '--fasta',
-        metavar='FASTA',
-        help="""sequence file""",
-        type=argparse.FileType('r'))
-
     # outputs
     p.add_argument(
-        '--out-annotations',
+        'out_fa',
+        type=argparse.FileType('w'),
+        help='fasta out')
+    p.add_argument(
+        'out_annotations',
         metavar='CSV',
         type=argparse.FileType('w'),
         help='seq info out')
-    p.add_argument(
-        '--out-fa',
-        type=argparse.FileType('w'),
-        help='fasta out')
     # filtering switches
     flt = p.add_argument_group('filtering options')
+    flt.add_argument(
+        '--types',
+        type=argparse.FileType('r'),
+        help=('text file of accessions to be marked '
+              'is_type=True in seq_info file'))
+    flt.add_argument(
+        '--is_type',
+        action='store_true',
+        help='filter for records is_type=True')
     flt.add_argument(
         '-a', '--prop-ambig-cutoff',
         type=float,
@@ -48,7 +55,6 @@ def build_parser():
     flt.add_argument(
         '--tax-ids',
         help='column tax_id')
-
     return p
 
 
@@ -74,9 +80,17 @@ def main():
         annotations = annotations.drop('prop_ambig', axis=1)
 
     if args.tax_ids:
-        tax_ids = pandas.read_csv(
-            args.tax_ids, usecols=['tax_id'], squeeze=True, dtype=str)
+        tax_ids = (i.strip() for i in open(args.tax_ids))
+        tax_ids = set(i for i in tax_ids if i)
         annotations = annotations[annotations['tax_id'].isin(tax_ids)]
+
+    if args.types:
+        types = (t.strip() for t in args.types)
+        types = set(t for t in types if t)
+        annotations['is_type'] = annotations['version'].isin(types)
+
+    if args.is_type:
+        annotations = annotations[annotations['is_type'] == 'True']
 
     if args.out_fa:
         seqs = SeqIO.parse(args.fasta, 'fasta')
