@@ -231,6 +231,7 @@ gbs = env.Command(
             '-id $SOURCE '
             '-db nucleotide '
             '-format ft '
+            '-mode text '
             '-retmax 1 '
             '-max-retry -1 '  # continuous retry
             '-log $out/ncbi.log '
@@ -247,6 +248,7 @@ gbs = env.Command(
             '-csv '
             '-db nucleotide '
             '-format gbwithparts '
+            '-mode text '
             '-log $out/ncbi.log '
             '-proc $nreq '
             '-retry $retry > $TARGET'])
@@ -527,15 +529,10 @@ filtered_tax = env.Command(
 """
 labmed do-not-trust filtering
 """
-trusted_fa, trusted_info, trusted_details = env.Command(
+trusted_fa, trusted_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
-            '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv',
-            '$out/dedup/1200bp/named/filtered/trusted/details_out.csv'],
-    source=['data/do_not_trust.txt',
-            dedup_info,
-            filtered_fa,
-            filtered_info,
-            filtered_details],
+            '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
+    source=['data/do_not_trust.txt', filtered_fa, named_info],
     action='do_not_trust.py $SOURCES $TARGETS')
 
 """
