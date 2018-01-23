@@ -158,7 +158,7 @@ def main():
     prev_fa = SeqIO.parse(args.previous_fasta, 'fasta')
     for r in itertools.chain(new_fa, prev_fa):
         if r.id in to_write:
-            SeqIO.write(r, args.fasta_out, 'fasta')
+            args.fasta_out.write('>{}\n{}\n'.format(r.description, r.seq))
             to_write.remove(r.id)
 
     # write annotations

@@ -43,9 +43,9 @@ def main():
             if s.id in vsearch and Alphabet._verify_alphabet(s.seq):
                 if vsearch[s.id] == '-':
                     s.seq = s.seq.reverse_complement()
-                SeqIO.write(s, out, 'fasta')
+                out.write('>{}\n{}\n'.format(s.description, s.seq))
             else:
-                SeqIO.write(s, unknowns, 'fasta')
+                unknowns.write('>{}\n{}\n'.format(s.description, s.seq))
 
 
 if __name__ == '__main__':
