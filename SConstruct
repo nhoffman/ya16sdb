@@ -311,7 +311,9 @@ vsearch = env.Command(
     action=('vsearch '
             '--usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
+            '--iddef 2 '  # matching cols / alignment len excluding term gaps
             '--id 0.70 '
+            '--query_cov 0.70 '
             '--threads 14 '
             '--userfields query+target+qstrand+id+tilo+tihi '
             '--strand both '
@@ -437,8 +439,8 @@ type_tax = env.Command(
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
             '--schema $schema '
-            '$tax_url | '
-            'ranked.py --columns --out $TARGET'))
+            '--out $TARGET '
+            '$tax_url'))
 
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
@@ -523,8 +525,8 @@ filtered_tax = env.Command(
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
             '--schema $schema '
-            '$tax_url | '
-            'ranked.py --columns --out $TARGET'))
+            '--out $TARGET '
+            '$tax_url'))
 
 """
 labmed do-not-trust filtering
@@ -541,8 +543,11 @@ Make filtered taxtable with ranked columns and no_rank rows
 trusted_tax = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxonomy.csv',
     source=filtered_info,
-    action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url | '
-            'ranked.py --columns --out $TARGET'))
+    action=('$taxit taxtable '
+            '--seq-info $SOURCE '
+            '--schema $schema '
+            '--out $TARGET '
+            '$tax_url'))
 
 blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
 
@@ -596,6 +601,15 @@ contributors = env.Command(
     action='git log --all --format="%cN <%cE>" | sort | uniq > $TARGET')
 
 """
+git version used to generate output
+"""
+commit = env.Command(
+    target='$out/git_version.txt',
+    source='.git/objects',
+    action=['(echo $$(hostname):$$(pwd); '
+            'git describe --tags --dirty) > $TARGET'])
+
+"""
 release steps
 """
 if release:
@@ -626,11 +640,6 @@ if release:
         target=os.path.join('$base', 'LATEST'),
         source='$out',
         action=SymLink())
-
-    commit = env.Command(
-        target='$out/git_version.txt',
-        source='.git/objects',
-        action='git describe --tags > $TARGET')
 
     freeze = env.Command(
         target='$out/requirements.txt',
