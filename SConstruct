@@ -80,6 +80,10 @@ vrs.Add(
     'schema',
     default='ncbi_taxonomy',
     help='postgres database schema')
+vrs.Add(
+    'notrust_file',
+    default='/molmicro/common/files/do_not_trust.txt',
+    help='location of do-not-trust list of accessions')
 
 # cache vars
 vrs.Add(PathVariable(
@@ -534,7 +538,7 @@ labmed do-not-trust filtering
 trusted_fa, trusted_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
-    source=['data/do_not_trust.txt', filtered_fa, named_info],
+    source=['$notrust_file', filtered_fa, named_info],
     action='do_not_trust.py $SOURCES $TARGETS')
 
 """
