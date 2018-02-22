@@ -74,11 +74,11 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add(
     'tax_url',
-    default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
+    default='url.conf',
     help='database url')
 vrs.Add(
     'schema',
-    default='ncbi_taxonomy',
+    default='',
     help='postgres database schema')
 
 # cache vars
