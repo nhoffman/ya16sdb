@@ -74,12 +74,16 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add(
     'tax_url',
-    default='"postgresql://crosenth:password@db3.labmed.uw.edu/molmicro"',
+    default='url.conf',
     help='database url')
 vrs.Add(
     'schema',
-    default='ncbi_taxonomy',
+    default='',
     help='postgres database schema')
+vrs.Add(
+    'notrust_file',
+    default='/molmicro/common/files/do_not_trust.txt',
+    help='location of do-not-trust list of accessions')
 
 # cache vars
 vrs.Add(PathVariable(
@@ -231,6 +235,7 @@ gbs = env.Command(
             '-id $SOURCE '
             '-db nucleotide '
             '-format ft '
+            '-mode text '
             '-retmax 1 '
             '-max-retry -1 '  # continuous retry
             '-log $out/ncbi.log '
@@ -247,6 +252,7 @@ gbs = env.Command(
             '-csv '
             '-db nucleotide '
             '-format gbwithparts '
+            '-mode text '
             '-log $out/ncbi.log '
             '-proc $nreq '
             '-retry $retry > $TARGET'])
@@ -309,7 +315,9 @@ vsearch = env.Command(
     action=('vsearch '
             '--usearch_global ${SOURCES[0]} '
             '--db ${SOURCES[1]} '
+            '--iddef 2 '  # matching cols / alignment len excluding term gaps
             '--id 0.70 '
+            '--query_cov 0.70 '
             '--threads 14 '
             '--userfields query+target+qstrand+id+tilo+tihi '
             '--strand both '
@@ -435,8 +443,8 @@ type_tax = env.Command(
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
             '--schema $schema '
-            '$tax_url | '
-            'ranked.py --columns --out $TARGET'))
+            '--out $TARGET '
+            '$tax_url'))
 
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
@@ -521,21 +529,16 @@ filtered_tax = env.Command(
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
             '--schema $schema '
-            '$tax_url | '
-            'ranked.py --columns --out $TARGET'))
+            '--out $TARGET '
+            '$tax_url'))
 
 """
 labmed do-not-trust filtering
 """
-trusted_fa, trusted_info, trusted_details = env.Command(
+trusted_fa, trusted_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
-            '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv',
-            '$out/dedup/1200bp/named/filtered/trusted/details_out.csv'],
-    source=['data/do_not_trust.txt',
-            dedup_info,
-            filtered_fa,
-            filtered_info,
-            filtered_details],
+            '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
+    source=['$notrust_file', filtered_fa, named_info],
     action='do_not_trust.py $SOURCES $TARGETS')
 
 """
@@ -544,8 +547,11 @@ Make filtered taxtable with ranked columns and no_rank rows
 trusted_tax = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxonomy.csv',
     source=filtered_info,
-    action=('$taxit taxtable --seq-info $SOURCE --schema $schema $tax_url | '
-            'ranked.py --columns --out $TARGET'))
+    action=('$taxit taxtable '
+            '--seq-info $SOURCE '
+            '--schema $schema '
+            '--out $TARGET '
+            '$tax_url'))
 
 blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
 
@@ -599,6 +605,15 @@ contributors = env.Command(
     action='git log --all --format="%cN <%cE>" | sort | uniq > $TARGET')
 
 """
+git version used to generate output
+"""
+commit = env.Command(
+    target='$out/git_version.txt',
+    source='.git/objects',
+    action=['(echo $$(hostname):$$(pwd); '
+            'git describe --tags --dirty) > $TARGET'])
+
+"""
 release steps
 """
 if release:
@@ -629,11 +644,6 @@ if release:
         target=os.path.join('$base', 'LATEST'),
         source='$out',
         action=SymLink())
-
-    commit = env.Command(
-        target='$out/git_version.txt',
-        source='.git/objects',
-        action='git describe --tags > $TARGET')
 
     freeze = env.Command(
         target='$out/requirements.txt',

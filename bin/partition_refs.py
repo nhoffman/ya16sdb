@@ -93,9 +93,9 @@ def main():
         annotations = annotations[annotations['is_type'] == 'True']
 
     if args.out_fa:
-        seqs = SeqIO.parse(args.fasta, 'fasta')
-        seqs = (s for s in seqs if s.id in annotations.index)
-        SeqIO.write(seqs, args.out_fa, 'fasta')
+        for s in SeqIO.parse(args.fasta, 'fasta'):
+            if s.id in annotations.index:
+                args.out_fa.write('>{}\n{}\n'.format(s.description, s.seq))
 
     if args.out_annotations:
         annotations.to_csv(args.out_annotations)
