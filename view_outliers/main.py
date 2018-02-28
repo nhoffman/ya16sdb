@@ -1,3 +1,5 @@
+import os
+from os import path
 from itertools import zip_longest
 from collections import Counter
 from functools import partial
@@ -16,12 +18,14 @@ COLORS = Spectral5
 discrete = ['cluster', 'is_out', 'is_type', 'match_species']
 continuous = ['x', 'y', 'dist', 'ord', 'match_pct']
 NO_POINTS_SELECTED = '(no points selected)'
-
-# TODO: provide input file as an environment variable or command line
-# argument (see 'bokeh server --args')
-fname = 'output/filtered_details.feather'
 DEFAULT_SPECIES = 'Enterococcus faecalis'
 DEFAULT_GENUS = DEFAULT_SPECIES.split()[0]
+
+# TODO: provide input file as an environment variable or command line
+# argument (see 'bokeh serve --args')
+fname = 'filtered_details.feather'
+if 'datadir' in os.environ:
+    fname = path.join(os.environ['datadir'], 'dedup/1200bp/named', fname)
 
 global data
 data = pd.read_feather(fname)
