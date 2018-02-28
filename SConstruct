@@ -77,12 +77,8 @@ vrs.Add(
     default='url.conf',
     help='database url')
 vrs.Add(
-    'schema',
-    default='',
-    help='postgres database schema')
-vrs.Add(
     'notrust_file',
-    default='/molmicro/common/files/do_not_trust.txt',
+    default='/molmicro/common/ncbi/do_not_trust/accessions.txt',
     help='location of do-not-trust list of accessions')
 
 # cache vars
@@ -121,7 +117,8 @@ env = Environment(
         'singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '/molmicro/common/singularity/taxtastic-0.8.3.img taxit'),
+        '/molmicro/common/singularity/'
+        'taxtastic-0.8.5-singularity2.4.img taxit'),
     deenurp=(
         'singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
@@ -300,7 +297,6 @@ known_info, _ = env.Command(
             '--unknown-action drop '
             '--unknowns ${TARGETS[1]} '
             '--outfile ${TARGETS[0]} '
-            '--schema $schema '
             '$SOURCE $tax_url'])
 
 """
@@ -394,7 +390,6 @@ seq_info = env.Command(
     source=refresh_info,
     action=['$taxit -v update_taxids '
             '--out $TARGET '
-            '--schema $schema '
             '$SOURCE $tax_url',
             Copy('$seq_info_cache', '$TARGET')])
 
@@ -442,7 +437,6 @@ type_tax = env.Command(
     source=type_info,
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
-            '--schema $schema '
             '--out $TARGET '
             '$tax_url'))
 
@@ -455,7 +449,7 @@ named_fa, named_info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
             '$out/dedup/1200bp/named/seq_info.csv'],
     source=[fa, full_seq_info],
-    action=('named.py --schema $schema $tax_url | '
+    action=('named.py $tax_url | '
             'partition_refs.py --tax-ids /dev/stdin $SOURCES $TARGETS'))
 
 """
@@ -466,7 +460,6 @@ named_tax = env.Command(
     source=named_info,
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
-            '--schema $schema '
             '--out $TARGET '
             '$tax_url'))
 
@@ -485,7 +478,6 @@ filtered_details_in = env.Command(
     source='$outliers_cache',
     target='$out/dedup/1200bp/named/filtered/details_in.csv',
     action=('$taxit update_taxids '
-            '--schema $schema '
             '--outfile $TARGET '
             '$SOURCE $tax_url'
             # continue if filter_outliers cache is empty
@@ -528,7 +520,6 @@ filtered_tax = env.Command(
     source=filtered_info,
     action=('$taxit -v taxtable '
             '--seq-info $SOURCE '
-            '--schema $schema '
             '--out $TARGET '
             '$tax_url'))
 
@@ -549,7 +540,6 @@ trusted_tax = env.Command(
     source=filtered_info,
     action=('$taxit taxtable '
             '--seq-info $SOURCE '
-            '--schema $schema '
             '--out $TARGET '
             '$tax_url'))
 
