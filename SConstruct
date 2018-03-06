@@ -70,7 +70,7 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add('tax_url', default='url.conf', help='database url')
-vrs.Add('notrust_file', default='/molmicro/common/lists/no_trust_records.csv')
+vrs.Add('notrust_file', default='/molmicro/common/lists/do_not_trust.txt')
 
 # cache vars
 vrs.Add(PathVariable(
