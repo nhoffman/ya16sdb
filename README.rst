@@ -61,3 +61,19 @@ As an (extreme) example of the incremental filtering process::
   ./1200bp/valid/dedup/seq_info.csv:11208
   ./1200bp/valid/filtered/seq_info.csv:11045
   ./1200bp/valid/types/seq_info.csv:58
+
+
+interactive visualizations
+==========================
+
+Interactive visualizations of the filtered reference sequences are
+implemented using Bokeh. In an activated virtualenv with the contents
+of ``requirements.txt`` installed::
+
+  bokeh serve --show view_outliers
+
+This will start a local Bokeh server and open the visualization in a
+web browser.
+
+
+
