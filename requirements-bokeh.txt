@@ -1,3 +1,3 @@
 bokeh
-pandas
+pandas>=0.20.0
 feather-format

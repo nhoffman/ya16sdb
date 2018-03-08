@@ -431,6 +431,14 @@ type_tax = env.Command(
             '--out $TARGET '
             '$tax_url'))
 
+"""
+Create taxtable output with replacing tax_ids with taxnames
+"""
+type_lineages = env.Command(
+    target='$out/dedup/1200bp/types/lineages.csv',
+    source=[type_tax, type_info],
+    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
 """
@@ -463,12 +471,12 @@ named_taxid_map = env.Command(
     action='csvcut.py --columns seqname,tax_id --out $TARGET $SOURCE')
 
 """
-TODO: add this for types output
+Create taxtable output with replacing tax_ids with taxnames
 """
 named_lineages = env.Command(
     target='$out/dedup/1200bp/named/lineages.csv',
     source=[named_tax, named_info],
-    action='taxit --csv-table $TARGET $SOURCES')
+    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
 
 '''
 find top hit for each sequence among type strains
@@ -547,10 +555,10 @@ feather output - https://github.com/wesm/feather
 filtered_feather = env.Command(
     target='$out/dedup/1200bp/named/filtered_details.feather',
     source=[filtered_details, named_info, named_lineages, named_type_hits],
-    action=['feather.py '
+    action=['to_feather.py '
             '--details ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
-            '--lineages ${SOURCES[2]) '
+            '--lineages ${SOURCES[2]} '
             '--hits ${SOURCES[3]} '
             '--outfile $TARGET'])
 
