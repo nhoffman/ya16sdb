@@ -463,6 +463,33 @@ named_taxid_map = env.Command(
     action='csvcut.py --columns seqname,tax_id --out $TARGET $SOURCE')
 
 """
+TODO: add this for types output
+"""
+named_lineages = env.Command(
+    target='$out/dedup/1200bp/named/lineages.csv',
+    source=[named_tax, named_info],
+    action='taxit --csv-table $TARGET $SOURCES')
+
+'''
+find top hit for each sequence among type strains
+
+NOTE: alleles will never align with themselves (--self) BUT
+can align with other alleles in the same genome accession
+'''
+named_type_hits = env.Command(
+    target='$out/dedup/1200bp/named/vsearch.tsv',
+    source=[named_fa, type_fa],
+    action=('vsearch --usearch_global ${SOURCES[0]} '
+            '--db ${SOURCES[1]} '
+            '--blast6out $TARGET '
+            '--id 0.75 '
+            '--threads 14 '
+            '--self '  # reject same sequence hits
+            '--threads 12 '
+            '--maxaccepts 1 '
+            '--strand plus'))
+
+"""
 update tax_ids in details_in cache
 """
 filtered_details_in = env.Command(
@@ -515,6 +542,19 @@ filtered_tax = env.Command(
             '$tax_url'))
 
 """
+feather output - https://github.com/wesm/feather
+"""
+filtered_feather = env.Command(
+    target='$out/dedup/1200bp/named/filtered_details.feather',
+    source=[filtered_details, named_info, named_lineages, named_type_hits],
+    action=['feather.py '
+            '--details ${SOURCES[0]} '
+            '--seq-info ${SOURCES[1]} '
+            '--lineages ${SOURCES[2]) '
+            '--hits ${SOURCES[3]} '
+            '--outfile $TARGET'])
+
+"""
 labmed do-not-trust filtering
 """
 trusted_fa, trusted_info = env.Command(
@@ -537,22 +577,6 @@ trusted_tax = env.Command(
 blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
 
 '''
-find top hit for each sequence among type strains
-'''
-type_hits = env.Command(
-    target='$out/dedup/1200bp/named/vsearch.tsv',
-    source=[named_fa, type_fa],
-    action=('vsearch --usearch_global ${SOURCES[0]} '
-            '--db ${SOURCES[1]} '
-            '--blast6out $TARGET '
-            '--id 0.75 '
-            '--threads 14 '
-            '--self '  # reject same sequence hits
-            '--threads 12 '
-            '--maxaccepts 1 '
-            '--strand plus'))
-
-'''
 bokeh plot filtered sequences
 
 hard coded: sort column 2 (records) desc
@@ -561,7 +585,7 @@ env.Command(
     target=['$out/dedup/1200bp/named/filtered/index.html',
             '$out/dedup/1200bp/named/filtered/plots/map.csv'],
     source=[filtered_details,
-            type_hits,
+            named_type_hits,
             seq_info,
             named_tax,
             types,

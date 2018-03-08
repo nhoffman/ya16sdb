@@ -11,7 +11,7 @@ singularity exec -B $datadir --pwd $datadir/dedup/1200bp/named /molmicro/common/
 Then:
 
 export named=$datadir/dedup/1200bp/named
-bin/prepare_plot_data.py \
+bin/feather.py \
     --details $named/filtered/details_out.csv \
     --seq-info $named/seq_info.csv \
     --lineages $named/lineages.csv \
