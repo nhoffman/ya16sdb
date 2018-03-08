@@ -553,7 +553,7 @@ filtered_tax = env.Command(
 feather output - https://github.com/wesm/feather
 """
 filtered_feather = env.Command(
-    target='$out/dedup/1200bp/named/filtered_details.feather',
+    target='$out/dedup/1200bp/named/filtered/details_out.feather',
     source=[filtered_details, named_info, named_lineages, named_type_hits],
     action=['to_feather.py '
             '--details ${SOURCES[0]} '
