@@ -2,6 +2,10 @@
 Changes for ya16sdb
 ===================
 
+0.3-dev
+=======
+* new filtered/details_out.feather, named/lineages.csv and types/lineags.csv outputs
+
 0.3
 ===
 * new folder structure dedup -> 1200bp -> named -> filtered -> trusted
