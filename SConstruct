@@ -6,17 +6,26 @@ TODO: download records updated before last download
 
 import errno
 import os
+import shutil
 import sys
 import time
 
 # requirements installed in the virtualenv
 import SCons
-from SCons.Script import (
-    Variables, ARGUMENTS, Help, Copy, Environment, PathVariable)
+from SCons.Script import Variables, ARGUMENTS, Help, Environment, PathVariable
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
+
+'''
+Force Copy to use shutil.copyfile instead of SCons.Script.Copy's
+use of shutil.copy2 which fails when file ownership is different
+'''
+Copy = SCons.Action.ActionFactory(
+    lambda dest, src, symlinks=True: not shutil.copyfile(
+        src, dest, follow_symlinks=not symlinks),
+    lambda dest, src, symlinks=True: 'Copy("%s", "%s")' % (dest, src))
 
 
 def PathIsFileCreate(key, val, env):
