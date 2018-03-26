@@ -6,7 +6,6 @@ TODO: download records updated before last download
 
 import errno
 import os
-import shutil
 import sys
 import time
 
@@ -17,15 +16,6 @@ from SCons.Script import Variables, ARGUMENTS, Help, Environment, PathVariable
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
-
-'''
-Force Copy to use shutil.copyfile instead of SCons.Script.Copy's
-use of shutil.copy2 which fails when file ownership is different
-'''
-Copy = SCons.Action.ActionFactory(
-    lambda dest, src, symlinks=True: not shutil.copyfile(
-        src, dest, follow_symlinks=not symlinks),
-    lambda dest, src, symlinks=True: 'Copy("%s", "%s")' % (dest, src))
 
 
 def PathIsFileCreate(key, val, env):
@@ -365,11 +355,11 @@ fa, refresh_info, pubmed_info, references, refseq_info, _ = env.Command(
             no_features, '$records_cache'],
     action=['refresh.py $SOURCES $TARGETS',
             # cache
-            Copy('$seqs_cache', '${TARGETS[0]}'),
-            Copy('$pubmed_info_cache', '${TARGETS[2]}'),
-            Copy('$references_cache', '${TARGETS[3]}'),
-            Copy('$refseq_info_cache', '${TARGETS[4]}'),
-            Copy('$records_cache', '${TARGETS[5]}')])
+            'cp ${TARGETS[0]} $seqs_cache',
+            'cp ${TARGETS[2]} $pubmed_info_cache',
+            'cp ${TARGETS[3]} $references_cache',
+            'cp ${TARGETS[4]} $refseq_info_cache',
+            'cp ${TARGETS[5]} $records_cache'])
 
 """
 append new records to global list
@@ -391,7 +381,7 @@ seq_info = env.Command(
     action=['$taxit -v update_taxids '
             '--out $TARGET '
             '$SOURCE $tax_url',
-            Copy('$seq_info_cache', '$TARGET')])
+            'cp $TARGET $seq_info_cache'])
 
 """
 Deduplicate sequences by isolate (accession)
@@ -545,7 +535,7 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             '--min-seqs-for-filtering 5 '
             '${SOURCES[:3]}',
             # cache it
-            Copy('$outliers_cache', '${TARGETS[2]}')])
+            'cp ${TARGETS[2]} $outliers_cache'])
 
 """
 Make general named taxtable with all ranks included for filter_outliers
