@@ -2,4 +2,5 @@ Chris Rosenthal <crosenth@uw.edu>
 dhoogest <dhoogest@uw.edu>
 GitHub <noreply@github.com>
 Noah Hoffman <noah.hoffman@gmail.com>
+Rosenthal <crosenth@unicorn.amc.uwmedicine.org>
 Rosenthal <crosenth@uw.edu>

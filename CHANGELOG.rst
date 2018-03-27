@@ -2,7 +2,7 @@
 Changes for ya16sdb
 ===================
 
-0.3-dev
+0.4
 =======
 * new filtered/details_out.feather, named/lineages.csv and types/lineags.csv outputs
 
