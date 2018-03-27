@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Filter csv file with version column
+Add is_type column based on presence in type strain file
 """
-
 import argparse
 import csv
 import sys
@@ -15,31 +14,27 @@ def main():
     p.add_argument(
         'seq_info',
         type=argparse.FileType('r'),
+        nargs='?',
+        default=sys.stdin,
         help='full seq_info file with description column')
     p.add_argument(
         'types',
         type=argparse.FileType('r'),
         help='txt file of version numbers that are type strains')
     p.add_argument(
-        '--in-description',
-        help=('comma delimited list of annotation(s) that may be '
-              'in the description field that would that would '
-              'designate a type strain'))
-    p.add_argument(
-        'out',
+        '--out',
         type=argparse.FileType('w'),
         default=sys.stdout,
         help='list of all version downloaded')
-
     args = p.parse_args()
     types = (t.strip() for t in args.types)
     types = set(t for t in types if t)
-    info = csv.reader(args.seq_info, quotechar='"')
-    header = next(info)
-    version = header.index('version')
-    writer = csv.writer(args.out)
-    writer.writerow(header)
-    writer.writerows(i for i in info if i[version] in types)
+    info = csv.DictReader(args.seq_info)
+    writer = csv.DictWriter(args.out, fieldnames=info.fieldnames + ['is_type'])
+    writer.writeheader()
+    for row in info:
+        row['is_type'] = row['version'] in types
+        writer.writerow(row)
 
 
 if __name__ == '__main__':

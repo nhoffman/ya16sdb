@@ -373,15 +373,20 @@ env.Command(
     action='cat $SOURCE >> $genbank_cache')
 
 """
-update all tax_ids
+update all tax_ids and add is_type columns
+
+See https://github.com/nhoffman/ya16sdb/issues/11 about is_type column
 """
 seq_info = env.Command(
     target='$out/seq_info.csv',
-    source=refresh_info,
-    action=['$taxit -v update_taxids '
-            '--out $TARGET '
-            '$SOURCE $tax_url',
+    source=[refresh_info, types],
+    action=['$taxit -v update_taxids ${SOURCES[0]} $tax_url | '
+            'is_type.py --out $TARGET ${SOURCES[1]}',  # add is_type column
             'cp $TARGET $seq_info_cache'])
+
+"""
+TODO: add is_type column here before deduplication
+"""
 
 """
 Deduplicate sequences by isolate (accession)
@@ -403,12 +408,11 @@ pull sequences at least 1200 bp and less than 1% ambiguous
 full_fa, full_seq_info = env.Command(
     target=['$out/dedup/1200bp/seqs.fasta',
             '$out/dedup/1200bp/seq_info.csv'],
-    source=[dedup_fa, dedup_info, types],
+    source=[dedup_fa, dedup_info],
     action=('partition_refs.py '
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
-            '--types ${SOURCES[2]} '
-            '${SOURCES[:2]} $TARGETS'))
+            '$SOURCES $TARGETS'))
 
 """
 pull type sequences
@@ -512,10 +516,10 @@ filtered_details_in = env.Command(
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
-filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
+filtered_fa, filtered_taxid_map, filtered_details, deenurp_log = env.Command(
     source=[named_fa, named_taxid_map, named_tax, filtered_details_in],
     target=['$out/dedup/1200bp/named/filtered/seqs.fasta',
-            '$out/dedup/1200bp/named/filtered/seq_info.csv',
+            '$out/dedup/1200bp/named/filtered/tax_id_map.csv',
             '$out/dedup/1200bp/named/filtered/details_out.csv',
             '$out/dedup/1200bp/named/filtered/deenurp.log'],
     action=['$deenurp -vvv filter_outliers '
@@ -538,6 +542,15 @@ filtered_fa, filtered_info, filtered_details, deenurp_log = env.Command(
             'cp ${TARGETS[2]} $outliers_cache'])
 
 """
+Create a filtered seq_info.csv file
+"""
+filtered_info = env.Command(
+    target='$out/dedup/1200bp/named/filtered/seq_info.csv',
+    source=[filtered_taxid_map, named_info],
+    action='cut --delimiter , --fields 1 ${SOURCES[0]} | '
+           'grep --file - ${SOURCES[1]} > $TARGET')
+
+"""
 Make general named taxtable with all ranks included for filter_outliers
 """
 filtered_tax = env.Command(
@@ -552,7 +565,7 @@ filtered_tax = env.Command(
 feather output - https://github.com/wesm/feather
 """
 filtered_feather = env.Command(
-    target='$out/dedup/1200bp/named/filtered/details_out.feather',
+    target='$out/dedup/1200bp/named/filtered/filter_details.feather',
     source=[filtered_details, named_info, named_lineages, named_type_hits],
     action=['to_feather.py '
             '--details ${SOURCES[0]} '
@@ -610,6 +623,8 @@ env.Command(
 
 """
 Append contributers
+
+FIXME: why are there two entries for crosenth
 """
 contributors = env.Command(
     source='.git/logs/HEAD',

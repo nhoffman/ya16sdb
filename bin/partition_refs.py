@@ -35,11 +35,6 @@ def build_parser():
     # filtering switches
     flt = p.add_argument_group('filtering options')
     flt.add_argument(
-        '--types',
-        type=argparse.FileType('r'),
-        help=('text file of accessions to be marked '
-              'is_type=True in seq_info file'))
-    flt.add_argument(
         '--is_type',
         action='store_true',
         help='filter for records is_type=True')
@@ -84,18 +79,12 @@ def main():
         tax_ids = set(i for i in tax_ids if i)
         annotations = annotations[annotations['tax_id'].isin(tax_ids)]
 
-    if args.types:
-        types = (t.strip() for t in args.types)
-        types = set(t for t in types if t)
-        annotations['is_type'] = annotations['version'].isin(types)
-
     if args.is_type:
         annotations = annotations[annotations['is_type'] == 'True']
 
-    if args.out_fa:
-        for s in SeqIO.parse(args.fasta, 'fasta'):
-            if s.id in annotations.index:
-                args.out_fa.write('>{}\n{}\n'.format(s.description, s.seq))
+    for s in SeqIO.parse(args.fasta, 'fasta'):
+        if s.id in annotations.index:
+            args.out_fa.write('>{}\n{}\n'.format(s.description, s.seq))
 
     if args.out_annotations:
         annotations.to_csv(args.out_annotations)
