@@ -547,8 +547,7 @@ Create a filtered seq_info.csv file
 filtered_info = env.Command(
     target='$out/dedup/1200bp/named/filtered/seq_info.csv',
     source=[filtered_taxid_map, named_info],
-    action='cut --delimiter , --fields 1 ${SOURCES[0]} | '
-           'grep --file - ${SOURCES[1]} > $TARGET')
+    action='merge.py --out $TARGET $SOURCES')
 
 """
 Make general named taxtable with all ranks included for filter_outliers
@@ -576,6 +575,9 @@ filtered_feather = env.Command(
 
 """
 labmed do-not-trust filtering
+
+FIXME:  This will process will eventually go in its own repo but consider
+doing a reverse grep into partition_refs.py
 """
 trusted_fa, trusted_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
