@@ -445,6 +445,39 @@ type_lineages = env.Command(
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
 """
+labmed do-not-trust types filtering
+
+FIXME:  This will process will eventually go in its own repo but consider
+doing a reverse grep into partition_refs.py
+"""
+trusted__type_fa, trusted_type_info = env.Command(
+    target=['$out/dedup/1200bp/types/trusted/seqs.fasta',
+            '$out/dedup/1200bp/types/trusted/seq_info.csv'],
+    source=['$notrust_file', type_fa, type_info],
+    action='do_not_trust.py $SOURCES $TARGETS')
+
+"""
+Make sequence_from_type trusted taxtable with all ranks included
+"""
+trusted_type_tax = env.Command(
+    target='$out/dedup/1200bp/types/trusted/taxonomy.csv',
+    source=trusted_type_info,
+    action=('$taxit -v taxtable '
+            '--seq-info $SOURCE '
+            '--out $TARGET '
+            '$tax_url'))
+
+"""
+Create taxtable output with replacing tax_ids with taxnames
+"""
+trusted_type_lineages = env.Command(
+    target='$out/dedup/1200bp/types/trusted/lineages.csv',
+    source=[type_tax, type_info],
+    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
+blast_db(env, type_fa, '$out/dedup/1200bp/types/trusted/blast')
+
+"""
 filter for named seqs and seq_info
 """
 named_fa, named_info = env.Command(
@@ -595,6 +628,14 @@ trusted_tax = env.Command(
             '--seq-info $SOURCE '
             '--out $TARGET '
             '$tax_url'))
+
+"""
+Taxtable output replacing tax_ids with taxnames
+"""
+trusted_type_lineages = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/lineages.csv',
+    source=[trusted_tax, trusted_info],
+    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
 
 blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
 

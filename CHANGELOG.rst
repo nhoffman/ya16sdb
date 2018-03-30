@@ -4,7 +4,8 @@ Changes for ya16sdb
 
 0.4
 =======
-* new filtered/details_out.feather, named/lineages.csv and types/lineags.csv outputs
+* new types/trusted directory
+* new filtered/details_out.feather, [named, named/trusted, types, types/trusted]/lineages.csv outputs
 
 0.3
 ===
