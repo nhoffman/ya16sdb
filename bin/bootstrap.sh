@@ -13,6 +13,7 @@ fi
 # install python envs
 python3 -m venv $venv
 source $venv/bin/activate
+$venv/bin/pip3 install --egg "scons>=3.0.1"
 $venv/bin/pip3 install --requirement requirements.txt
 $venv/bin/pip3 install --requirement requirements-bokeh.txt
 
