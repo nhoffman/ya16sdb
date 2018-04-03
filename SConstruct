@@ -69,7 +69,7 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add('tax_url', default='url.conf', help='database url')
-vrs.Add('notrust_file', default='/molmicro/common/lists/do_not_trust.txt')
+vrs.Add('notrust_file', default='data/do_not_trust.txt')
 
 # cache vars
 vrs.Add(PathVariable(
@@ -107,14 +107,14 @@ env = Environment(
         'singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '/molmicro/common/singularity/'
-        'taxtastic-0.8.5-singularity2.4.img taxit'),
+        '/fh/fast/fredricks_d/bvdiversity/singularity/'
+        'taxtastic-0.8.5-singularity2.3.img taxit'),
     deenurp=(
         'singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '/molmicro/common/singularity/deenurp-v0.2.4-singularity2.4.img '
-        'deenurp')
+        '/fh/fast/fredricks_d/bvdiversity/singularity/'
+        'deenurp-v0.2.4-singularity2.4.img deenurp')
 )
 
 env.Decider('MD5-timestamp')
@@ -472,7 +472,7 @@ Create taxtable output with replacing tax_ids with taxnames
 """
 trusted_type_lineages = env.Command(
     target='$out/dedup/1200bp/types/trusted/lineages.csv',
-    source=[type_tax, type_info],
+    source=[trusted_type_tax, trusted_type_info],
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
 
 blast_db(env, type_fa, '$out/dedup/1200bp/types/trusted/blast')
