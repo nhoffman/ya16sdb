@@ -594,6 +594,14 @@ filtered_tax = env.Command(
             '$tax_url'))
 
 """
+Create taxtable output with replacing tax_ids with taxnames
+"""
+filtered_lineages = env.Command(
+    target='$out/dedup/1200bp/named/filtered/lineages.csv',
+    source=[filtered_tax, filtered_info],
+    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
+"""
 feather output - https://github.com/wesm/feather
 """
 filtered_feather = env.Command(
