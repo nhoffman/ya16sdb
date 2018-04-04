@@ -442,6 +442,16 @@ type_lineages = env.Command(
     source=[type_tax, type_info],
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
 
+"""
+Create mothur output
+
+https://mothur.org/wiki/Taxonomy_File
+"""
+types_mothur = env.Command(
+    target='$out/dedup/1200bp/types/lineages.txt',
+    source=[type_tax, type_info],
+    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
+
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
 """
@@ -474,6 +484,16 @@ trusted_type_lineages = env.Command(
     target='$out/dedup/1200bp/types/trusted/lineages.csv',
     source=[trusted_type_tax, trusted_type_info],
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
+"""
+Create mothur output
+
+https://mothur.org/wiki/Taxonomy_File
+"""
+trusted_type_mothur = env.Command(
+    target='$out/dedup/1200bp/types/trusted/lineages.txt',
+    source=[trusted_type_tax, trusted_type_info],
+    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 blast_db(env, type_fa, '$out/dedup/1200bp/types/trusted/blast')
 
@@ -513,6 +533,16 @@ named_lineages = env.Command(
     target='$out/dedup/1200bp/named/lineages.csv',
     source=[named_tax, named_info],
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
+"""
+Create taxtable output with replacing tax_ids with taxnames
+
+https://mothur.org/wiki/Taxonomy_File
+"""
+named_mothur = env.Command(
+    target='$out/dedup/1200bp/named/lineages.txt',
+    source=[named_tax, named_info],
+    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 '''
 find top hit for each sequence among type strains
@@ -602,6 +632,16 @@ filtered_lineages = env.Command(
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
 
 """
+Create mothur output
+
+https://mothur.org/wiki/Taxonomy_File
+"""
+filtered_mothur = env.Command(
+    target='$out/dedup/1200bp/named/filtered/lineages.txt',
+    source=[filtered_tax, filtered_info],
+    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
+
+"""
 feather output - https://github.com/wesm/feather
 """
 filtered_feather = env.Command(
@@ -644,6 +684,16 @@ trusted_type_lineages = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/lineages.csv',
     source=[trusted_tax, trusted_info],
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
+"""
+Mothur output
+
+https://mothur.org/wiki/Taxonomy_File
+"""
+trusted_type_mothur = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/lineages.txt',
+    source=[trusted_tax, trusted_info],
+    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
 
