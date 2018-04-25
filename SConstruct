@@ -632,7 +632,7 @@ find top hit for each sequence among type strains
 NOTE: alleles will never align with themselves (--self) BUT
 can align with other alleles in the same genome accession
 '''
-trusted_type_hits = env.Command(
+named_type_hits = env.Command(
     target='$out/dedup/1200bp/named/vsearch.tsv',
     source=[named_fa, trusted_type_fa],
     action=('vsearch --usearch_global ${SOURCES[0]} '
@@ -654,7 +654,7 @@ env.Command(
     target=['$out/dedup/1200bp/named/filtered/index.html',
             '$out/dedup/1200bp/named/filtered/plots/map.csv'],
     source=[filtered_details,
-            trusted_type_hits,
+            named_type_hits,
             seq_info,
             named_tax,
             types,
@@ -675,7 +675,7 @@ feather output - https://github.com/wesm/feather
 """
 filtered_feather = env.Command(
     target='$out/dedup/1200bp/named/filtered/filter_details.feather',
-    source=[filtered_details, named_info, named_lineages, trusted_type_hits],
+    source=[filtered_details, named_info, named_lineages, named_type_hits],
     action=['to_feather.py '
             '--details ${SOURCES[0]} '
             '--seq-info ${SOURCES[1]} '
