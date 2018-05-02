@@ -26,9 +26,13 @@ def main():
     conf.optionxform = str  # options are case-sensitive
     conf.read(args.url)
     url = conf.get('sqlalchemy', 'url')
-    con = sqlalchemy.create_engine(url).raw_connection()
-    result = con.execute('select tax_id from nodes where is_valid=1')
-    for i in result.fetchall():
+    engine = sqlalchemy.create_engine(url)
+    conn = engine.connect()
+    meta = sqlalchemy.MetaData(engine, reflect=True)
+    nodes = meta.tables['nodes']
+    s = sqlalchemy.select([nodes.c.tax_id]).where(nodes.c.is_valid)
+    result = conn.execute(s)
+    for i in result:
         args.out.write(i[0] + '\n')
 
 
