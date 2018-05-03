@@ -558,25 +558,6 @@ named_mothur = env.Command(
     source=[named_tax, named_info],
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
-'''
-find top hit for each sequence among type strains
-
-NOTE: alleles will never align with themselves (--self) BUT
-can align with other alleles in the same genome accession
-'''
-named_type_hits = env.Command(
-    target='$out/dedup/1200bp/named/vsearch.tsv',
-    source=[named_fa, type_fa],
-    action=('vsearch --usearch_global ${SOURCES[0]} '
-            '--db ${SOURCES[1]} '
-            '--blast6out $TARGET '
-            '--id 0.75 '
-            '--threads 14 '
-            '--self '  # reject same sequence hits
-            '--threads 12 '
-            '--maxaccepts 1 '
-            '--strand plus'))
-
 """
 update tax_ids in details_in cache
 """
