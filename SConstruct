@@ -68,8 +68,11 @@ vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
+
+# sym links
 vrs.Add('tax_url', default='url.conf', help='database url')
-vrs.Add('notrust_file', default='data/do_not_trust.txt')
+vrs.Add('notrust_file', default='do_not_trust.txt')
+vrs.Add('singularity', default='bin/singularity')
 
 # cache vars
 vrs.Add(PathVariable(
@@ -104,13 +107,13 @@ env = Environment(
     variables=vrs,
     shell='bash',
     taxit=(
-        'singularity exec '
+        '$singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
         '/fh/fast/fredricks_d/bvdiversity/singularity/'
         'taxtastic-0.8.5-singularity2.3.img taxit'),
     deenurp=(
-        'singularity exec '
+        '$singularity exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
         '/fh/fast/fredricks_d/bvdiversity/singularity/'
@@ -356,6 +359,7 @@ fa, refresh_info, pubmed_info, references, refseq_info, _ = env.Command(
     action=['refresh.py $SOURCES $TARGETS',
             # cache
             'cp ${TARGETS[0]} $seqs_cache',
+            'cp ${TARGETS[1]} $seq_info_cache',
             'cp ${TARGETS[2]} $pubmed_info_cache',
             'cp ${TARGETS[3]} $references_cache',
             'cp ${TARGETS[4]} $refseq_info_cache',
@@ -374,19 +378,37 @@ env.Command(
 
 """
 update all tax_ids and add is_type columns
+"""
+update_seq_info = env.Command(
+    target='$out/refresh/taxit/seq_info.csv',
+    source=refresh_info,
+    action='$taxit -v update_taxids --out $TARGET $SOURCE $tax_url')
 
-See https://github.com/nhoffman/ya16sdb/issues/11 about is_type column
+"""
+is_type column
+
+https://github.com/nhoffman/ya16sdb/issues/11 about is_type column
+"""
+is_type_seq_info = env.Command(
+    target='$out/refresh/taxit/is_type/seq_info.csv',
+    source=[update_seq_info, types],
+    action='is_type.py --out $TARGET $SOURCES')
+
+"""
+taxonomy
+"""
+taxonomy = env.Command(
+    target='$out/taxonomy.csv',
+    source=update_seq_info,
+    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+
+"""
+seq_info with species column
 """
 seq_info = env.Command(
     target='$out/seq_info.csv',
-    source=[refresh_info, types],
-    action=['$taxit -v update_taxids ${SOURCES[0]} $tax_url | '
-            'is_type.py --out $TARGET ${SOURCES[1]}',  # add is_type column
-            'cp $TARGET $seq_info_cache'])
-
-"""
-TODO: add is_type column here before deduplication
-"""
+    source=[is_type_seq_info, taxonomy],
+    action='merge.py --right-columns tax_id,species --out $TARGET $SOURCES')
 
 """
 Deduplicate sequences by isolate (accession)
@@ -412,6 +434,7 @@ full_fa, full_seq_info = env.Command(
     action=('partition_refs.py '
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
+            '--species '
             '$SOURCES $TARGETS'))
 
 """
@@ -429,10 +452,7 @@ Make sequence_from_type taxtable with all ranks included
 type_tax = env.Command(
     target='$out/dedup/1200bp/types/taxonomy.csv',
     source=type_info,
-    action=('$taxit -v taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '$tax_url'))
+    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Create taxtable output with replacing tax_ids with taxnames
@@ -472,10 +492,7 @@ Make sequence_from_type trusted taxtable with all ranks included
 trusted_type_tax = env.Command(
     target='$out/dedup/1200bp/types/trusted/taxonomy.csv',
     source=trusted_type_info,
-    action=('$taxit -v taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '$tax_url'))
+    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Create taxtable output with replacing tax_ids with taxnames
@@ -513,10 +530,7 @@ Make general named taxtable with all ranks included for filter_outliers
 named_tax = env.Command(
     target='$out/dedup/1200bp/named/taxonomy.csv',
     source=named_info,
-    action=('$taxit -v taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '$tax_url'))
+    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Trimmed seqname,tax_id map file that can be easily cached by filter_outliers
@@ -618,10 +632,7 @@ Make general named taxtable with all ranks included for filter_outliers
 filtered_tax = env.Command(
     target='$out/dedup/1200bp/named/filtered/taxonomy.csv',
     source=filtered_info,
-    action=('$taxit -v taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '$tax_url'))
+    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Create taxtable output with replacing tax_ids with taxnames
@@ -672,10 +683,7 @@ Make filtered taxtable with ranked columns and no_rank rows
 trusted_tax = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxonomy.csv',
     source=filtered_info,
-    action=('$taxit taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '$tax_url'))
+    action='$taxit taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Taxtable output replacing tax_ids with taxnames

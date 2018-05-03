@@ -39,6 +39,10 @@ def build_parser():
         action='store_true',
         help='filter for records is_type=True')
     flt.add_argument(
+        '--species',
+        action='store_true',
+        help='filter for records with tax id in species column')
+    flt.add_argument(
         '-a', '--prop-ambig-cutoff',
         type=float,
         help=('Maximum proportion of characters in '
@@ -81,6 +85,9 @@ def main():
 
     if args.is_type:
         annotations = annotations[annotations['is_type'] == 'True']
+
+    if args.species:
+        annotations = annotations[~annotations['species'].isna()]
 
     for s in SeqIO.parse(args.fasta, 'fasta'):
         if s.id in annotations.index:
