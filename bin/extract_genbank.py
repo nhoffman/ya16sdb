@@ -23,8 +23,10 @@ REFERENCE_COLS = ['pubmed_id', 'title', 'authors',
 
 REFSEQ_INFO_COLS = ['seqname', 'accession', 'gi', 'seq_start', 'seq_stop']
 
-REFSEQ_SOURCE = re.compile('(?P<accession>[A-Z]{1,4}\d{5,8})'
-                           ':?(?P<seq_start>\d+)?-?(?P<seq_stop>\d+)?')
+REFSEQ_SOURCE = re.compile(
+    'REFSEQ.*?(?P<accession>[A-Z]{1,4}_?\d{5,8})'
+    ':?(?P<seq_start>\d+)?-?(?P<seq_stop>\d+)?',
+    re.DOTALL)
 
 GI_SOURCE = re.compile('gi:(?P<gi>\d+)')
 

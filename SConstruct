@@ -653,19 +653,6 @@ filtered_mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 """
-feather output - https://github.com/wesm/feather
-"""
-filtered_feather = env.Command(
-    target='$out/dedup/1200bp/named/filtered/filter_details.feather',
-    source=[filtered_details, named_info, named_lineages, named_type_hits],
-    action=['to_feather.py '
-            '--details ${SOURCES[0]} '
-            '--seq-info ${SOURCES[1]} '
-            '--lineages ${SOURCES[2]} '
-            '--hits ${SOURCES[3]} '
-            '--outfile $TARGET'])
-
-"""
 labmed do-not-trust filtering
 
 FIXME:  This will process will eventually go in its own repo but consider
@@ -688,7 +675,7 @@ trusted_tax = env.Command(
 """
 Taxtable output replacing tax_ids with taxnames
 """
-trusted_type_lineages = env.Command(
+trusted_lineages = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/lineages.csv',
     source=[trusted_tax, trusted_info],
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
@@ -704,6 +691,48 @@ trusted_type_mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 blast_db(env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
+
+'''
+Pull type strains from trusted db
+'''
+trusted_type_fa, trusted_type_info = env.Command(
+    target=['$out/dedup/1200bp/named/filtered/trusted/types/seqs.fasta',
+            '$out/dedup/1200bp/named/filtered/trusted/types/seq_info.csv'],
+    source=[trusted_fa, trusted_type_info],
+    action='partition_refs.py --is_type $SOURCES $TARGETS')
+
+"""
+Make trusted type taxtable with ranked columns and no_rank rows
+"""
+trusted_type_tax = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/types/taxonomy.csv',
+    source=trusted_type_info,
+    action=('$taxit taxtable '
+            '--seq-info $SOURCE '
+            '--out $TARGET '
+            '$tax_url'))
+
+blast_db(
+    env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/types/blast')
+
+'''
+find top hit for each sequence among type strains
+
+NOTE: alleles will never align with themselves (--self) BUT
+can align with other alleles in the same genome accession
+'''
+named_type_hits = env.Command(
+    target='$out/dedup/1200bp/named/vsearch.tsv',
+    source=[named_fa, trusted_type_fa],
+    action=('vsearch --usearch_global ${SOURCES[0]} '
+            '--db ${SOURCES[1]} '
+            '--blast6out $TARGET '
+            '--id 0.75 '
+            '--threads 14 '
+            '--self '  # reject same sequence hits
+            '--threads 12 '
+            '--maxaccepts 1 '
+            '--strand plus'))
 
 '''
 bokeh plot filtered sequences
@@ -729,6 +758,19 @@ env.Command(
             '--plot-dir $out/dedup/1200bp/named/filtered/plots '
             '--plot-map ${TARGETS[1]} '
             '--plot-index ${TARGETS[0]}'))
+
+"""
+feather output - https://github.com/wesm/feather
+"""
+filtered_feather = env.Command(
+    target='$out/dedup/1200bp/named/filtered/filter_details.feather',
+    source=[filtered_details, named_info, named_lineages, named_type_hits],
+    action=['to_feather.py '
+            '--details ${SOURCES[0]} '
+            '--seq-info ${SOURCES[1]} '
+            '--lineages ${SOURCES[2]} '
+            '--hits ${SOURCES[3]} '
+            '--outfile $TARGET'])
 
 """
 Append contributers
