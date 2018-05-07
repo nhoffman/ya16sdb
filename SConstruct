@@ -3,7 +3,7 @@ Download and curate the NCBI 16S rRNA sequences
 
 TODO: download records updated before last download
 """
-
+import configparser
 import errno
 import os
 import sys
@@ -38,21 +38,22 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
     prefix = dbtype[0]
     extensions = ['.{0}{1}'.format(prefix, suffix)
                   for suffix in ('hr', 'in', 'sq')]
-
     blast_out = env.Command(
         target=[output_base + ext for ext in extensions],
         source=sequence_file,
         action=('makeblastdb -dbtype {0} '
                 '-in $SOURCE '
                 '-out {1}'.format(dbtype, output_base)))
-
     env.Command(
         target=output_base,
         source=blast_out,
         action=('md5sum $SOURCES > $TARGET'))
-
     return blast_out
 
+
+conf = configparser.SafeConfigParser()
+conf.read('paths.conf')
+paths = conf['paths']
 
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
@@ -68,11 +69,7 @@ vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
-
-# sym links
-vrs.Add('tax_url', default='url.conf', help='database url')
-vrs.Add('notrust_file', default='do_not_trust.txt')
-vrs.Add('singularity', default='bin/singularity')
+vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
 
 # cache vars
 vrs.Add(PathVariable(
@@ -107,17 +104,16 @@ env = Environment(
     variables=vrs,
     shell='bash',
     taxit=(
-        '$singularity exec '
+        '{singularity} exec '
         '--bind $$(readlink -f $$(pwd)) '
+        '--bind {taxonomy} '
         '--pwd $$(readlink -f $$(pwd)) '
-        '/fh/fast/fredricks_d/bvdiversity/singularity/'
-        'taxtastic-0.8.5-singularity2.3.img taxit'),
+        '{taxtastic} taxit'.format(**paths)),
     deenurp=(
-        '$singularity exec '
+        '{singularity} exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '/fh/fast/fredricks_d/bvdiversity/singularity/'
-        'deenurp-v0.2.4-singularity2.4.img deenurp')
+        '{deenurp} deenurp'.format(**paths))
 )
 
 env.Decider('MD5-timestamp')
@@ -483,7 +479,7 @@ doing a reverse grep into partition_refs.py
 trusted__type_fa, trusted_type_info = env.Command(
     target=['$out/dedup/1200bp/types/trusted/seqs.fasta',
             '$out/dedup/1200bp/types/trusted/seq_info.csv'],
-    source=['$notrust_file', type_fa, type_info],
+    source=[paths['do_not_trust'], type_fa, type_info],
     action='do_not_trust.py $SOURCES $TARGETS')
 
 """
@@ -642,7 +638,7 @@ doing a reverse grep into partition_refs.py
 trusted_fa, trusted_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
-    source=['$notrust_file', filtered_fa, named_info],
+    source=[paths['do_not_trust'], filtered_fa, named_info],
     action='do_not_trust.py $SOURCES $TARGETS')
 
 """
