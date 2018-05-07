@@ -105,8 +105,8 @@ env = Environment(
     shell='bash',
     taxit=(
         '{singularity} exec '
-        '--bind $$(readlink -f $$(pwd)) '
         '--bind {taxonomy} '
+        '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
         '{taxtastic} taxit'.format(**paths)),
     deenurp=(

@@ -4,6 +4,5 @@ output*
 test_output
 .DS_Store
 ._.DS_Store
-bin/singularity
-do_not_trust.txt
+data/do_not_trust.txt
 paths.conf
