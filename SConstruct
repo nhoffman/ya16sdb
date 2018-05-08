@@ -16,6 +16,11 @@ from SCons.Script import Variables, ARGUMENTS, Help, Environment, PathVariable
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
+if not os.path.exists('paths.conf'):
+    sys.exit("Can't find paths.conf")
+conf = configparser.SafeConfigParser()
+conf.read('paths.conf')
+paths = conf['paths']
 
 
 def PathIsFileCreate(key, val, env):
@@ -51,14 +56,9 @@ def blast_db(env, sequence_file, output_base, dbtype='nucl'):
     return blast_out
 
 
-conf = configparser.SafeConfigParser()
-conf.read('paths.conf')
-paths = conf['paths']
-
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
-
 vrs = Variables(None, ARGUMENTS)
 if test:
     vrs.Add('base', help='Path to output directory', default='test_output')
@@ -70,7 +70,6 @@ vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
 vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
 vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
-
 # cache vars
 vrs.Add(PathVariable(
     'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
