@@ -4,6 +4,7 @@ Changes for ya16sdb
 
 0.4
 =======
+* species only records to be paritioned (GH: 13)
 * new types/trusted directory
 * new filtered/details_out.feather, [named, named/trusted, types, types/trusted]/lineages.[csv, txt] outputs (GH: 5)
 
