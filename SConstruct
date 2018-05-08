@@ -421,7 +421,7 @@ dedup_fa, dedup_info = env.Command(
             'csvcut.py --not-columns weight --out ${TARGETS[1]}'))
 
 """
-pull sequences at least 1200 bp and less than 1% ambiguous
+pull sequences at least 1200 bp, less than 1% ambiguous and with species tax id
 """
 full_fa, full_seq_info = env.Command(
     target=['$out/dedup/1200bp/seqs.fasta',
