@@ -16,10 +16,10 @@ from SCons.Script import Variables, ARGUMENTS, Help, Environment, PathVariable
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
-if not os.path.exists('paths.conf'):
-    sys.exit("Can't find paths.conf")
+if not os.path.exists('settings.conf'):
+    sys.exit("Can't find settings.conf")
 conf = configparser.SafeConfigParser()
-conf.read('paths.conf')
+conf.read('settings.conf')
 paths = conf['paths']
 
 
