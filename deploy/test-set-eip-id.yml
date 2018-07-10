@@ -1,0 +1,26 @@
+#!/usr/bin/env ansible-playbook -i deploy/hosts
+
+## test deploy/library/set_eip_id.py
+
+- hosts: localhost
+  become: no
+
+  tasks:
+    - name: define EIP_ALLOCATION_ID using server_name
+      set_eip_id:
+        server_name: oltgtest.labmed.uw.edu
+
+    - name: define EIP_ALLOCATION_ID using server_ip
+      set_eip_id:
+        server_ip: 54.71.235.167
+
+    - name: run without parameters
+      set_eip_id:
+      ignore_errors: yes
+
+    - name: print EIP_ALLOCATION_ID
+      command: echo {{ EIP_ALLOCATION_ID }}
+
+    - name: print EIP_PUBLIC_IP
+      command: echo {{ EIP_PUBLIC_IP }}
+

@@ -13,49 +13,50 @@ Example:
 """
 
 import json
-import subprocess
-import sys
-import shutil
-import shlex
 import socket
+import sys
 
 import boto3
-
-def parse_args(infile):
-    args = {}
-    with open(infile) as f:
-        for token in shlex.split(f.read()):
-            if '=' in token:
-                key, val = token.strip().split('=', 1)
-                args[key] = val
-
-    return args
+from ansible.module_utils.basic import AnsibleModule
 
 
-args = parse_args(sys.argv[1])
+def main():
 
-try:
-    server_name = args['server_name']
-except KeyError:
-    sys.exit('the parameter "server_name" is required')
+    module = AnsibleModule(
+        argument_spec={
+            'server_name': {'required': False, 'type': 'str'},
+            'server_ip': {'required': False, 'type': 'str'}
+        })
 
-# get the ip address corresponding to server_name
-try:
-    ip = socket.gethostbyname(server_name)
-except socket.gaierror:
-    sys.exit('could not find IP address for "{}"'.format(server_name))
+    server_name = module.params['server_name']
+    server_ip = module.params['server_ip']
 
-# describe the elastic IP associated with this address
-ec2 = boto3.client('ec2')
-response = ec2.describe_addresses(PublicIps=[ip])
-eip = response['Addresses'][0]
+    if server_name:
+        # get the ip address corresponding to server_name
+        try:
+            ip = socket.gethostbyname(server_name)
+        except socket.gaierror:
+            sys.exit('could not find IP address for "{}"'.format(server_name))
+    elif server_ip:
+        ip = server_ip
+    else:
+        sys.exit('either server_name or server_ip is required')
 
-output = {
-    'changed': True,
-    'ansible_facts': {
-        'EIP_ALLOCATION_ID': eip['AllocationId'],
-        'EIP_PUBLIC_IP': ip,
+    # describe the elastic IP associated with this address
+    ec2 = boto3.client('ec2')
+    response = ec2.describe_addresses(PublicIps=[ip])
+    eip = response['Addresses'][0]
+
+    output = {
+        'changed': True,
+        'ansible_facts': {
+            'EIP_ALLOCATION_ID': eip['AllocationId'],
+            'EIP_PUBLIC_IP': ip,
+        }
     }
-}
 
-print(json.dumps(output))
+    print(json.dumps(output))
+
+
+if __name__ == '__main__':
+    main()
