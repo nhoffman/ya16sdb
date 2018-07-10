@@ -28,6 +28,15 @@ Virtualenv for deployment
 AWS credentials
 ---------------
 
+Deployment
+==========
+
+Deploy the entire stack and application::
+
+  deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt
+
+
+
 Notes
 =====
 
