@@ -6,3 +6,4 @@ test_output
 ._.DS_Store
 data/do_not_trust.txt
 settings.conf
+vault_pass.txt

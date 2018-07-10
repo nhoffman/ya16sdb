@@ -1,0 +1,63 @@
+#!/usr/bin/env ansible-playbook
+
+- hosts: localhost
+  become: no
+
+  vars_files:
+    - secrets.yml
+
+  vars:
+    SSH_KEY_NAME: "ya16sdb"
+    SSH_KEY_FILE: "~/.ssh/ya16sdb.pem"
+    CLOUDFORMATION_PARAMS:
+      KeyName: "{{ SSH_KEY_NAME }}"
+      AMIId: "ami-db710fa3"
+      InstanceType: "t2.medium"
+      # defined cloudformation.yml by task 'set_eip_id':
+      ElasticIPAllocationId: "{{ EIP_ALLOCATION_ID }}"
+
+  tasks:
+    - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.6"
+      when: ansible_version['full'] is version('2.6', '<')
+      tags:
+        - always
+        - ansible-version
+
+    # - name: define EIP_ALLOCATION_ID
+    #   set_eip_id:
+    #     server_name: "{{ SERVER_NAME }}"
+
+    # - name: deploy the cloudformation template for this stack
+    #   cloudformation:
+    #     stack_name: "ya16sdb"
+    #     state: "present"
+    #     region: "us-west-2"
+    #     template: "ya16sdb-stack.json"
+    #     template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
+
+    - name: install ssh private key to ~/.ssh
+      copy:
+        content: "{{ SSH_PRIVATE_KEY }}"
+        dest: "{{ SSH_KEY_FILE }}"
+        owner: "{{ ansible_user_id }}"
+        mode: "0600"
+      tags:
+        - ssh-key
+
+    # run using -e install_ssh_config=yes -t ssh-config
+    # - name: add ssh configuration for this target to ~/.ssh/config
+    #   blockinfile:
+    #     create: yes
+    #     backup: yes
+    #     dest: ~/.ssh/config
+    #     marker: "# {mark} config for {{ TARGET }} added by oltg-flask"
+    #     content: |
+    #       Host oltg-{{ TARGET }}
+    #         HostName {{ SERVER_NAME }}
+    #         User ubuntu
+    #         IdentityFile {{ SSH_KEY_FILE }}
+    #         ProxyCommand ssh ihop exec nc %h %p 2> /dev/null
+    #   when: install_ssh_config is defined and install_ssh_config == 'yes'
+    #   tags:
+    #     - ssh-config
+
