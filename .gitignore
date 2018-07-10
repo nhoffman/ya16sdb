@@ -4,6 +4,5 @@ output*
 test_output
 .DS_Store
 ._.DS_Store
-data/do_not_trust.txt
 settings.conf
 vault_pass.txt
