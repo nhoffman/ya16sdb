@@ -1,12 +1,10 @@
+import collections
+import functools
+import itertools
 import os
-from os import path
-from itertools import zip_longest
-from collections import Counter
-from functools import partial
-from itertools import groupby
-from pprint import pprint
-
 import pandas as pd
+
+from pprint import pprint
 
 from bokeh.layouts import row, widgetbox, column
 from bokeh.models import Select
@@ -31,7 +29,7 @@ TABLE = ('<a href="https://www.ncbi.nlm.nih.gov/nuccore/{accession}" '
 # argument (see 'bokeh serve --args')
 fname = 'filtered_details.feather'
 if 'datadir' in os.environ:
-    fname = path.join(os.environ['datadir'], 'dedup/1200bp/named', fname)
+    fname = os.path.join(os.environ['datadir'], 'dedup/1200bp/named', fname)
 
 global data
 data = pd.read_feather(fname)
@@ -61,22 +59,21 @@ def get_species_data(tax_name=None, tax_id=None):
 
 
 def get_colors(values):
-    counts = Counter(values).most_common()
+    counts = collections.Counter(values).most_common()
     if len(counts) < len(COLORS):
         zfun = zip
     else:
-        zfun = partial(zip_longest, fillvalue=COLORS[-1])
+        zfun = functools.partial(itertools.zip_longest, fillvalue=COLORS[-1])
 
     d = {
         val: color
         for color, (val, count) in zfun(
-            COLORS, Counter(values).most_common())
+            COLORS, collections.Counter(values).most_common())
     }
     return [d[val] for val in values]
 
 
 def create_figure(df=None, select_col=None, select_val=None):
-
     df = df if df is not None else get_species_data()
 
     xs = df[x.value].values
@@ -172,7 +169,6 @@ def on_selection_change(attr, old, new):
     # {'0d': {'get_view': {}, 'glyph': None, 'indices': []},
     #  '1d': {'indices': [6946]},
     #  '2d': {'indices': {}}}
-
     try:
         idx = new['1d']['indices'][0]
     except IndexError:
@@ -202,9 +198,7 @@ def update_genus(attr, old, new):
 def update_species(attr, old, new):
     """Get a df of species data based on current value of
     `select_species.value`
-
     """
-
     df = get_species_data()
     select_msg.text = NO_POINTS_SELECTED
 
@@ -214,7 +208,6 @@ def update_species(attr, old, new):
 
 
 def reset_species():
-
     # clear all selectors
     x.value = 'x'
     y.value = 'y'
@@ -256,13 +249,11 @@ def get_selectors(df, colnames=discrete):
         control = Select(
             title=col, value="All",
             options=['All'] + [val[0] for val in
-                               Counter(df[col]).most_common()])
+                               collections.Counter(df[col]).most_common()])
         control.on_change('value', update)
         selectors.append(control)
 
     return selectors
-
-# iterate through species
 
 
 x = Select(title='X-Axis', value='x', options=continuous + discrete)
@@ -277,7 +268,10 @@ color.on_change('value', update)
 select_msg = Div(text=NO_POINTS_SELECTED, width=900)
 
 get = curdoc().session_context.request.arguments
-if 'tax_id' in get:
+
+if 'tax_name' in get:
+    df = get_species_data(tax_name=get['tax_id'][0].decode('ascii'))
+elif 'tax_id' in get:
     df = get_species_data(tax_id=get['tax_id'][0].decode('ascii'))
 else:
     df = get_species_data(tax_name=DEFAULT_SPECIES)
@@ -287,8 +281,9 @@ select_accession = TextInput(title='Accession search')
 select_accession.on_change('value', search_accession)
 
 species_names = sorted(set(data['tax_name'].loc[data['x'].notna()]))
-genera = {genus: list(species)
-          for genus, species in groupby(species_names, lambda x: x.split()[0])}
+genera = {}
+for genus, species in itertools.groupby(species_names, lambda x: x.split()[0]):
+    genera[genus] = list(species)
 
 select_genus = Select(
     title='Genus', value=DEFAULT_GENUS, options=sorted(genera.keys()))
