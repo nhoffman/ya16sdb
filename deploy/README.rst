@@ -72,6 +72,15 @@ Deploy the entire stack and application::
 
   deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt
 
+The first time you run the deployment, add the following parameters to
+update your ssh configuration to install the private key and define
+the ``ya16sdb`` ssh alias::
+
+  deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt -e ssh_config=yes -t ssh-config
+
+After the above, you should be able to ssh into the instance::
+
+  ssh ya16sdb
 
 
 Notes
