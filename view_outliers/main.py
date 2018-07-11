@@ -1,18 +1,16 @@
+import collections
+import functools
+import itertools
 import os
-from os import path
-from itertools import zip_longest
-from collections import Counter
-from functools import partial
-from itertools import groupby
-import pprint
-
 import pandas as pd
+
+from pprint import pprint
 
 from bokeh.layouts import row, widgetbox, column
 from bokeh.models import Select
 from bokeh.palettes import Spectral5
 from bokeh.plotting import curdoc, figure
-from bokeh.models.widgets import Div, TextInput, Button, CheckboxButtonGroup
+from bokeh.models.widgets import Div, TextInput, Button
 
 COLORS = Spectral5
 discrete = ['cluster', 'is_out', 'is_type', 'match_species']
@@ -21,11 +19,17 @@ NO_POINTS_SELECTED = '(no points selected)'
 DEFAULT_SPECIES = 'Enterococcus faecalis'
 DEFAULT_GENUS = DEFAULT_SPECIES.split()[0]
 
+TABLE = ('<a href="https://www.ncbi.nlm.nih.gov/nuccore/{accession}" '
+         'style="color: white;" target=_blank>'
+         '{accession}</a> {description} '
+         '[{match_pct}% match to '
+         '{match_species} {match_seqname}]')
+
 # TODO: provide input file as an environment variable or command line
 # argument (see 'bokeh serve --args')
 fname = 'filtered_details.feather'
 if 'datadir' in os.environ:
-    fname = path.join(os.environ['datadir'], 'dedup/1200bp/named', fname)
+    fname = os.path.join(os.environ['datadir'], 'dedup/1200bp/named', fname)
 
 global data
 data = pd.read_feather(fname)
@@ -41,33 +45,35 @@ def ifelse(items, if_t, if_f):
     return [if_t if x else if_f for x in items]
 
 
-def get_species_data(tax_name=None):
+def get_species_data(tax_name=None, tax_id=None):
     # globals: data (data_frame), organism (a selector widget)
-
-    tax_name = tax_name or select_species.value
-    tab = data.loc[data['tax_name'] == tax_name]
+    if tax_id is not None:
+        tab = data.loc[data['tax_id'] == tax_id]
+    elif tax_name is not None:
+        tab = data.loc[data['tax_name'] == tax_name]
+    else:
+        tab = data.loc[data['tax_name'] == select_species.value]
     tab = tab.sort_values(by=['dist']).reindex()
     tab['ord'] = pd.Series(range(len(tab.dist)), index=tab.index)
     return tab
 
 
 def get_colors(values):
-    counts = Counter(values).most_common()
+    counts = collections.Counter(values).most_common()
     if len(counts) < len(COLORS):
         zfun = zip
     else:
-        zfun = partial(zip_longest, fillvalue=COLORS[-1])
+        zfun = functools.partial(itertools.zip_longest, fillvalue=COLORS[-1])
 
     d = {
         val: color
         for color, (val, count) in zfun(
-            COLORS, Counter(values).most_common())
+            COLORS, collections.Counter(values).most_common())
     }
     return [d[val] for val in values]
 
 
-def create_figure(df=None):
-
+def create_figure(df=None, select_col=None, select_val=None):
     df = df if df is not None else get_species_data()
 
     xs = df[x.value].values
@@ -98,8 +104,10 @@ def create_figure(df=None):
 
     kw['title'] = plot_title
 
-    p = figure(plot_height=600, plot_width=800,
-               tools='pan,box_zoom,tap,reset,save',
+    p = figure(plot_height=600,
+               plot_width=800,
+               toolbar_sticky=False,
+               tools='pan,box_zoom,box_select,tap,reset,save,hover',
                **kw)
 
     p.xaxis.axis_label = x_title
@@ -111,12 +119,18 @@ def create_figure(df=None):
     alpha_on, alpha_off = 0.6, 0.1
     sz_on, sz_off = 9, 1
 
-    try:
-        # global variable grid may not be defined yet
-        selectors = grid.children[0].children[1].children
-        selections = [(s.title, s.value) for s in selectors if s.value != 'All']
-    except NameError:
-        selections = None
+    selections = []
+    if select_col is not None and select_val is not None:
+        selections.append([select_col, select_val])
+    else:
+        try:
+            # global variable layout may not be defined yet
+            selectors = layout.children[0].children[1].children
+            for s in selectors:
+                if s.value != 'All':
+                    selections.append([s.title, s.value])
+        except NameError:
+            pass
 
     if selections:
         selected = list(pd.DataFrame(
@@ -155,7 +169,6 @@ def on_selection_change(attr, old, new):
     # {'0d': {'get_view': {}, 'glyph': None, 'indices': []},
     #  '1d': {'indices': [6946]},
     #  '2d': {'indices': {}}}
-
     try:
         idx = new['1d']['indices'][0]
     except IndexError:
@@ -163,27 +176,19 @@ def on_selection_change(attr, old, new):
     else:
         df = get_species_data()
         d = df.iloc[idx].to_dict()
-        pprint.pprint(d)
-
-        url = 'https://www.ncbi.nlm.nih.gov/nuccore'
-
-        msg = ('<a href="{url}/{accession}" style="color: white;" target=_blank>'
-               '{accession}</a> {description} '
-               '[{match_pct}% match to {match_species} {match_seqname}]').format(
-                   url=url, **d)
-
-        select_msg.text = msg
+        pprint(d)
+        select_msg.text = TABLE.format(**d)
 
 
 def update(attr, old, new):
-    # see definition of grid object below to explain indexing
-    grid.children[1].children[0] = create_figure()
+    # see definition of layout object below to explain indexing
+    layout.children[1].children[0] = create_figure()
 
 
 def update_genus(attr, old, new):
     # reset list of species for the newly selected genus (second
     # element of the first widgetbox)
-    grid.children[0].children[0].children[1].options = genera[new]
+    layout.children[0].children[0].children[1].options = genera[new]
 
     # update species to first option
     select_species.value = genera[new][0]
@@ -193,19 +198,16 @@ def update_genus(attr, old, new):
 def update_species(attr, old, new):
     """Get a df of species data based on current value of
     `select_species.value`
-
     """
-
     df = get_species_data()
     select_msg.text = NO_POINTS_SELECTED
 
     # clear selectors but not colors and axes
-    grid.children[0].children[1] = widgetbox(get_selectors(df), width=200)
-    grid.children[1].children[0] = create_figure(df)
+    layout.children[0].children[1] = widgetbox(get_selectors(df), width=200)
+    layout.children[1].children[0] = create_figure(df)
 
 
 def reset_species():
-
     # clear all selectors
     x.value = 'x'
     y.value = 'y'
@@ -215,21 +217,30 @@ def reset_species():
 
 
 def search_accession(attr, old, new):
-    accession = new
-    result = data.loc[data['accession'] == accession]
-    if result.shape[0]:
-        tax_name = list(result['tax_name'])[0]
-        df = get_species_data(tax_name)
+    df = None
+    if new is not None:
+        accession = new.strip()
+        results = data.loc[data['accession'] == accession]
+        if results.shape[0]:
+            tax_name = list(results['tax_name'])[0]
+            df = get_species_data(tax_name)
 
-        select_genus.value = tax_name.split()[0]
-        select_species.value = tax_name
-        grid.children[1].children[0] = create_figure(
-            df, select_col='accession', select_val=accession)
+            select_genus.value = tax_name.split()[0]
+            select_species.value = tax_name
+            layout.children[1].children[0] = create_figure(
+                df, select_col='accession', select_val=accession)
+            msg = []
+            for _, r in results.iterrows():
+                pprint(r.to_dict())
+                msg.append(TABLE.format(**r.to_dict()))
+            select_msg.text = '<br>'.join(msg)
 
-        # clear selectors
-        grid.children[0].children[1] = widgetbox(get_selectors(df), width=200)
-    else:
-        select_msg.text = 'no match for accession "{}"'.format(accession)
+            # clear selectors
+            layout.children[0].children[1] = widgetbox(
+                get_selectors(df), width=200)
+        else:
+            select_msg.text = 'no match for accession "{}"'.format(accession)
+    return df
 
 
 def get_selectors(df, colnames=discrete):
@@ -237,7 +248,8 @@ def get_selectors(df, colnames=discrete):
     for col in colnames:
         control = Select(
             title=col, value="All",
-            options=['All'] + [val[0] for val in Counter(df[col]).most_common()])
+            options=['All'] + [val[0] for val in
+                               collections.Counter(df[col]).most_common()])
         control.on_change('value', update)
         selectors.append(control)
 
@@ -255,15 +267,23 @@ color.on_change('value', update)
 
 select_msg = Div(text=NO_POINTS_SELECTED, width=900)
 
-df = get_species_data(DEFAULT_SPECIES)
+get = curdoc().session_context.request.arguments
+
+if 'tax_name' in get:
+    df = get_species_data(tax_name=get['tax_id'][0].decode('ascii'))
+elif 'tax_id' in get:
+    df = get_species_data(tax_id=get['tax_id'][0].decode('ascii'))
+else:
+    df = get_species_data(tax_name=DEFAULT_SPECIES)
 
 # get dict of genus and species names where there is plot data
 select_accession = TextInput(title='Accession search')
 select_accession.on_change('value', search_accession)
 
 species_names = sorted(set(data['tax_name'].loc[data['x'].notna()]))
-genera = {genus: list(species)
-          for genus, species in groupby(species_names, lambda x: x.split()[0])}
+genera = {}
+for genus, species in itertools.groupby(species_names, lambda x: x.split()[0]):
+    genera[genus] = list(species)
 
 select_genus = Select(
     title='Genus', value=DEFAULT_GENUS, options=sorted(genera.keys()))
@@ -279,14 +299,17 @@ reset.on_click(reset_species)
 # selectors
 leftcol = column(
     widgetbox([select_genus, select_species, reset,
-               select_accession, x, y, color], width=200),
-    widgetbox(get_selectors(df), width=200),
+               select_accession, x, y, color], width=250),
+    widgetbox(get_selectors(df), width=250),
 )
 
 rightcol = column(create_figure(df), select_msg)
 
-# 'grid' is a global variable with references in update()
-grid = row(leftcol, rightcol)
+# 'layout' is a global variable with references in update()
+layout = row(leftcol, rightcol)
 
-curdoc().add_root(grid)
+curdoc().add_root(layout)
 curdoc().title = "Outliers"
+
+if 'accession' in get:
+    search_accession(None, None, get['accession'][0].decode('ascii'))
