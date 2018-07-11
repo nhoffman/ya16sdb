@@ -2,18 +2,23 @@
 
 - hosts: localhost
   become: no
+  gather_facts: no
 
   vars_files:
     - secrets.yml
 
   vars:
+    SSH_ALIAS: "ya16sdb"
     SSH_KEY_NAME: "ya16sdb"
     SSH_KEY_FILE: "~/.ssh/ya16sdb.pem"
+    SERVER_NAME:
+    SERVER_IP: "35.155.170.9"
+
     CLOUDFORMATION_PARAMS:
       KeyName: "{{ SSH_KEY_NAME }}"
       AMIId: "ami-db710fa3"
       InstanceType: "t2.medium"
-      # defined cloudformation.yml by task 'set_eip_id':
+      # defined by task 'set_eip_id' below:
       ElasticIPAllocationId: "{{ EIP_ALLOCATION_ID }}"
 
   tasks:
@@ -23,41 +28,53 @@
         - always
         - ansible-version
 
-    # - name: define EIP_ALLOCATION_ID
-    #   set_eip_id:
-    #     server_name: "{{ SERVER_NAME }}"
+    - name: define EIP_ALLOCATION_ID
+      set_eip_id:
+        server_ip: "{{ SERVER_IP }}"
+        # server_name: "{{ SERVER_NAME }}"
 
-    # - name: deploy the cloudformation template for this stack
-    #   cloudformation:
-    #     stack_name: "ya16sdb"
-    #     state: "present"
-    #     region: "us-west-2"
-    #     template: "ya16sdb-stack.json"
-    #     template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
+    - name: deploy the cloudformation template for this stack
+      cloudformation:
+        stack_name: "ya16sdb"
+        state: "present"
+        region: "us-west-2"
+        template: "ya16sdb-stack.json"
+        template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
 
+    # run using -e ssh_config=yes -t ssh-config
     - name: install ssh private key to ~/.ssh
       copy:
         content: "{{ SSH_PRIVATE_KEY }}"
         dest: "{{ SSH_KEY_FILE }}"
         owner: "{{ ansible_user_id }}"
         mode: "0600"
+      when: ssh_config is defined and ssh_config == 'yes'
       tags:
-        - ssh-key
+        - ssh-config
 
-    # run using -e install_ssh_config=yes -t ssh-config
-    # - name: add ssh configuration for this target to ~/.ssh/config
-    #   blockinfile:
-    #     create: yes
-    #     backup: yes
-    #     dest: ~/.ssh/config
-    #     marker: "# {mark} config for {{ TARGET }} added by oltg-flask"
-    #     content: |
-    #       Host oltg-{{ TARGET }}
-    #         HostName {{ SERVER_NAME }}
-    #         User ubuntu
-    #         IdentityFile {{ SSH_KEY_FILE }}
-    #         ProxyCommand ssh ihop exec nc %h %p 2> /dev/null
-    #   when: install_ssh_config is defined and install_ssh_config == 'yes'
-    #   tags:
-    #     - ssh-config
+    # run using -e ssh_config=yes -t ssh-config
+    - name: add ssh configuration for this target to ~/.ssh/config
+      blockinfile:
+        create: yes
+        backup: yes
+        dest: ~/.ssh/config
+        marker: "# {mark} added by ya16sdb/deploy/deploy.yml"
+        content: |
+          Host {{ SSH_ALIAS }}
+            HostName {{ SERVER_NAME or SERVER_IP }}
+            User ubuntu
+            IdentityFile {{ SSH_KEY_FILE }}
+      when: ssh_config is defined and ssh_config == 'yes'
+      tags:
+        - ssh-config
+
+# required for ubuntu 16.04 to ensure python is installed
+- hosts: "webserver"
+  become: yes
+  gather_facts: no
+  pre_tasks:
+    - raw: "sudo apt-get update && sudo apt-get -y install python-simplejson"
+
+- hosts: "webserver"
+  become: yes
 

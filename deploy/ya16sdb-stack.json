@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "AWS CloudFormation stack for the OLTG application",
+  "Description" : "AWS CloudFormation stack for the ya16sdb outlier plot app",
 
   "Parameters" : {
 
@@ -59,7 +59,7 @@
       "Default": "127.0.0.1/32",
       "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
       "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
-    },
+    }
 
   },
 
