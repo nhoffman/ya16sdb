@@ -25,11 +25,10 @@ Virtualenv for deployment
    pip install -U pip wheel
    pip install -r requirements-deploy.txt
 
-Install Mitogen::
+NOTE: mitogen will be installed to the virtualenv and so the path to the ansible mitogen plugin in the ansible.cfg is within the venv::
 
-  wget https://github.com/dw/mitogen/archive/stable.zip
-  unzip stable.zip
-
+  strategy_plugins = deploy-env/lib/python3.6/site-packages/ansible_mitogen/plugins/strategy
+  strategy = mitogen_linear
 
 AWS credentials
 ---------------

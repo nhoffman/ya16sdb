@@ -46,7 +46,7 @@
       copy:
         content: "{{ SSH_PRIVATE_KEY }}"
         dest: "{{ SSH_KEY_FILE }}"
-        owner: "{{ ansible_user_id }}"
+        owner: "{{ lookup('env', 'USER') }}"
         mode: "0600"
       when: ssh_config is defined and ssh_config == 'yes'
       tags:

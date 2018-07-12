@@ -1,4 +1,4 @@
-#!/usr/bin/env ansible-playbook -i deploy/hosts
+#!/usr/bin/env ansible-playbook
 
 ## test deploy/library/set_eip_id.py
 
