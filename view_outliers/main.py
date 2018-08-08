@@ -7,8 +7,7 @@ import plotly.graph_objs as go
 import pprint
 import urllib
 
-DEFAULT_GENUS = '1350'
-DEFAULT_SPECIES = '1351'
+DEFAULT_GENUS = '547'
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
@@ -19,63 +18,42 @@ info = df.columns
 
 modified_dates = df['modified_date'].apply(lambda x: x.year).unique()
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
-tax = tax.drop_duplicates()
+tax = tax.drop_duplicates().sort_values(by='species_name')
 species_genus = dict(tax[['species', 'genus']].drop_duplicates().values)
 species_id = dict(tax[['species_name', 'species']].drop_duplicates().values)
 genera = tax.groupby(by='genus')
-
-default_species_group = genera.get_group(DEFAULT_GENUS)
-default_species_group = default_species_group[['species', 'species']]
-species_opts = default_species_group.values
-species_opts = [{'label': sn, 'value': si} for si, sn in species_opts]
 genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
 genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
 
-app.layout = html.Div(children=[
-    dcc.Location(id='url', refresh=False),
-    dcc.Input(value='', type='text', id='text-input'),
-    html.Div(children=[
-        html.Div(children=[
-            dcc.Dropdown(
-                id='genus-column',
-                options=genus_opts,
-                value=DEFAULT_GENUS),
-        ], style={'width': '48%', 'display': 'inline-block'}),
-
-        html.Div(children=[
-            dcc.Dropdown(
-                id='species-column',
-                options=species_opts,
-                value=DEFAULT_SPECIES),
-        ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
-    ]),
-    html.Div(children=[
-        html.Div(children=[
-            dcc.Dropdown(
-                id='xaxis-column',
-                options=[{'label': i, 'value': i} for i in info],
-                value='x'
-            ),
-        ], style={'width': '48%', 'display': 'inline-block'}),
-
-        html.Div(children=[
-            dcc.Dropdown(
-                id='yaxis-column',
-                options=[{'label': i, 'value': i} for i in info],
-                value='y'
-            ),
-        ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
-    ]),
-    dcc.Graph(id='indicator-graphic'),
-    dcc.Slider(
-        id='year--slider',
-        min=modified_dates.min(),
-        max=modified_dates.max(),
-        value=modified_dates.max(),
-        step=None,
-        marks={str(year): str(year) for year in modified_dates}
-    )],
-    style={'width': '1200'})
+app.layout = html.Div(
+    className="container",
+    style={'width': '1150', 'vertical-align': 'middle', 'display': 'inline-block'},
+    children=[
+        dcc.Location(id='url', refresh=False),
+        dcc.Input(value='', type='text', id='text-input'),
+        dcc.Dropdown(id='genus-column', options=genus_opts),
+        dcc.Dropdown(id='species-column'),
+        dcc.Dropdown(
+            id='xaxis-column',
+            options=[{'label': i, 'value': i} for i in info],
+            value='x'),
+        dcc.Dropdown(
+            id='yaxis-column',
+            options=[{'label': i, 'value': i} for i in info],
+            value='y'),
+        html.Div(
+            children=[dcc.Graph(id='indicator-graphic')],
+            style={'display': 'inline-block'}),
+        html.Div(
+            children=[
+                dcc.Slider(
+                    id='year--slider',
+                    min=modified_dates.min(),
+                    max=modified_dates.max(),
+                    value=modified_dates.max(),
+                    step=None,
+                    marks={str(year): str(year) for year in modified_dates})],
+            style={'padding': '10', 'width': '100%'})])
 
 
 @app.callback(
@@ -84,12 +62,13 @@ app.layout = html.Div(children=[
 def update_genus_value(search):
     args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
     if 'species_name' in args:
-        species = species_id.get(args['species_name'][0], DEFAULT_SPECIES)
+        species = species_id.get(args['species_name'][0], None)
+        value = species_genus.get(species, DEFAULT_GENUS)
     elif 'species_id' in args:
-        species = args['species_id']
+        value = species_genus[args['species_id']]
     else:
-        species = DEFAULT_SPECIES
-    return species_genus[species]
+        value = DEFAULT_GENUS
+    return value
 
 
 @app.callback(
@@ -173,10 +152,12 @@ def update_graph(species_id, xaxis_column_name, yaxis_column_name,
                 'type': 'linear',
                 'showgrid': False
             },
+            legend={'orientation': 'h'},
             hovermode='closest',
-            height=700,
-            width=700,
-            autosize=False,
+            # height=700,
+            # width=700,
+            # autosize=True,
+            # scene={'aspectmode': 'auto'},
             title='{}, tax_id {} outliers: {} ({:.0%}), total: {}'.format(
                 dff.iloc[0]['species_name'],
                 species_id,
