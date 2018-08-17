@@ -5,7 +5,6 @@ import dash_html_components as html
 import dash_table_experiments as dt
 import pandas
 import plotly.graph_objs as go
-import pprint
 import urllib
 
 from dash.dependencies import Input, State, Output
@@ -28,16 +27,25 @@ genera = tax.groupby(by='genus')
 genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
 genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
 
+
 app.layout = html.Div(
     # style={'width': '1150'},
     children=[
+        html.Div(id='state'),
         html.Div(
             children=[
                 html.Div(
                     children=[
                         dcc.Location(id='url', refresh=False),
-                        dcc.Markdown('**Search**'),
-                        dcc.Input(value='', type='text', id='text-input'),
+                        html.Div(
+                            children=[
+                                dcc.Input(
+                                    type='text',
+                                    id='text-input'),
+                                html.Button(
+                                    id='submit-button',
+                                    n_clicks=0,
+                                    children='Search')]),
                         dcc.Markdown('**Genus**'),
                         dcc.Dropdown(id='genus-column', options=genus_opts),
                         dcc.Markdown('**Species**'),
@@ -55,7 +63,7 @@ app.layout = html.Div(
                             value='y')],
                     style={'width': '30%', 'display': 'inline-block'}),
                 html.Div(
-                    children=[dcc.Graph(id='indicator-graphic')],
+                    children=[dcc.Graph(id='plot')],
                     style={
                         'width': '70%',
                         'display': 'inline-block',
@@ -72,8 +80,8 @@ app.layout = html.Div(
                     # Initialise the rows
                     rows=[{}],
                     editable=False,
-                    row_selectable=True,
-                    filterable=True,
+                    row_selectable=False,
+                    filterable=False,
                     resizable=True,
                     sortable=True,
                     id='datatable')],
@@ -84,12 +92,40 @@ app.layout = html.Div(
 
 
 @app.callback(
+    Output('state', 'hidden'),
+    [Input('submit-button', 'n_clicks'),
+     Input('species-column', 'value'),
+     Input('plot', 'figure')])
+def update_state(n_clicks, tax_id, figure):
+    '''
+    preserve state on the client to help determine how actions are processed
+    here on the server
+    '''
+    return {
+        'n_clicks': n_clicks,  # determine if button was clicked
+        'tax_id': tax_id,  # if tax_id changes we reset everything
+        # preserve axes ranges
+        'xrange': figure['layout']['xaxis']['range'],
+        'yrange': figure['layout']['yaxis']['range']}
+
+
+@app.callback(
     Output('datatable', 'rows'),
-    [Input('species-column', 'value'),
-     Input('indicator-graphic', 'selectedData'),
-     Input('indicator-graphic', 'clickData')])
-def update_datatable(value, selected, clicked):
-    if selected is not None:
+    [Input('url', 'search'),
+     Input('plot', 'selectedData'),
+     Input('plot', 'clickData'),
+     Input('species-column', 'value'),
+     Input('submit-button', 'n_clicks')],
+    [State('text-input', 'value'),
+     State('state', 'hidden')])
+def update_datatable(search, selected, clicked, tax_id, n_clicks, text, state):
+    if state is None:
+        rows = df[(df['species'] == tax_id) & (df['is_out'])]
+    elif state['n_clicks'] < n_clicks:  # button was pressed
+        rows = df[(df['seqname'] == text) |
+                  (df['accession'] == text) |
+                  (df['version'] == text)]
+    elif selected is not None:
         idx = [i['customdata'] for i in selected['points']]
         rows = df.loc[idx]
     elif clicked is not None:
@@ -97,7 +133,7 @@ def update_datatable(value, selected, clicked):
         rows = df.loc[idx]
     else:
         # outliers
-        rows = df[(df['species'] == value) & (df['is_out'])]
+        rows = df[(df['species'] == tax_id) & (df['is_out'])]
     rows = rows.copy()  # avoid SettingWithCopyWarning
     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
@@ -120,31 +156,76 @@ def update_datatable(value, selected, clicked):
 
 @app.callback(
     Output('genus-column', 'value'),
-    [Input('url', 'search')])
-def update_genus_value(search):
-    args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-    if 'species_name' in args:
-        species = species_id.get(args['species_name'][0], None)
-        value = species_genus.get(species, DEFAULT_GENUS)
-    elif 'species_id' in args:
-        value = species_genus.get(args['species_id'][0], DEFAULT_GENUS)
+    [Input('url', 'search'),
+     Input('submit-button', 'n_clicks')],
+    [State('text-input', 'value'),
+     State('state', 'hidden')])
+def update_genus_value(search, n_clicks, text, state):
+    if state and state['n_clicks'] < n_clicks:
+        text = text.strip()
+        if text in df['accession'].values:
+            value = df[df['accession'] == text].iloc[0]['genus']
+        elif text in df['genus']:
+            value = text
+        elif text in df['species']:
+            value = species_genus[text]
+        else:
+            value = DEFAULT_GENUS
     else:
-        value = DEFAULT_GENUS
+        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+        if 'accession' in args:
+            acc = args['accession'][0]
+            value = df[df['accession'] == acc].iloc[0]['genus']
+        elif 'species_name' in args:
+            species = species_id.get(args['species_name'][0], None)
+            value = species_genus.get(species, DEFAULT_GENUS)
+        elif 'species_id' in args:
+            value = species_genus.get(args['species_id'][0], DEFAULT_GENUS)
+        else:
+            value = DEFAULT_GENUS
     return value
+
+
+@app.callback(
+    Output('species-column', 'options'),
+    [Input('genus-column', 'value'),
+     Input('text-input', 'value')])
+def update_species_options(genus_id, text):
+    group = genera.get_group(genus_id)
+    group = group[['species', 'species_name']]
+    return [{'label': sn, 'value': si} for si, sn in group.values]
 
 
 @app.callback(
     Output('species-column', 'value'),
     [Input('species-column', 'options'),
-     Input('url', 'search')])
-def update_species_value(options, search):
-    args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-    if 'species_name' in args:
-        value = species_id.get(args['species_name'][0], None)
-    elif 'species_id' in args:
-        value = args['species_id'][0]
+     Input('url', 'search'),
+     Input('submit-button', 'n_clicks')],
+    [State('text-input', 'value'),
+     State('state', 'hidden')])
+def update_species_value(options, search, n_clicks, text, state):
+    print(locals())
+    if state and state['n_clicks'] < n_clicks:
+        text = text.strip()
+        if text in df['accession'].values:
+            value = df[df['accession'] == text].iloc[0]['species']
+        elif text in df['species']:
+            value = text
+        else:
+            value = state['tax_id']
     else:
-        value = None
+        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+        if 'accession' in args:
+            acc = args['accession'][0]
+            value = df[df['accession'] == acc].iloc[0]['genus']
+        elif 'species_name' in args:
+            value = species_id.get(args['species_name'][0], None)
+        elif 'species_id' in args:
+            value = args['species_id'][0]
+        elif state:
+            value = state['tax_id']
+        else:
+            value = None
     if value is None or value not in set(o['value'] for o in options):
         value = options[0]['value']
     return value
@@ -231,36 +312,25 @@ def update_isolation_source_value(tax_id):
 
 
 @app.callback(
-    Output('species-column', 'options'),
-    [Input('genus-column', 'value'),
-     Input('text-input', 'value')])
-def update_species_options(genus_id, text):
-    group = genera.get_group(genus_id)
-    group = group[['species', 'species_name']]
-    return [{'label': sn, 'value': si} for si, sn in group.values]
-
-
-@app.callback(
-    Output('indicator-graphic', 'figure'),
+    Output('plot', 'figure'),
     [Input('species-column', 'value'),
      Input('xaxis-column', 'value'),
      Input('yaxis-column', 'value'),
      Input('year--slider', 'value'),
-     Input('text-input', 'value'),
      Input('isolation-source-column', 'value')],
-    [State('indicator-graphic', 'figure')])
+    [State('state', 'hidden')])
 def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
-                 year_value, text_value, iso_values, figure):
-    pprint.pprint(locals())
+                 year_value, iso_values, state):
+    # pprint.pprint(locals())
     dff = df[df['species'] == tax_id]
     dff = dff[dff['modified_date'] <= str(year_value+1)]
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
 
-    # use figure State to preserve max range
-    if figure is not None and tax_id == figure['tax_id']:
-        x_range = figure['layout']['xaxis']['range']
-        y_range = figure['layout']['yaxis']['range']
+    # decide if we should allow plot to calculate axes ranges
+    if state is not None and tax_id == state['tax_id']:
+        x_range = state['xrange']
+        y_range = state['yrange']
     else:
         x_range = None
         y_range = None
@@ -287,6 +357,7 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
                     'line': {'width': 0.5, 'color': 'white'}},
                 mode='markers',
                 name='inliers',
+                selectedpoints=[],
                 # selected=go.scatter.Selected(marker={'size': 20}),
                 unselected=go.scatter.Unselected(marker={'opacity': 0.1}),
                 text=inliers['text'],
@@ -302,6 +373,7 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
                 mode='markers',
                 name='outliers',
                 text=outliers['text'],
+                selectedpoints=list(range(len(outliers))),
                 # selected=go.scatter.Selected(marker={'size': 20}),
                 unselected=go.scatter.Unselected(marker={'opacity': 0.1}),
                 x=outliers[xaxis_column_name],
@@ -317,6 +389,7 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
                 mode='markers',
                 name='outlier-types',
                 # selected=go.scatter.Selected(marker={'size': 20}),
+                selectedpoints=[],
                 unselected=go.scatter.Unselected(marker={'opacity': 0.1}),
                 text=types['text'],
                 x=types[xaxis_column_name],
@@ -348,9 +421,7 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
                 len(outliers),
                 (len(outliers) / len(dff)),
                 len(dff)),
-        ),
-        # great place to store State data
-        'tax_id': tax_id,
+        )
     }
     return figure
 
