@@ -63,7 +63,15 @@ app.layout = html.Div(
                             value='y')],
                     style={'width': '30%', 'display': 'inline-block'}),
                 html.Div(
-                    children=[dcc.Graph(id='plot')],
+                    children=[
+                        dcc.Graph(id='plot'),
+                        dcc.RadioItems(
+                            id='radio-items',
+                            options=[
+                                {'label': 'All', 'value': 'all'},
+                                {'label': 'Type Strain', 'value': 'is_type'},
+                                {'label': 'Outliers', 'value': 'is_out'}],
+                            value='all')],
                     style={
                         'width': '70%',
                         'display': 'inline-block',
@@ -74,21 +82,31 @@ app.layout = html.Div(
                 'display': 'inline-block',
                 'padding': '10',
                 'width': '97%'}),
+        # html.Div(
+        #     children=[
+        #         dt.DataTable(
+        #             # Initialise the rows
+        #             rows=[{}],
+        #             editable=False,
+        #             row_selectable=False,
+        #             filterable=False,
+        #             resizable=True,
+        #             sortable=True,
+        #             id='datatable')],
+        #     style={
+        #         'display': 'inline-block',
+        #         'padding': '10',
+        #         'width': '97%'}),
         html.Div(
+            id='table-div',
+            style={'heght': '500', 'overflow-y': 'scroll'},
             children=[
-                dt.DataTable(
-                    # Initialise the rows
-                    rows=[{}],
-                    editable=False,
-                    row_selectable=False,
-                    filterable=False,
-                    resizable=True,
-                    sortable=True,
-                    id='datatable')],
-            style={
-                'display': 'inline-block',
-                'padding': '10',
-                'width': '97%'})])
+                html.Table(
+                    children=[
+                        html.Tr(
+                            children=[
+                                html.Td()])])])
+        ])
 
 
 @app.callback(
@@ -109,8 +127,46 @@ def update_state(n_clicks, tax_id, figure):
         'yrange': figure['layout']['yaxis']['range']}
 
 
+# @app.callback(
+#     Output('datatable', 'rows'),
+#     [Input('url', 'search'),
+#      Input('plot', 'selectedData'),
+#      Input('plot', 'clickData'),
+#      Input('species-column', 'value'),
+#      Input('submit-button', 'n_clicks')],
+#     [State('text-input', 'value'),
+#      State('state', 'hidden')])
+# def update_datatable(search, selected, clicked, tax_id, n_clicks, text, state):
+#     if state is None:
+#         rows = df[(df['species'] == tax_id) & (df['is_out'])]
+#     elif state['n_clicks'] < n_clicks:  # button was pressed
+#         rows = df[(df['seqname'] == text) |
+#                   (df['accession'] == text) |
+#                   (df['version'] == text)]
+#     elif selected is not None:
+#         idx = [i['customdata'] for i in selected['points']]
+#         rows = df.loc[idx]
+#     elif clicked is not None:
+#         idx = [i['customdata'] for i in clicked['points']]
+#         rows = df.loc[idx]
+#     else:
+#         # outliers
+#         rows = df[(df['species'] == tax_id) & (df['is_out'])]
+#
+#     rows = rows[['seqname', 'description', 'is_type', 'dist',
+#                  'is_out', 'match_species', 'match_pct']]
+#     rows = rows.copy()  # avoid SettingWithCopyWarning
+#
+#     # clean up boolean text and sort by dist
+#     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
+#     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
+#     rows = rows.sort_values(by='dist', ascending=False)
+#
+#     return rows.to_dict('records')
+
+
 @app.callback(
-    Output('datatable', 'rows'),
+    Output('table-div', 'children'),
     [Input('url', 'search'),
      Input('plot', 'selectedData'),
      Input('plot', 'clickData'),
@@ -118,7 +174,7 @@ def update_state(n_clicks, tax_id, figure):
      Input('submit-button', 'n_clicks')],
     [State('text-input', 'value'),
      State('state', 'hidden')])
-def update_datatable(search, selected, clicked, tax_id, n_clicks, text, state):
+def update_divtable(search, selected, clicked, tax_id, n_clicks, text, state):
     if state is None:
         rows = df[(df['species'] == tax_id) & (df['is_out'])]
     elif state['n_clicks'] < n_clicks:  # button was pressed
@@ -134,13 +190,42 @@ def update_datatable(search, selected, clicked, tax_id, n_clicks, text, state):
     else:
         # outliers
         rows = df[(df['species'] == tax_id) & (df['is_out'])]
+
+    # TODO: rebuild feather file to get match_version from seq_info file..
     rows = rows.copy()  # avoid SettingWithCopyWarning
+
+    # clean up boolean text and sort by dist
     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
     rows = rows.sort_values(by='dist', ascending=False)
-    rows = rows[['seqname', 'description', 'is_type', 'dist',
-                 'is_out', 'match_species', 'match_pct']]
-    return rows.to_dict('records')
+
+    TABLE_STYLE = {
+        'padding': '10',
+        'border-bottom': '1px solid #ddd',
+        'text-align': 'left'}
+
+    cols = ['seqname', 'description', 'is_type', 'dist',
+            'is_out', 'match_species', 'match_pct']
+
+    trs = [html.Tr(children=[
+        html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
+    for _, r in rows.iterrows():
+        r = r.to_dict()
+        tds = []
+        for c in cols:
+            if c == 'seqname':
+                cell = html.A(
+                    href='https://www.ncbi.nlm.nih.gov/nuccore/' + r['version'],
+                    children=r[c])
+            elif c == 'match_species':
+                cell = html.A(
+                    href='https://www.ncbi.nlm.nih.gov/nuccore/' + r[c],
+                    children=r[c])
+            else:
+                cell = r[c]
+            tds.append(html.Td(children=[cell], style=TABLE_STYLE))
+        trs.append(html.Tr(children=tds))
+    return [html.Table(children=trs)]
 
 
 # Setting the url search does not seem to work at the moment in addition
@@ -161,17 +246,19 @@ def update_datatable(search, selected, clicked, tax_id, n_clicks, text, state):
     [State('text-input', 'value'),
      State('state', 'hidden')])
 def update_genus_value(search, n_clicks, text, state):
-    if state and state['n_clicks'] < n_clicks:
+    if state and state['n_clicks'] < n_clicks:  # button clicked?
         text = text.strip()
         if text in df['accession'].values:
             value = df[df['accession'] == text].iloc[0]['genus']
-        elif text in df['genus']:
+        elif text in df['genus'].values:
             value = text
-        elif text in df['species']:
+        elif text in df['species'].values:
             value = species_genus[text]
+        elif text in df['species_name'].values:
+            value = species_genus.get(species_id[text], DEFAULT_GENUS)
         else:
             value = DEFAULT_GENUS
-    else:
+    else:  # url?
         args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
         if 'accession' in args:
             acc = args['accession'][0]
@@ -188,9 +275,8 @@ def update_genus_value(search, n_clicks, text, state):
 
 @app.callback(
     Output('species-column', 'options'),
-    [Input('genus-column', 'value'),
-     Input('text-input', 'value')])
-def update_species_options(genus_id, text):
+    [Input('genus-column', 'value')])
+def update_species_options(genus_id):
     group = genera.get_group(genus_id)
     group = group[['species', 'species_name']]
     return [{'label': sn, 'value': si} for si, sn in group.values]
@@ -204,16 +290,17 @@ def update_species_options(genus_id, text):
     [State('text-input', 'value'),
      State('state', 'hidden')])
 def update_species_value(options, search, n_clicks, text, state):
-    print(locals())
-    if state and state['n_clicks'] < n_clicks:
+    if state and state['n_clicks'] < n_clicks:  # button clicked?
         text = text.strip()
         if text in df['accession'].values:
             value = df[df['accession'] == text].iloc[0]['species']
-        elif text in df['species']:
+        elif text in df['species'].values:
             value = text
+        elif text in df['species_name'].values:
+            value = species_id.get(text, None)
         else:
             value = state['tax_id']
-    else:
+    else:  # anything in url?
         args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
         if 'accession' in args:
             acc = args['accession'][0]
@@ -317,12 +404,18 @@ def update_isolation_source_value(tax_id):
      Input('xaxis-column', 'value'),
      Input('yaxis-column', 'value'),
      Input('year--slider', 'value'),
-     Input('isolation-source-column', 'value')],
+     Input('isolation-source-column', 'value'),
+     Input('radio-items', 'value')],
     [State('state', 'hidden')])
 def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
-                 year_value, iso_values, state):
+                 year_value, iso_values, radio, state):
     # pprint.pprint(locals())
     dff = df[df['species'] == tax_id]
+    if radio == 'is_type':
+        dff = dff[dff['is_type']]
+    elif radio == 'is_out':
+        dff = dff[dff['is_out']]
+
     dff = dff[dff['modified_date'] <= str(year_value+1)]
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
