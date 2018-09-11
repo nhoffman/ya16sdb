@@ -9,6 +9,8 @@ import urllib
 from dash.dependencies import Input, State, Output
 
 DEFAULT_GENUS = '547'  # Enterobacter
+SEARCH_OPTS = ['seqname', 'accession', 'version',
+               'species_name', 'species', 'genus']
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
@@ -100,40 +102,13 @@ app.layout = html.Div(
     [State('text-input', 'value'),
      State('state', 'hidden')])
 def update_genus_value(search, n_clicks, text, state):
-    if state and state['n_clicks'] < n_clicks:  # button clicked?
-        text = text.strip()
-        if text in df['seqname'].values:
-            value = df[df['seqname'] == text].iloc[0]['genus']
-        elif text in df['accession'].values:
-            value = df[df['accession'] == text].iloc[0]['genus']
-        elif text in df['version'].values:
-            value = df[df['version'] == text].iloc[0]['genus']
-        elif text in df['genus'].values:
-            value = text
-        elif text in df['species'].values:
-            value = species_genus[text]
-        elif text in df['species_name'].values:
-            value = species_genus.get(species_id[text], DEFAULT_GENUS)
-        else:
-            value = DEFAULT_GENUS
-    else:  # url
-        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-        if 'seqname' in args:
-            seqname = args['seqname'][0]
-            value = df[df['seqname'] == seqname].iloc[0]['genus']
-        elif 'accession' in args:
-            acc = args['accession'][0]
-            value = df[df['accession'] == acc].iloc[0]['genus']
-        elif 'version' in args:
-            acc = args['version'][0]
-            value = df[df['version'] == acc].iloc[0]['genus']
-        elif 'species_name' in args:
-            species = species_id.get(args['species_name'][0], None)
-            value = species_genus.get(species, DEFAULT_GENUS)
-        elif 'species_id' in args:
-            value = species_genus.get(args['species_id'][0], DEFAULT_GENUS)
-        else:
-            value = DEFAULT_GENUS
+    request, data = parse_search_input(df, state, search, n_clicks, text)
+    if request is None:  # no request
+        value = DEFAULT_GENUS  # return the default starting genus
+    elif request == 'species_name':
+        value = species_genus.get(data, DEFAULT_GENUS)
+    else:
+        value = value = df[df[request] == data].iloc[0]['genus']
     return value
 
 
@@ -156,38 +131,33 @@ def update_species_options(tax_id):
      State('genus-column', 'value')])
 def update_species_value(options, search, n_clicks, text, state, tax_id):
     dff = df[df['genus'] == tax_id]
-    if state is None:
-        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-        if 'seqname' in args:
-            seqname = args['seqname'][0]
-            value = dff[dff['seqname'] == seqname].iloc[0]['species']
-        elif 'accession' in args:
-            acc = args['accession'][0]
-            value = dff[dff['accession'] == acc].iloc[0]['species']
-        elif 'species_name' in args:
-            name = args['species_name'][0]
-            value = species_id.get(name, options[0]['value'])
-        elif 'species_id' in args:
-            value = args['species_id'][0]
-        else:
-            value = options[0]['value']
-    elif state['n_clicks'] < n_clicks:  # button clicked
-        text = text.strip()
-        if text in dff['seqname'].values:
-            value = dff[dff['seqname'] == text].iloc[0]['species']
-        elif text in dff['accession'].values:
-            value = dff[dff['accession'] == text].iloc[0]['species']
-        elif text in dff['version'].values:
-            value = dff[dff['version'] == text].iloc[0]['species']
-        elif text in dff['species'].values:
-            value = text
-        elif text in dff['species_name'].values:
-            value = species_id.get(text, options[0]['value'])
-        else:
-            value = options[0]['value']
+    request, data = parse_search_input(dff, state, search, n_clicks, text)
+    if request is None:  # no request
+        value = options[0]['value']  # return first item in dropdown
+    elif request == 'species_name':
+        value = species_id.get(data, options[0]['value'])
     else:
-        value = options[0]['value']
+        value = dff[dff[request] == data].iloc[0]['species']
     return value
+
+
+def parse_search_input(dff, state, search, n_clicks, text):
+    '''
+    '''
+    request = None
+    data = None
+    if state is None:  # new instance of the web page
+        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+        for o in SEARCH_OPTS:
+            if o in args:
+                request = o
+                data = args[o]
+    elif state['n_clicks'] < n_clicks:  # button clicked
+        data = text.strip()
+        for o in SEARCH_OPTS:
+            if text in dff[o].values:
+                request = o
+    return request, data
 
 
 # Setting the url search does not seem to work at the moment in addition
@@ -350,28 +320,9 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
 
     # decide selected points
     dff['selected'] = False
-    if state is None:
-        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-        if 'seqname' in args:
-            seqname = args['seqname'][0]
-            dff.loc[dff['seqname'] == seqname, 'selected'] = True
-        elif 'version' in args:
-            ver = args['version'][0]
-            dff.loc[dff['version'] == ver, 'selected'] = True
-        elif 'accession' in args:
-            acc = args['accession'][0]
-            dff.loc[dff['accession'] == acc, 'selected'] = True
-        else:
-            dff.loc[dff['is_out'] & ~dff['is_type'], 'selected'] = True
-    elif state['n_clicks'] < n_clicks:  # button clicked
-        if text in df['accession'].values:
-            dff.loc[dff['accession'] == text, 'selected'] = True
-        elif text in df['version'].values:
-            dff.loc[dff['version'] == text, 'selected'] = True
-        elif text in df['seqname'].values:
-            dff.loc[dff['seqname'] == text, 'selected'] = True
-        else:
-            dff.loc[dff['is_out'] & ~dff['is_type'], 'selected'] = True
+    request, data = parse_search_input(dff, state, search, n_clicks, text)
+    if request is not None:
+        dff.loc[dff[request] == data, 'selected'] = True
     else:
         dff.loc[dff['is_out'] & ~dff['is_type'], 'selected'] = True
 
@@ -395,7 +346,8 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
                 name='inliers',
                 selected=go.scatter.Selected(marker={'size': 15}),
                 selectedpoints=inliers[inliers['selected']]['iselected'],
-                unselected=go.scatter.Unselected(marker={'size': 5}),
+                unselected=go.scatter.Unselected(
+                    marker={'size': 5, 'opacity': 0.2}),
                 text=inliers['text'],
                 x=inliers[xaxis_column_name],
                 y=inliers[yaxis_column_name]),
@@ -446,6 +398,7 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name,
                 'showgrid': False,
                 'range': y_range
             },
+            dragmode='select',  # default tool from modebar
             showlegend=False,
             legend={'orientation': 'v'},
             hovermode='closest',
@@ -540,11 +493,13 @@ def update_table(_, selected, n_clicks, tax_id, text, search, state):
                 cell = html.A(
                     href=('https://www.ncbi.nlm.nih.gov/nuccore/' +
                           r['version']),
-                    children=r[c])
+                    children=r[c],
+                    target='_blank')
             elif c == 'match_species':
                 cell = html.A(
                     href='https://www.ncbi.nlm.nih.gov/nuccore/' + r[c],
-                    children=r[c])
+                    children=r[c],
+                    target='_blank')
             else:
                 cell = r[c]
             tds.append(html.Td(children=[cell], style=TABLE_STYLE))
