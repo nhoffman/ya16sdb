@@ -667,7 +667,9 @@ trusted_type_mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 blast_db(
-    env, trusted_fa, '$out/dedup/1200bp/named/filtered/trusted/types/blast')
+    env,
+    trusted_type_fa,
+    '$out/dedup/1200bp/named/filtered/trusted/types/blast')
 
 '''
 find top hit for each sequence among type strains
