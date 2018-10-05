@@ -111,6 +111,7 @@ app.layout = html.Div(
                         'display': 'inline-block',
                         }),
                 dcc.RadioItems(
+                    id='color-items',
                     options=[
                         {'value': 'colors-isolation'},
                         {'value': 'colors-match-species'},
@@ -123,6 +124,7 @@ app.layout = html.Div(
                         'width': '5%',
                         'display': 'inline-block'}),
                 dcc.RadioItems(
+                    id='symbol-items',
                     options=[
                         {'value': 'symbols-isolation-source'},
                         {'value': 'symbols-match-species'},
@@ -304,7 +306,6 @@ def parse_search_input(dff, state, search, n_clicks, text):
 #     Output('url', 'search'),
 #     [Input('species-column', 'value')])
 # def update_url_search(value):
-#     print(value)
 #     return '?' + urllib.parse.urlencode({'species_id': value})
 
 
@@ -578,6 +579,20 @@ def update_published_visibility_value(tax_id):
 
 
 @app.callback(
+    Output('color-items', 'value'),
+    [Input('species-column', 'value')])
+def update_color_items(tax_id):
+    return None  # clear values
+
+
+@app.callback(
+    Output('symbol-items', 'value'),
+    [Input('species-column', 'value')])
+def update_symbol_items(tax_id):
+    return None  # clear values
+
+
+@app.callback(
     Output('plot', 'figure'),
     [Input('species-column', 'value'),
      Input('xaxis-column', 'value'),
@@ -593,6 +608,8 @@ def update_published_visibility_value(tax_id):
      Input('type-strains-selection', 'value'),
      Input('published-visibility', 'value'),
      Input('published-selection', 'value'),
+     Input('color-items', 'value'),
+     Input('symbol-items', 'value'),
      Input('submit-button', 'n_clicks')],
     [State('state', 'hidden'),
      State('text-input', 'value'),
@@ -603,8 +620,8 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
                  vout, sout,
                  vtypes, stypes,
                  vpubs, spubs,
+                 color, symbol,
                  n_clicks, state, text, search):
-    # pprint.pprint(locals())
     dff = df[df['species'] == tax_id]
     dff = dff[dff['modified_date'] <= str(year_value+1)]
     if viso_source:
@@ -758,7 +775,6 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
      State('url', 'search'),
      State('state', 'hidden')])
 def update_table(_, selected, n_clicks, tax_id, text, search, state):
-    # pprint.pprint(locals())
     dff = df[df['species'] == tax_id]
     request, data = parse_search_input(dff, state, search, n_clicks, text)
     if request is not None:
@@ -799,7 +815,7 @@ def update_table(_, selected, n_clicks, tax_id, text, search, state):
                           r['version']),
                     children=r[c],
                     target='_blank')
-            elif c == 'match_species':
+            elif c == 'match_species' and r[c] is not None:
                 cell = html.A(
                     href='https://www.ncbi.nlm.nih.gov/nuccore/' + r[c],
                     children=r[c],
