@@ -3,22 +3,28 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import pandas
-import plotly.graph_objs as go
 import urllib
 
 from dash.dependencies import Input, State, Output
 
+LEGEND_OTHER = 'other'
 DEFAULT_GENUS = '547'  # Enterobacter
 SEARCH_OPTS = ['seqname', 'accession', 'version',
                'species_name', 'species', 'genus']
+
+SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
+          'pentagon', 'hexagon', 'octagon', 'star']
+COLORS = ['blue', 'red', 'black', 'yellow',
+          'gray', 'brown', 'violet', 'silver']
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
 
 df = pandas.read_feather('filter_details.feather')
 df = df[~df['x'].isna() & ~df['y'].isna()]
+df = df.sort_values(by='dist')
 
-info = df[['x', 'y', 'match_species', 'dist', 'match_pct']].columns
+info = ['x', 'y', 'match_species', 'dist', 'match_pct', 'rank_order']
 
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
 tax = tax.drop_duplicates().sort_values(by='species_name')
@@ -113,11 +119,11 @@ app.layout = html.Div(
                 dcc.RadioItems(
                     id='color-items',
                     options=[
-                        {'value': 'colors-isolation'},
-                        {'value': 'colors-match-species'},
-                        {'value': 'colors-outlier'},
-                        {'value': 'colors-type-strains'},
-                        {'value': 'colors-published'}],
+                        {'value': 'isolation_source'},
+                        {'value': 'match_species'},
+                        {'value': 'is_out'},
+                        {'value': 'is_type'},
+                        {'value': 'pubmed_id'}],
                     inputStyle={'height': 15, 'width': 15, 'margin': 11},
                     style={
                         'vertical-align': 'middle',
@@ -126,11 +132,11 @@ app.layout = html.Div(
                 dcc.RadioItems(
                     id='symbol-items',
                     options=[
-                        {'value': 'symbols-isolation-source'},
-                        {'value': 'symbols-match-species'},
-                        {'value': 'symbols-outlier'},
-                        {'value': 'symbols-type-strains'},
-                        {'value': 'symbols-published'}],
+                        {'value': 'isolation_source'},
+                        {'value': 'match_species'},
+                        {'value': 'is_out'},
+                        {'value': 'is_type'},
+                        {'value': 'pubmed_id'}],
                     inputStyle={'height': 15, 'width': 15, 'margin': 11},
                     style={
                         'vertical-align': 'middle',
@@ -582,14 +588,14 @@ def update_published_visibility_value(tax_id):
     Output('color-items', 'value'),
     [Input('species-column', 'value')])
 def update_color_items(tax_id):
-    return None  # clear values
+    return 'is_out'
 
 
 @app.callback(
     Output('symbol-items', 'value'),
     [Input('species-column', 'value')])
 def update_symbol_items(tax_id):
-    return None  # clear values
+    return 'is_type'
 
 
 @app.callback(
@@ -624,17 +630,6 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
                  n_clicks, state, text, search):
     dff = df[df['species'] == tax_id]
     dff = dff[dff['modified_date'] <= str(year_value+1)]
-    if viso_source:
-        dff = dff[dff['isolation_source'].isin(viso_source)]
-    if vmatch:
-        dff = dff[dff['match_species'].isin(vmatch)]
-    if vout:
-        dff = dff[dff['is_out'].isin(set(i == 'Yes' for i in vout))]
-    if vtypes:
-        dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vtypes))]
-    if vpubs:
-        # pubmed_id
-        dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vpubs))]
 
     # decide if we should allow plot to calculate axes ranges
     if state is None:
@@ -653,12 +648,18 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
         x_range = state['xrange']
         y_range = state['yrange']
 
-    dff['text'] = dff.apply(
-        lambda x: 'seqname: {seqname}<br>'
-                  'accession: {version}<br>'
-                  'modified_date: {modified_date}<br>'
-                  'isolation source: {isolation_source}'.format(**x),
-        axis='columns')
+    # decide visibile points
+    if viso_source:
+        dff = dff[dff['isolation_source'].isin(viso_source)]
+    if vmatch:
+        dff = dff[dff['match_species'].isin(vmatch)]
+    if vout:
+        dff = dff[dff['is_out'].isin(set(i == 'Yes' for i in vout))]
+    if vtypes:
+        dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vtypes))]
+    if vpubs:
+        # pubmed_id
+        dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vpubs))]
 
     # decide selected points
     dff['selected'] = False
@@ -679,68 +680,91 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
         is_pub = dff['isolation_source'].isin(set(i == 'Yes' for i in spubs))
         dff.loc[is_pub, 'selected'] = True
 
-    inliers = ~dff['is_out'] & ~dff['is_type']
-    outliers = dff['is_out'] & ~dff['is_type']
-    types = dff['is_type']
+    if xaxis_column_name == 'rank_order' or yaxis_column_name == 'rank_order':
+        dff['rank_order'] = range(len(dff))
 
-    dff.loc[inliers | outliers, 'symbol'] = 'circle'
-    dff.loc[types, 'symbol'] = 'triangle-up'
-    dff.loc[inliers, 'color'] = 'lightblue'
-    dff.loc[outliers, 'color'] = 'lightgreen'
-    dff.loc[types, 'color'] = 'darkred'
+    dff['text'] = dff.apply(
+        lambda x: 'seqname: {seqname}<br>'
+                  'accession: {version}<br>'
+                  'modified_date: {modified_date}<br>'
+                  'isolation source: {isolation_source}'.format(**x),
+        axis='columns')
 
-    # sort markers to move non-circle markers in front
-    cat_type = pandas.api.types.CategoricalDtype(
-        categories=['circle', 'triangle-up'])
-    dff['symbol'] = dff['symbol'].astype(cat_type)
-    dff = dff.sort_values(by='symbol', ascending=True)
+    # assign symbols and colors
+    for col, label, styles in [[symbol, 'symbol', SHAPES],
+                               [color, 'color', COLORS]]:
+        name = label + '_name'
+        dff[name] = LEGEND_OTHER
+        dff[label] = styles[0]
+        if col in ['is_out', 'is_type']:
+            dff.loc[dff[col], name] = col
+            dff.loc[dff[col], label] = styles[1]
+        else:
+            style_count = len(styles) - 1  # minus styles[0]
+            top = dff[col].value_counts().iloc[:style_count].keys()
+            for i, c in enumerate(top, start=1):
+                dff.loc[dff[col] == c, name] = c
+                dff.loc[dff[col] == c, label] = styles[i]
 
-    dff['iselected'] = range(len(dff))
+    # create scatter plots for every symbol and color combination
+    data = []
+    by = ['symbol_name', 'color_name', 'symbol', 'color']
+    for (sym_name, clr_name, _, _), d in dff.groupby(by=by):
+        d = d.copy()
+        d['iselected'] = range(len(d))
+        if sym_name == clr_name:
+            name = sym_name
+        elif sym_name == LEGEND_OTHER:
+            name = clr_name
+        elif clr_name == LEGEND_OTHER:
+            name = sym_name
+        else:
+            name = '{} and {}'.format(clr_name, sym_name)
+        data.append({
+            'type': 'scatter',
+            'customdata': d.index,
+            'marker': {'symbol': d['symbol'], 'color': d['color']},
+            'mode': 'markers',
+            'name': name,
+            'selected': {'marker': {'size': 15, 'opacity': 0.7}},
+            'selectedpoints': d[d['selected']]['iselected'],
+            'unselected': {'marker': {'size': 10, 'opacity': 0.4}},
+            'text': d['text'],
+            'x': d[xaxis_column_name],
+            'y': d[yaxis_column_name],
+            })
 
+    outliers = dff[dff['is_out']]
     figure = {
-        'data': [
-            go.Scatter(
-                customdata=dff.index,
-                marker={
-                    'symbol': dff['symbol'],
-                    'color': dff['color']},
-                mode='markers',
-                selected={'marker': {'size': 15, 'opacity': 0.7}},
-                selectedpoints=dff[dff['selected']]['iselected'],
-                unselected={'marker': {'size': 5, 'opacity': 0.4}},
-                text=dff['text'],
-                x=dff[xaxis_column_name],
-                y=dff[yaxis_column_name]),
-            ],
-        'layout': go.Layout(
-            xaxis={
-                'scaleanchor': 'y',  # square grid ratio
+        'data': data,
+        'layout': {
+            'xaxis': {
+                # 'scaleanchor': 'y',  # square grid ratio
                 'title': xaxis_column_name,
-                'type': 'linear',
+                # 'type': 'linear',
                 'showgrid': False,
                 'range': x_range
             },
-            yaxis={
-                'scaleanchor': 'x',  # square grid ratio
+            'yaxis': {
+                # 'scaleanchor': 'x',  # square grid ratio
                 'title': yaxis_column_name,
-                'type': 'linear',
+                # 'type': 'linear',
                 'showgrid': False,
                 'range': y_range
             },
-            dragmode='select',  # default tool from modebar
-            showlegend=False,
-            legend={'orientation': 'v'},
-            hovermode='closest',
-            height=900,
-            width=900,
-            title='{}, tax_id {} outliers: {} ({:.0%}), total: {}'.format(
+            'dragmode': 'select',  # default tool from modebar
+            'showlegend': True,
+            'legend': {'orientation': 'h'},
+            'hovermode': 'closest',
+            'height': 900,
+            'width': 900,
+            'title': '{}, tax_id {} outliers: {} ({:.0%}), total: {}'.format(
                 dff.iloc[0]['species_name'],
                 tax_id,
                 len(outliers),
                 (len(outliers) / len(dff)),
-                len(dff)),
-        )
-    }
+                len(dff))
+            }}
     return figure
 
 
