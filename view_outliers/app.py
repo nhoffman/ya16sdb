@@ -1,4 +1,9 @@
 #! /usr/bin/env python3
+'''
+TODO:
+1. match_species categories in feather file
+2. add published column to feather file
+'''
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -23,6 +28,8 @@ app.title = 'Species Outlier Plots'
 df = pandas.read_feather('filter_details.feather')
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df = df.sort_values(by='dist')
+by = 'species'
+df['rank_order'] = df.groupby(by=by)[by].transform(lambda x: range(len(x)))
 
 info = ['x', 'y', 'match_species', 'dist', 'match_pct', 'rank_order']
 
@@ -196,36 +203,31 @@ app.layout = html.Div(
                 'padding': 10,
                 'width': '95%'}),
         html.Div(
+            children=[dcc.Slider(id='year--slider')],
+            style={'padding': 15, 'width': '95%'}),
+        dcc.Graph(
+            id='plot',
+            style={'padding': 15}),
+        html.Div(
             children=[
                 dcc.Dropdown(
+                    clearable=False,
                     id='yaxis-column',
                     options=[{'label': i, 'value': i} for i in info],
                     value='y')],
             style={
-                'width': '13%',
-                'vertical-align': 'middle',
+                'width': '14%',
                 'display': 'inline-block'}),
         html.Div(
             children=[
-                dcc.Graph(id='plot'),
-                html.Div(
-                    children=[
-                        dcc.Dropdown(
-                            id='xaxis-column',
-                            options=[{'label': i, 'value': i} for i in info],
-                            value='x')],
-                    style={
-                       'text-align': 'left',
-                       'display': 'inline-block',
-                       'width': '17%'})],
+                dcc.Dropdown(
+                    clearable=False,
+                    id='xaxis-column',
+                    options=[{'label': i, 'value': i} for i in info],
+                    value='x')],
             style={
-                'display': 'inline-block',
-                'text-align': 'center',
-                'vertical-align': 'middle',
-                'width': '77%'}),
-        html.Div(
-            children=[dcc.Slider(id='year--slider')],
-            style={'padding': 15, 'display': 'inline-block', 'width': '95%'}),
+                'width': '14%',
+                'display': 'inline-block'}),
         html.Table(
             id='table-div',
             style={
@@ -252,7 +254,7 @@ def update_genus_value(search, n_clicks, text, state):
     elif request == 'species_name':
         value = species_genus.get(data, DEFAULT_GENUS)
     else:
-        value = value = df[df[request] == data].iloc[0]['genus']
+        value = df[df[request] == data].iloc[0]['genus']
     return value
 
 
@@ -296,7 +298,7 @@ def parse_search_input(dff, state, search, n_clicks, text):
         for o in SEARCH_OPTS:
             if o in args:
                 request = o
-                data = args[o]
+                data = args[o][0]
     elif text is not None and state['n_clicks'] < n_clicks:  # button clicked
         data = text.strip()
         for o in SEARCH_OPTS:
@@ -620,7 +622,7 @@ def update_symbol_items(tax_id):
     [State('state', 'hidden'),
      State('text-input', 'value'),
      State('url', 'search')])
-def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
+def update_graph(tax_id, xaxis, yaxis, year_value,
                  viso_source, siso_source,
                  vmatch, smatch,
                  vout, sout,
@@ -638,10 +640,10 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
     elif tax_id != state['tax_id']:
         x_range = None
         y_range = None
-    elif state['xaxis'] != xaxis_column_name:
+    elif state['xaxis'] != xaxis:
         x_range = None
         y_range = None
-    elif state['yaxis'] != yaxis_column_name:
+    elif state['yaxis'] != yaxis:
         x_range = None
         y_range = None
     else:
@@ -679,9 +681,6 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
     if spubs:
         is_pub = dff['isolation_source'].isin(set(i == 'Yes' for i in spubs))
         dff.loc[is_pub, 'selected'] = True
-
-    if xaxis_column_name == 'rank_order' or yaxis_column_name == 'rank_order':
-        dff['rank_order'] = range(len(dff))
 
     dff['text'] = dff.apply(
         lambda x: 'seqname: {seqname}<br>'
@@ -730,41 +729,45 @@ def update_graph(tax_id, xaxis_column_name, yaxis_column_name, year_value,
             'selectedpoints': d[d['selected']]['iselected'],
             'unselected': {'marker': {'size': 10, 'opacity': 0.4}},
             'text': d['text'],
-            'x': d[xaxis_column_name],
-            'y': d[yaxis_column_name],
+            'x': d[xaxis],
+            'y': d[yaxis],
             })
 
     outliers = dff[dff['is_out']]
     figure = {
         'data': data,
         'layout': {
-            'xaxis': {
-                # 'scaleanchor': 'y',  # square grid ratio
-                'title': xaxis_column_name,
-                # 'type': 'linear',
-                'showgrid': False,
-                'range': x_range
-            },
-            'yaxis': {
-                # 'scaleanchor': 'x',  # square grid ratio
-                'title': yaxis_column_name,
-                # 'type': 'linear',
-                'showgrid': False,
-                'range': y_range
-            },
             'dragmode': 'select',  # default tool from modebar
-            'showlegend': True,
-            'legend': {'orientation': 'h'},
-            'hovermode': 'closest',
+            'legend': {
+                'orientation': 'v',
+                },
             'height': 900,
-            'width': 900,
+            'hovermode': 'closest',
+            'margin': {
+                'b': 200 if xaxis == 'match_species' else None,
+                'l': 200 if yaxis == 'match_species' else None
+                },
+            'showlegend': True,
             'title': '{}, tax_id {} outliers: {} ({:.0%}), total: {}'.format(
                 dff.iloc[0]['species_name'],
                 tax_id,
                 len(outliers),
                 (len(outliers) / len(dff)),
-                len(dff))
-            }}
+                len(dff)),
+            # 'width': 900,
+            'xaxis': {
+                'scaleanchor': 'y' if xaxis == 'x' else None,
+                'title': xaxis,
+                'showgrid': True if xaxis == 'match_species' else False,
+                'range': x_range
+            },
+            'yaxis': {
+                'scaleanchor': 'x' if yaxis == 'y' else None,
+                'title': yaxis,
+                'showgrid': True if yaxis == 'match_species' else False,
+                'range': y_range
+            }
+        }}
     return figure
 
 
@@ -801,14 +804,18 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
 def update_table(_, selected, n_clicks, tax_id, text, search, state):
     dff = df[df['species'] == tax_id]
     request, data = parse_search_input(dff, state, search, n_clicks, text)
-    if request is not None:
+    if state is None or state['tax_id'] != tax_id:
+        rows = dff
+    elif request is not None:
         rows = dff[dff[request] == data]
+    elif state is None or state['tax_id'] != tax_id:
+        rows = dff
     elif selected is not None:
         idx = [i['customdata'] for i in selected['points']]
         rows = dff.loc[idx]
     else:
         # raise exception?
-        rows = dff[dff['is_out']]  # outliers
+        rows = dff
 
     # TODO: rebuild feather file to get match_version from seq_info file..
     rows = rows.copy()  # avoid SettingWithCopyWarning
