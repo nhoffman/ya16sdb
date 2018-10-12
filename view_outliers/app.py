@@ -680,8 +680,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     # decide selected points
     dff['selected'] = False
     request, data = parse_search_input(dff, state, search, n_clicks, text)
-    if request == 'seqname':
-        dff.loc[dff['seqname'] == data, 'selected'] = True
+    if request in ['seqname', 'accession', 'version']:
+        dff.loc[dff[request] == data, 'selected'] = True
     if siso_source:
         dff.loc[dff['isolation_source'].isin(siso_source), 'selected'] = True
     if smatch:
