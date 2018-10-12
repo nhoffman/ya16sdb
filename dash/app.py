@@ -1,12 +1,13 @@
 #! /usr/bin/env python3
 '''
+Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
+
 TODO:
-1. match_species categories in feather file
-2. add published column to feather file
-3. add rank_order to feather file
-4. remove data without coordinates or species ids
-5. data['genus_name'] = data['genus_name'].fillna('unclassified')
-data['genus'] = data['genus'].fillna('')
+1. add published column to feather file
+2. add rank_order to feather file
+3. remove data without coordinates or species ids
+4. data['genus_name'] = data['genus_name'].fillna('unclassified')
+   data['genus'] = data['genus'].fillna('')
 '''
 import dash
 import dash_core_components as dcc
@@ -16,19 +17,17 @@ import urllib
 
 from dash.dependencies import Input, State, Output
 
-LEGEND_OTHER = 'other'
-DEFAULT_GENUS = '547'  # Enterobacter
-SEARCH_OPTS = ['seqname', 'accession', 'version',
-               'species_name', 'species', 'genus']
-
-SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
-          'pentagon', 'hexagon', 'octagon', 'star']
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'brown', 'violet', 'silver']
+DEFAULT_GENUS = '547'  # Enterobacter
+LEGEND_OTHER = 'other'
+SEARCH_OPTS = ['seqname', 'accession', 'version',
+               'species_name', 'species', 'genus']
+SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
+          'pentagon', 'hexagon', 'octagon', 'star']
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
-
 df = pandas.read_feather('filter_details.feather')
 
 # temporary data processing. See above TODO
@@ -38,9 +37,9 @@ df['genus'] = df['genus'].fillna('')
 df = df.sort_values(by='dist')
 by = 'species'
 df['rank_order'] = df.groupby(by=by)[by].transform(lambda x: range(len(x)))
+###
 
 info = ['x', 'y', 'match_species', 'dist', 'match_pct', 'rank_order']
-
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
 tax = tax.drop_duplicates().sort_values(by=['genus_name', 'species_name'])
 species_genus = dict(tax[['species', 'genus']].drop_duplicates().values)
@@ -48,7 +47,6 @@ species_id = dict(tax[['species_name', 'species']].drop_duplicates().values)
 genera = tax.groupby(by='genus')
 genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
 genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
-
 
 app.layout = html.Div(
     style={'width': 1175},
@@ -255,6 +253,36 @@ app.layout = html.Div(
                 'width': '97%'})])
 
 
+def parse_search_input(dff, state, search, n_clicks, text):
+    '''
+    Determine where request came from url or text input
+    '''
+    request = None
+    data = None
+    if state is None:  # new instance of the web page
+        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+        for o in SEARCH_OPTS:
+            if o in args:
+                request = o
+                data = args[o][0]
+    elif text is not None and state['n_clicks'] < n_clicks:  # button clicked
+        data = text.strip()
+        for o in SEARCH_OPTS:
+            if text in dff[o].values:
+                request = o
+    return request, data
+
+
+# Setting the url search does not seem to work at the moment in addition
+# to the circular logic this introduces:
+# https://github.com/plotly/dash-core-components/issues/44
+# @app.callback(
+#     Output('url', 'search'),
+#     [Input('species-column', 'value')])
+# def update_url_search(value):
+#     return '?' + urllib.parse.urlencode({'species_id': value})
+
+
 @app.callback(
     Output('genus-column', 'value'),
     [Input('url', 'search'),
@@ -263,8 +291,8 @@ app.layout = html.Div(
      State('state', 'hidden')])
 def update_genus_value(search, n_clicks, text, state):
     request, data = parse_search_input(df, state, search, n_clicks, text)
-    if request is None:  # no request
-        value = DEFAULT_GENUS  # return the default starting genus
+    if request is None:
+        value = DEFAULT_GENUS
     elif request == 'species_name':
         value = species_genus.get(data, DEFAULT_GENUS)
     else:
@@ -299,36 +327,6 @@ def update_species_value(options, search, n_clicks, text, state, tax_id):
     else:
         value = dff[dff[request] == data].iloc[0]['species']
     return value
-
-
-def parse_search_input(dff, state, search, n_clicks, text):
-    '''
-    determine where the search input came from
-    '''
-    request = None
-    data = None
-    if state is None:  # new instance of the web page
-        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-        for o in SEARCH_OPTS:
-            if o in args:
-                request = o
-                data = args[o][0]
-    elif text is not None and state['n_clicks'] < n_clicks:  # button clicked
-        data = text.strip()
-        for o in SEARCH_OPTS:
-            if text in dff[o].values:
-                request = o
-    return request, data
-
-
-# Setting the url search does not seem to work at the moment in addition
-# to the circular logic this introduces:
-# https://github.com/plotly/dash-core-components/issues/44
-# @app.callback(
-#     Output('url', 'search'),
-#     [Input('species-column', 'value')])
-# def update_url_search(value):
-#     return '?' + urllib.parse.urlencode({'species_id': value})
 
 
 @app.callback(
@@ -747,7 +745,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             'y': d[yaxis],
             })
 
-    outliers = dff[dff['is_out']]
+    outliers = dff[dff['is_out']]  # for title denominator
     figure = {
         'data': data,
         'layout': {
