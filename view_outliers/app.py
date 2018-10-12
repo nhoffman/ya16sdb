@@ -3,6 +3,10 @@
 TODO:
 1. match_species categories in feather file
 2. add published column to feather file
+3. add rank_order to feather file
+4. remove data without coordinates or species ids
+5. data['genus_name'] = data['genus_name'].fillna('unclassified')
+data['genus'] = data['genus'].fillna('')
 '''
 import dash
 import dash_core_components as dcc
@@ -26,7 +30,11 @@ app = dash.Dash()
 app.title = 'Species Outlier Plots'
 
 df = pandas.read_feather('filter_details.feather')
+
+# temporary data processing. See above TODO
 df = df[~df['x'].isna() & ~df['y'].isna()]
+df['genus_name'] = df['genus_name'].fillna('Unclassified')
+df['genus'] = df['genus'].fillna('')
 df = df.sort_values(by='dist')
 by = 'species'
 df['rank_order'] = df.groupby(by=by)[by].transform(lambda x: range(len(x)))
@@ -34,7 +42,7 @@ df['rank_order'] = df.groupby(by=by)[by].transform(lambda x: range(len(x)))
 info = ['x', 'y', 'match_species', 'dist', 'match_pct', 'rank_order']
 
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
-tax = tax.drop_duplicates().sort_values(by='species_name')
+tax = tax.drop_duplicates().sort_values(by=['genus_name', 'species_name'])
 species_genus = dict(tax[['species', 'genus']].drop_duplicates().values)
 species_id = dict(tax[['species_name', 'species']].drop_duplicates().values)
 genera = tax.groupby(by='genus')
@@ -43,7 +51,7 @@ genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
 
 
 app.layout = html.Div(
-    style={'width': 1200},
+    style={'width': 1175},
     children=[
         html.Div(id='state'),
         dcc.Location(id='url', refresh=False),
@@ -58,17 +66,20 @@ app.layout = html.Div(
             children=['**Genus**'],
             containerProps={
                 'style': {
-                    'align': 'middle',
                     'display': 'inline-block',
                     'text-align': 'center',
                     'vertical-align': 'middle',
                     'width': '5%'}}),
         html.Div(
-            children=[dcc.Dropdown(id='genus-column', options=genus_opts)],
+            children=[
+                dcc.Dropdown(
+                    id='genus-column',
+                    options=genus_opts,
+                    clearable=False)],
             style={
                 'display': 'inline-block',
                 'vertical-align': 'middle',
-                'width': '45%'}),
+                'width': '40%'}),
         dcc.Markdown(
             children=['**Species**'],
             containerProps={
@@ -78,11 +89,11 @@ app.layout = html.Div(
                     'vertical-align': 'middle',
                     'width': '6%'}}),
         html.Div(
-            children=[dcc.Dropdown(id='species-column')],
+            children=[dcc.Dropdown(id='species-column', clearable=False)],
             style={
-                'vertical-align': 'middle',
                 'display': 'inline-block',
-                'width': '41%'}),
+                'vertical-align': 'middle',
+                'width': '48%'}),
         html.Div(
             children=[
                 html.Div(style={'width': '11%', 'display': 'inline-block'}),
@@ -112,11 +123,11 @@ app.layout = html.Div(
                             'display': 'inline-block'}}),
                 html.Div(
                     children=[
-                        dcc.Markdown(children=['**Isolation Source**']),
-                        dcc.Markdown(children=['**Match Species**']),
                         dcc.Markdown(children=['**Outliers**']),
                         dcc.Markdown(children=['**Type Strains**']),
+                        dcc.Markdown(children=['**Match Species**']),
                         dcc.Markdown(children=['**Published**']),
+                        dcc.Markdown(children=['**Isolation Source**']),
                         ],
                     style={
                         'vertical-align': 'middle',
@@ -126,11 +137,11 @@ app.layout = html.Div(
                 dcc.RadioItems(
                     id='color-items',
                     options=[
-                        {'value': 'isolation_source'},
-                        {'value': 'match_species'},
                         {'value': 'is_out'},
                         {'value': 'is_type'},
-                        {'value': 'pubmed_id'}],
+                        {'value': 'match_species'},
+                        {'value': 'pubmed_id'},
+                        {'value': 'isolation_source'}],
                     inputStyle={'height': 15, 'width': 15, 'margin': 11},
                     style={
                         'vertical-align': 'middle',
@@ -139,11 +150,11 @@ app.layout = html.Div(
                 dcc.RadioItems(
                     id='symbol-items',
                     options=[
-                        {'value': 'isolation_source'},
-                        {'value': 'match_species'},
                         {'value': 'is_out'},
                         {'value': 'is_type'},
-                        {'value': 'pubmed_id'}],
+                        {'value': 'match_species'},
+                        {'value': 'pubmed_id'},
+                        {'value': 'isolation_source'}],
                     inputStyle={'height': 15, 'width': 15, 'margin': 11},
                     style={
                         'vertical-align': 'middle',
@@ -152,34 +163,26 @@ app.layout = html.Div(
                 html.Div(
                     children=[
                         dcc.Dropdown(
-                            id='isolation-source-selection',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='match-species-selection',
-                            multi=True),
-                        dcc.Dropdown(
                             id='outliers-selection',
                             multi=True),
                         dcc.Dropdown(
                             id='type-strains-selection',
                             multi=True),
                         dcc.Dropdown(
+                            id='match-species-selection',
+                            multi=True),
+                        dcc.Dropdown(
                             id='published-selection',
                             multi=True),
-                        ],
+                        dcc.Dropdown(
+                            id='isolation-source-selection',
+                            multi=True)],
                     style={
                         'vertical-align': 'middle',
                         'width': '39%',
-                        'display': 'inline-block',
-                        }),
+                        'display': 'inline-block'}),
                 html.Div(
                     children=[
-                        dcc.Dropdown(
-                            id='isolation-source-visibility',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='match-species-visibility',
-                            multi=True),
                         dcc.Dropdown(
                             id='outliers-visibility',
                             multi=True),
@@ -187,27 +190,36 @@ app.layout = html.Div(
                             id='type-strains-visibility',
                             multi=True),
                         dcc.Dropdown(
+                            id='match-species-visibility',
+                            multi=True),
+                        dcc.Dropdown(
                             id='published-visibility',
                             multi=True),
-                        ],
+                        dcc.Dropdown(
+                            id='isolation-source-visibility',
+                            multi=True)],
                     style={
                         'vertical-align': 'middle',
                         'width': '39%',
-                        'display': 'inline-block',
-                        }),
-                    ],
+                        'display': 'inline-block'})],
             style={
                 'border': 'thin lightgrey solid',
                 'borderRadius': 5,
                 'margin': 5,
                 'padding': 10,
-                'width': '95%'}),
+                'width': '97%'}),
         html.Div(
             children=[dcc.Slider(id='year--slider')],
-            style={'padding': 15, 'width': '95%'}),
-        dcc.Graph(
-            id='plot',
-            style={'padding': 15}),
+            style={'margin': 15, 'width': '95%'}),
+        dcc.Graph(id='plot'),
+        dcc.Markdown(
+            children=['**Axes**'],
+            containerProps={
+                'style': {
+                    'display': 'inline-block',
+                    'text-align': 'center',
+                    'vertical-align': 'middle',
+                    'width': '4%'}}),
         html.Div(
             children=[
                 dcc.Dropdown(
@@ -217,7 +229,8 @@ app.layout = html.Div(
                     value='y')],
             style={
                 'width': '14%',
-                'display': 'inline-block'}),
+                'display': 'inline-block',
+                'vertical-align': 'middle'}),
         html.Div(
             children=[
                 dcc.Dropdown(
@@ -227,14 +240,15 @@ app.layout = html.Div(
                     value='x')],
             style={
                 'width': '14%',
-                'display': 'inline-block'}),
+                'display': 'inline-block',
+                'vertical-align': 'middle'}),
         html.Table(
             id='table-div',
             style={
                 'border': 'thin lightgrey solid',
                 'borderRadius': 5,
                 'display': 'inline-block',
-                'height': 500,
+                'height': 420,
                 'margin': 5,
                 'overflow-y': 'scroll',
                 'padding': 10,
@@ -666,8 +680,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     # decide selected points
     dff['selected'] = False
     request, data = parse_search_input(dff, state, search, n_clicks, text)
-    if request is not None:
-        dff.loc[dff[request] == data, 'selected'] = True
+    if request == 'seqname':
+        dff.loc[dff['seqname'] == data, 'selected'] = True
     if siso_source:
         dff.loc[dff['isolation_source'].isin(siso_source), 'selected'] = True
     if smatch:
@@ -754,7 +768,6 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
                 len(outliers),
                 (len(outliers) / len(dff)),
                 len(dff)),
-            # 'width': 900,
             'xaxis': {
                 'scaleanchor': 'y' if xaxis == 'x' else None,
                 'title': xaxis,
@@ -804,12 +817,10 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
 def update_table(_, selected, n_clicks, tax_id, text, search, state):
     dff = df[df['species'] == tax_id]
     request, data = parse_search_input(dff, state, search, n_clicks, text)
-    if state is None or state['tax_id'] != tax_id:
+    if any(i not in dff.index for i in dff.index):
         rows = dff
     elif request is not None:
         rows = dff[dff[request] == data]
-    elif state is None or state['tax_id'] != tax_id:
-        rows = dff
     elif selected is not None:
         idx = [i['customdata'] for i in selected['points']]
         rows = dff.loc[idx]
