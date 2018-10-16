@@ -433,6 +433,14 @@ full_fa, full_seq_info = env.Command(
             '$SOURCES $TARGETS'))
 
 """
+generate full taxonomy table. Needed (at least) when running to_feather.py
+"""
+full_tax = env.Command(
+    target='$out/dedup/1200bp/taxonomy.csv',
+    source=full_seq_info,
+    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+
+"""
 pull type sequences
 """
 type_fa, type_info = env.Command(
@@ -717,16 +725,14 @@ env.Command(
 
 """
 feather output - https://github.com/wesm/feather
+
+TODO: compress gzip
 """
 filtered_feather = env.Command(
     target='$out/dedup/1200bp/named/filtered/filter_details.feather',
-    source=[filtered_details, named_info, named_lineages, named_type_hits],
-    action=['to_feather.py '
-            '--details ${SOURCES[0]} '
-            '--seq-info ${SOURCES[1]} '
-            '--lineages ${SOURCES[2]} '
-            '--hits ${SOURCES[3]} '
-            '--outfile $TARGET'])
+    source=[filtered_details, full_seq_info, full_tax,
+            named_type_hits, pubmed_info],
+    action='to_feather.py --out $TARGET $SOURCES')
 
 """
 Append contributers
