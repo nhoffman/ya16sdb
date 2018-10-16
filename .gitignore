@@ -6,3 +6,4 @@ test_output
 ._.DS_Store
 settings.conf
 vault_pass.txt
+__pycache__
