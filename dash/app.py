@@ -25,6 +25,7 @@ SEARCH_OPTS = ['seqname', 'accession', 'version',
                'species_name', 'species', 'genus']
 SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
           'pentagon', 'hexagon', 'octagon', 'star']
+MAX_TABLE_RECORDS = 500
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
@@ -251,6 +252,19 @@ app.layout = html.Div(
                 'overflow-y': 'scroll',
                 'padding': 10,
                 'width': '97%'})])
+
+
+def assign_hover_text(s):
+    '''
+    assign hover text to outliers for now
+    '''
+    text = None
+    if s['is_out']:
+        text = ('seqname: {seqname}<br>'
+                'accession: {version}<br>'
+                'modified_date: {modified_date}<br>'
+                'isolation source: {isolation_source}'.format(**s))
+    return text
 
 
 def parse_search_input(dff, state, search, n_clicks, text):
@@ -675,6 +689,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         # pubmed_id
         dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vpubs))]
 
+    dff['text'] = dff.apply(assign_hover_text, axis='columns')
+
     # decide selected points
     dff['selected'] = False
     request, data = parse_search_input(dff, state, search, n_clicks, text)
@@ -693,13 +709,6 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     if spubs:
         is_pub = dff['isolation_source'].isin(set(i == 'Yes' for i in spubs))
         dff.loc[is_pub, 'selected'] = True
-
-    dff['text'] = dff.apply(
-        lambda x: 'seqname: {seqname}<br>'
-                  'accession: {version}<br>'
-                  'modified_date: {modified_date}<br>'
-                  'isolation source: {isolation_source}'.format(**x),
-        axis='columns')
 
     # assign symbols and colors
     for col, label, styles in [[symbol, 'symbol', SHAPES],
@@ -732,15 +741,16 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         else:
             name = '{} and {}'.format(clr_name, sym_name)
         data.append({
-            'type': 'scatter',
             'customdata': d.index,
+            'hoverinfo': 'text',
             'marker': {'symbol': d['symbol'], 'color': d['color']},
             'mode': 'markers',
             'name': name,
             'selected': {'marker': {'size': 15, 'opacity': 0.7}},
             'selectedpoints': d[d['selected']]['iselected'],
+            'type': 'scatter',
             'unselected': {'marker': {'size': 10, 'opacity': 0.4}},
-            'text': d['text'],
+            'hovertext': d['text'],
             'x': d[xaxis],
             'y': d[yaxis],
             })
@@ -845,8 +855,7 @@ def update_table(_, selected, n_clicks, tax_id, text, search, state):
 
     trs = [html.Tr(children=[
         html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
-    for _, r in rows.iterrows():
-        r = r.to_dict()
+    for r in rows.iloc[:MAX_TABLE_RECORDS].to_dict('records'):
         tds = []
         for c in cols:
             if c == 'seqname':
@@ -868,4 +877,4 @@ def update_table(_, selected, n_clicks, tax_id, text, search, state):
 
 
 if __name__ == '__main__':
-    app.run_server(port=8005)
+    app.run_server()
