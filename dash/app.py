@@ -257,6 +257,7 @@ def assign_hover_text(s):
         text = ('seqname: {seqname}<br>'
                 'accession: {version}<br>'
                 'modified_date: {modified_date}<br>'
+                'match_species: {match_species}<br>'
                 'isolation source: {isolation_source}'.format(**s))
     return text
 
@@ -746,6 +747,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             'marker': {'symbol': d['symbol'], 'color': d['color']},
             'mode': 'markers',
             'name': name,
+            'legendgroup': clr_name,
             'selected': {'marker': {'size': 15, 'opacity': 0.7}},
             'selectedpoints': d[d['selected']]['iselected'],
             'type': 'scatter',
@@ -829,6 +831,7 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
 def update_table(selected, iso, match, outliers, tstrains, published,
                  n_clicks, tax_id, text, search, state):
     dff = df[df['species'] == tax_id]
+    dff = dff.sort_values(by='dist_pct', ascending=False)
 
     # parse selected points
     request, data = parse_search_input(dff, state, search, n_clicks, text)
@@ -856,24 +859,21 @@ def update_table(selected, iso, match, outliers, tstrains, published,
             if all(i in dff.index for i in idx):  # equivalent to new tax_id
                 irows |= dff.index.isin(idx)
     if not irows.any():
-        irows[:MAX_TABLE_RECORDS] = True  # no rows selected
+        irows[:] = True  # no rows selected
 
-    rows = dff[irows].copy()  # pull selected rows
+    rows = dff[irows].iloc[:MAX_TABLE_RECORDS].copy()  # pull selected rows
 
     # clean up boolean text and sort by dist
     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
-    rows = rows.sort_values(by='dist_pct', ascending=False)
 
     TABLE_STYLE = {
         'width': 500,
         'padding': 10,
         'border-bottom': '1px solid #ddd',
         'text-align': 'left'}
-
     cols = ['seqname', 'description', 'is_type', 'dist_pct',
             'is_out', 'match_species', 'match_pct']
-
     trs = [html.Tr(children=[
         html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
     for r in rows.to_dict('records'):
