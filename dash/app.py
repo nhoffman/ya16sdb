@@ -3,11 +3,7 @@
 Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 
 TODO:
-1. add published column to feather file
-2. add rank_order to feather file
-3. remove data without coordinates or species ids
-4. data['genus_name'] = data['genus_name'].fillna('unclassified')
-   data['genus'] = data['genus'].fillna('')
+1. add Selection dropdown data in html datatable
 '''
 import dash
 import dash_core_components as dcc
@@ -19,28 +15,26 @@ from dash.dependencies import Input, State, Output
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'brown', 'violet', 'silver']
-DEFAULT_GENUS = '547'  # Enterobacter
+DEFAULT_GENUS = '497'  # '547'  # Enterobacter
+FEATHER_FILE = 'filter_details.feather'
 LEGEND_OTHER = 'other'
+MAX_TABLE_RECORDS = 500
 SEARCH_OPTS = ['seqname', 'accession', 'version',
                'species_name', 'species', 'genus']
 SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
           'pentagon', 'hexagon', 'octagon', 'star']
-MAX_TABLE_RECORDS = 500
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
-df = pandas.read_feather('filter_details.feather')
+df = pandas.read_feather(FEATHER_FILE)
 
 # temporary data processing. See above TODO
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
 df['genus'] = df['genus'].fillna('')
-df = df.sort_values(by='dist')
-by = 'species'
-df['rank_order'] = df.groupby(by=by)[by].transform(lambda x: range(len(x)))
 ###
-
-info = ['x', 'y', 'match_species', 'dist', 'match_pct', 'rank_order']
+info = ['x', 'y', 'match_species', 'dist_pct',
+        'match_version', 'match_pct', 'rank_order']
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
 tax = tax.drop_duplicates().sort_values(by=['genus_name', 'species_name'])
 species_genus = dict(tax[['species', 'genus']].drop_duplicates().values)
@@ -685,11 +679,11 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         dff = dff[dff['is_out'].isin(set(i == 'Yes' for i in vout))]
     if vtypes:
         dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vtypes))]
-    if vpubs:
-        # pubmed_id
-        dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vpubs))]
-
-    dff['text'] = dff.apply(assign_hover_text, axis='columns')
+    if vpubs and len(vpubs) == 1:
+        if 'Yes' in vpubs:
+            dff = dff[~dff['pubmed_id'].isnull()]
+        else:  # 'No' in vpubs:
+            dff = dff[dff['pubmed_id'].isnull()]
 
     # decide selected points
     dff['selected'] = False
@@ -707,8 +701,14 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         is_type = dff['is_type'].isin(set(i == 'Yes' for i in stypes))
         dff.loc[is_type, 'selected'] = True
     if spubs:
-        is_pub = dff['isolation_source'].isin(set(i == 'Yes' for i in spubs))
-        dff.loc[is_pub, 'selected'] = True
+        if len(spubs) == 2:
+            dff.loc[:, 'selected'] = True
+        elif 'Yes' in spubs:
+            dff.loc[~dff['pubmed_id'].isnull(), 'selected'] = True
+        else:  # 'No' in spubs:
+            dff.loc[dff['pubmed_id'].isnull(), 'selected'] = True
+
+    dff['text'] = dff.apply(assign_hover_text, axis='columns')
 
     # assign symbols and colors
     for col, label, styles in [[symbol, 'symbol', SHAPES],
@@ -815,34 +815,55 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
 
 @app.callback(
     Output('table-div', 'children'),
-    [Input('plot', 'figure'),
-     Input('plot', 'selectedData')],
+    [Input('plot', 'selectedData'),
+     Input('isolation-source-selection', 'value'),
+     Input('match-species-selection', 'value'),
+     Input('outliers-selection', 'value'),
+     Input('type-strains-selection', 'value'),
+     Input('published-selection', 'value')],
     [State('submit-button', 'n_clicks'),
      State('species-column', 'value'),
      State('text-input', 'value'),
      State('url', 'search'),
      State('state', 'hidden')])
-def update_table(_, selected, n_clicks, tax_id, text, search, state):
+def update_table(selected, iso, match, outliers, tstrains, published,
+                 n_clicks, tax_id, text, search, state):
     dff = df[df['species'] == tax_id]
-    request, data = parse_search_input(dff, state, search, n_clicks, text)
-    if any(i not in dff.index for i in dff.index):
-        rows = dff
-    elif request is not None:
-        rows = dff[dff[request] == data]
-    elif selected is not None:
-        idx = [i['customdata'] for i in selected['points']]
-        rows = dff.loc[idx]
-    else:
-        # raise exception?
-        rows = dff
 
-    # TODO: rebuild feather file to get match_version from seq_info file..
-    rows = rows.copy()  # avoid SettingWithCopyWarning
+    # parse selected points
+    request, data = parse_search_input(dff, state, search, n_clicks, text)
+    irows = pandas.Series(index=dff.index, data=False)
+    if request is not None:
+        irows |= dff[request] == data
+    else:  # look for selected points
+        if iso:
+            irows |= dff['isolation_source'].isin(iso)
+        if match:
+            irows |= dff['match_species'].isin(match)
+        if outliers:
+            irows |= dff['is_out'].isin(i == 'Yes' for i in outliers)
+        if tstrains:
+            irows |= dff['is_type'].isin(i == 'Yes' for i in tstrains)
+        if published:
+            if len(published) == 2:
+                irows |= True
+            elif 'Yes' in published:
+                irows |= ~dff['pubmed_id'].isnull()
+            else:  # 'No' in spubs:
+                irows |= dff['pubmed_id'].isnull()
+        if selected is not None:
+            idx = [i['customdata'] for i in selected['points']]
+            if all(i in dff.index for i in idx):  # equivalent to new tax_id
+                irows |= dff.index.isin(idx)
+    if not irows.any():
+        irows[:MAX_TABLE_RECORDS] = True  # no rows selected
+
+    rows = dff[irows].copy()  # pull selected rows
 
     # clean up boolean text and sort by dist
     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
-    rows = rows.sort_values(by='dist', ascending=False)
+    rows = rows.sort_values(by='dist_pct', ascending=False)
 
     TABLE_STYLE = {
         'width': 500,
@@ -850,12 +871,12 @@ def update_table(_, selected, n_clicks, tax_id, text, search, state):
         'border-bottom': '1px solid #ddd',
         'text-align': 'left'}
 
-    cols = ['seqname', 'description', 'is_type', 'dist',
+    cols = ['seqname', 'description', 'is_type', 'dist_pct',
             'is_out', 'match_species', 'match_pct']
 
     trs = [html.Tr(children=[
         html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
-    for r in rows.iloc[:MAX_TABLE_RECORDS].to_dict('records'):
+    for r in rows.to_dict('records'):
         tds = []
         for c in cols:
             if c == 'seqname':
@@ -866,7 +887,8 @@ def update_table(_, selected, n_clicks, tax_id, text, search, state):
                     target='_blank')
             elif c == 'match_species' and r[c] is not None:
                 cell = html.A(
-                    href='https://www.ncbi.nlm.nih.gov/nuccore/' + r[c],
+                    href=('https://www.ncbi.nlm.nih.gov/nuccore/' +
+                          r['match_version']),
                     children=r[c],
                     target='_blank')
             else:
