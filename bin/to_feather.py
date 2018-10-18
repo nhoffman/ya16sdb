@@ -91,7 +91,7 @@ def main(arguments):
         left_on='species',
         right_on='tax_id',
         suffixes=['', '_'])
-    hits = hits.drop(columns=['tax_id_', 'species'], axis='columns')
+    hits = hits.drop(columns=['tax_id', 'tax_id_', 'species'], axis='columns')
 
     details = details.merge(seq_info)
     details = details.merge(taxonomy)
