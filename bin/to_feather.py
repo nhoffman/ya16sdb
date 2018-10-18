@@ -57,7 +57,7 @@ def main(arguments):
     parser.add_argument('taxonomy')
     parser.add_argument('hits')
     parser.add_argument('pubmed_ids')
-    parser.add_argument('--out', default=sys.stdout, help='[%(default)s]', )
+    parser.add_argument('--out', default=sys.stdout, help='[%(default)s]')
     args = parser.parse_args(arguments)
 
     details = pandas.read_csv(args.details, dtype=DTYPES)
@@ -80,24 +80,23 @@ def main(arguments):
         args.pubmed_ids, dtype=DTYPES, usecols=['pubmed_id', 'version'])
 
     hits = hits.merge(
-        seq_info[['seqname', 'tax_id']],
+        seq_info[['seqname', 'tax_id', 'version']].rename(
+            columns={'version': 'match_version'}),
         left_on='match_seqname',
         suffixes=['', '_'],
         right_on='seqname').drop(columns='seqname_', axis='columns')
-    hits = hits.merge(taxonomy[['tax_id', 'species']].rename(
-        columns={'species': 'match_species'}))
+    hits = hits.merge(taxonomy[['tax_id', 'species']])
     hits = hits.merge(taxonomy[['tax_id', 'tax_name']].rename(
-        columns={'tax_name': 'match_name'}),
-        left_on='match_species',
+        columns={'tax_name': 'match_species'}),
+        left_on='species',
         right_on='tax_id',
-        suffixes=['', '_']).drop(columns='tax_id_', axis='columns')
+        suffixes=['', '_'])
+    hits = hits.drop(columns=['tax_id_', 'species'], axis='columns')
 
-    before_merging = len(details)
     details = details.merge(seq_info)
     details = details.merge(taxonomy)
     details = details.merge(hits, how='left')
     details = details.merge(pubmed_ids, how='left')
-    assert(len(details) == before_merging)
 
     taxonomy = taxonomy[['tax_id', 'tax_name']]
 
@@ -113,10 +112,12 @@ def main(arguments):
         right_on='tax_id',
         suffixes=('', '_')).drop(columns='tax_id_', axis='columns')
 
-    # setup data for dist v rank_order plot
+    # setup data for dist_pct v rank_order plot
     details = details.sort_values(by='dist')
     species_groups = details.groupby(by='species')['species']
     details['rank_order'] = species_groups.transform(lambda x: range(len(x)))
+    details['dist_pct'] = details['dist'].apply(
+        lambda x: '{:.2f}'.format(x * 100))
 
     details.reset_index(drop=True).to_feather(args.out)
 
