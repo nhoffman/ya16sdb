@@ -6,13 +6,16 @@
   become: no
 
   tasks:
-    - name: define EIP_ALLOCATION_ID using server_name
-      set_eip_id:
-        server_name: oltgtest.labmed.uw.edu
+    - name: foo
+      command: echo foo
+
+    # - name: define EIP_ALLOCATION_ID using server_name
+    #   set_eip_id:
+    #     server_name: oltgtest.labmed.uw.edu
 
     - name: define EIP_ALLOCATION_ID using server_ip
       set_eip_id:
-        server_ip: 54.71.235.167
+        server_ip: 35.155.170.9
 
     - name: run without parameters
       set_eip_id:

@@ -36,11 +36,12 @@ def main():
         try:
             ip = socket.gethostbyname(server_name)
         except socket.gaierror:
-            sys.exit('could not find IP address for "{}"'.format(server_name))
+            module.fail_json(
+                msg='could not find IP address for "{}"'.format(server_name))
     elif server_ip:
         ip = server_ip
     else:
-        sys.exit('either server_name or server_ip is required')
+        module.fail_json(msg='either server_name or server_ip is required')
 
     # describe the elastic IP associated with this address
     ec2 = boto3.client('ec2')
@@ -55,7 +56,7 @@ def main():
         }
     }
 
-    print(json.dumps(output))
+    module.exit_json(**output)
 
 
 if __name__ == '__main__':

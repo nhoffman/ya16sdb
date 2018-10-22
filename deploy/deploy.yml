@@ -22,8 +22,8 @@
       ElasticIPAllocationId: "{{ EIP_ALLOCATION_ID }}"
 
   tasks:
-    - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.6"
-      when: ansible_version['full'] is version('2.6', '<')
+    - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.7"
+      when: ansible_version['full'] is version('2.7', '<')
       tags:
         - always
         - ansible-version
