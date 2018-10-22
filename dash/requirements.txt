@@ -1,4 +1,5 @@
 pandas>=0.20.0
+pyarrow==0.9.0
 feather-format
 dash>=0.28.1
 dash-core-components==0.30.1
