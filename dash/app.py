@@ -2,8 +2,7 @@
 '''
 Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 
-TODO:
-1. add Selection dropdown data in html datatable
+TODO: add select/deselect all button
 '''
 import dash
 import dash_core_components as dcc
@@ -27,12 +26,9 @@ SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
 df = pandas.read_feather(FEATHER_FILE)
-
-# temporary data processing. See above TODO
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
 df['genus'] = df['genus'].fillna('')
-###
 info = ['x', 'y', 'match_species', 'dist_pct',
         'match_version', 'match_pct', 'rank_order']
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
