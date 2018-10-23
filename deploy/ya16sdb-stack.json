@@ -73,6 +73,29 @@
       }
     },
 
+    "LoadBalancer" : {
+	"Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+	"Properties" : {
+	    "Subnets" : [ { "Ref" : "Subnet" } ],
+	    "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+	    "Instances" : [
+		{ "Ref" : "WebServerInstance" }
+	    ],
+	    "Listeners" : [ {
+		"LoadBalancerPort" : "80",
+		"InstancePort" : "80",
+		"Protocol" : "HTTP"
+	    } ],
+	    "HealthCheck" : {
+		"Target" : "HTTP:80/",
+		"HealthyThreshold" : "3",
+		"UnhealthyThreshold" : "5",
+		"Interval" : "30",
+		"Timeout" : "5"
+	    }
+	}
+    },
+
     "Subnet" : {
       "Type" : "AWS::EC2::Subnet",
       "Properties" : {
