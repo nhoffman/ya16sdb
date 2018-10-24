@@ -6,8 +6,6 @@
   become: no
 
   tasks:
-    - name: foo
-      command: echo foo
 
     # - name: define EIP_ALLOCATION_ID using server_name
     #   set_eip_id:

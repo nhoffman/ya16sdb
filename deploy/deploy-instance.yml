@@ -1,0 +1,10 @@
+# required for ubuntu 16.04 to ensure python is installed
+- hosts: "webserver"
+  become: yes
+  gather_facts: no
+  pre_tasks:
+    - raw: "sudo apt-get update && sudo apt-get -y install python-simplejson"
+
+- hosts: "webserver"
+  become: yes
+

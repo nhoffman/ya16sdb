@@ -20,11 +20,6 @@
       "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
     },
 
-    "ElasticIPAllocationId" : {
-        "Description" : "AllocationId for Elastic IP Address",
-	"Type": "String"
-    },
-
     "AMIId" : {
         "Description": "AMI ID for Ubiuntu 16.04",
         "Type": "String",
@@ -252,14 +247,6 @@
         "SubnetId" : { "Ref" : "Subnet" },
         "NetworkAclId" : { "Ref" : "NetworkAcl" }
       }
-    },
-
-    "IPAssoc" : {
-         "Type" : "AWS::EC2::EIPAssociation",
-         "Properties" : {
-             "AllocationId" : { "Ref" : "ElasticIPAllocationId" },
-             "InstanceId" : { "Ref" : "WebServerInstance" }
-         }
     },
 
     "InstanceSecurityGroup" : {

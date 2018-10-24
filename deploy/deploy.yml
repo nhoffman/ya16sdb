@@ -8,6 +8,7 @@
     - secrets.yml
 
   vars:
+    STACK_NAME: "ya16sdb"
     SSH_ALIAS: "ya16sdb"
     SSH_KEY_NAME: "ya16sdb"
     SSH_KEY_FILE: "~/.ssh/ya16sdb.pem"
@@ -17,9 +18,9 @@
     CLOUDFORMATION_PARAMS:
       KeyName: "{{ SSH_KEY_NAME }}"
       AMIId: "ami-db710fa3"
-      InstanceType: "t2.medium"
+      InstanceType: "t2.small"
       # defined by task 'set_eip_id' below:
-      ElasticIPAllocationId: "{{ EIP_ALLOCATION_ID }}"
+      # ElasticIPAllocationId: "{{ EIP_ALLOCATION_ID }}"
 
   tasks:
     - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.7"
@@ -28,14 +29,9 @@
         - always
         - ansible-version
 
-    - name: define EIP_ALLOCATION_ID
-      set_eip_id:
-        server_ip: "{{ SERVER_IP }}"
-        # server_name: "{{ SERVER_NAME }}"
-
     - name: deploy the cloudformation template for this stack
       cloudformation:
-        stack_name: "ya16sdb"
+        stack_name: "{{ STACK_NAME }}"
         state: "present"
         region: "us-west-2"
         template: "ya16sdb-stack.json"
@@ -52,6 +48,15 @@
       tags:
         - ssh-config
 
+    - name: define INSTANCE_IP
+      set_instance_ip:
+        stack_name: "{{ STACK_NAME }}"
+      tags: ssh-config
+
+    - name: print INSTANCE_IP
+      command: echo {{ INSTANCE_IP }}
+      tags: ssh-config
+
     # run using -e ssh_config=yes -t ssh-config
     - name: add ssh configuration for this target to ~/.ssh/config
       blockinfile:
@@ -61,20 +66,11 @@
         marker: "# {mark} added by ya16sdb/deploy/deploy.yml"
         content: |
           Host {{ SSH_ALIAS }}
-            HostName {{ SERVER_NAME or SERVER_IP }}
+            HostName {{ INSTANCE_IP }}
             User ubuntu
             IdentityFile {{ SSH_KEY_FILE }}
-      when: ssh_config is defined and ssh_config == 'yes'
+            StrictHostKeyChecking no
+      # when: ssh_config is defined and ssh_config == 'yes'
       tags:
         - ssh-config
-
-# required for ubuntu 16.04 to ensure python is installed
-- hosts: "webserver"
-  become: yes
-  gather_facts: no
-  pre_tasks:
-    - raw: "sudo apt-get update && sudo apt-get -y install python-simplejson"
-
-- hosts: "webserver"
-  become: yes
 
