@@ -7,9 +7,9 @@ Github: https://github.com/nhoffman/ya16sdb
 
 Authors: Noah Hoffman, Chris Rosenthal
 
-.. image:: newplot.png
+.. image:: screenshot.png
 
-Notes
+notes
 =====
 
 Users can browse Bacteria and Archea species using the Genus and 
