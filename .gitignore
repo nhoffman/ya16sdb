@@ -7,4 +7,3 @@ test_output
 settings.conf
 vault_pass.txt
 __pycache__
-dash/filter_details.feather
