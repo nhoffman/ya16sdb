@@ -4,6 +4,7 @@ Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 
 TODO: add select/deselect all button
 '''
+import config
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -15,7 +16,6 @@ from dash.dependencies import Input, State, Output
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
 DEFAULT_GENUS = '497'  # '547'  # Enterobacter
-FEATHER_FILE = 'filter_details.feather'
 LEGEND_OTHER = 'other'
 MAX_TABLE_RECORDS = 500
 SEARCH_OPTS = ['seqname', 'accession', 'version',
@@ -25,7 +25,7 @@ SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
-df = pandas.read_feather(FEATHER_FILE)
+df = pandas.read_feather(config.feather_file)
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
 df['genus'] = df['genus'].fillna('')
