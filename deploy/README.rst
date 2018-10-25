@@ -74,19 +74,21 @@ Deploy the entire stack and application::
 
   deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt
 
-The first time you run the deployment, add the following parameters to
-update your ssh configuration to install the private key and define
-the ``ya16sdb`` ssh alias::
+This will also update ``~/.ssh/config`` to define an ssh alias for the
+instance.  After the above, you should be able to ssh into the
+instance::
 
-  deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt -e ssh_config=yes -t ssh-config
+  ssh ya16sdb
 
 See the lines added to ``~/.ssh/config``::
 
   grep -A 6 ya16sdb ~/.ssh/config
 
-After the above, you should be able to ssh into the instance::
+Note that ssh access is via the public IP of the *instance* which will
+change if the stack is re-created. In this case, update your ssh
+config using::
 
-  ssh ya16sdb
+  deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt -t ssh-config
 
 Register the domain name
 ------------------------
@@ -103,8 +105,7 @@ Add the DNS name of the ELB as a CNAME record to
 ``ya16sdb.labmed.uw.edu`` using the self-service DNS registration
 portal: https://networks.uw.edu/networks/dns/resources
 
-
-
+It may take a while for the registration of ``ya16sdb.labmed.uw.edu`` to propagate.
 
 Notes
 =====

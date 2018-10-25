@@ -335,7 +335,7 @@
         "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
              "#!/bin/bash -xe\n",
              "apt-get update -y\n",
-             "apt-get install -y python-setuptools\n",
+             "apt-get install -y python-setuptools nginx\n",
              "mkdir -p /opt/aws/bin\n",
              "wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
              "easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-latest.tar.gz\n",

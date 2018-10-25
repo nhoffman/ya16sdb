@@ -4,14 +4,19 @@ Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 
 TODO: add select/deselect all button
 '''
-import config
+import urllib
+import gzip
+from os import path
+
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import pandas
-import urllib
+import feather
 
 from dash.dependencies import Input, State, Output
+
+# import config
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
@@ -25,7 +30,18 @@ SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
-df = pandas.read_feather(config.feather_file)
+
+FEATHER_FILE_DEFAULT = path.join(
+    path.dirname(__file__), 'filter_details.feather.gz')
+FEATHER_FILE_SYSTEM = '/path/to/filter_details.feather.gz'
+
+FEATHER_FILE = (FEATHER_FILE_SYSTEM
+                if path.exists(FEATHER_FILE_SYSTEM)
+                else FEATHER_FILE_DEFAULT)
+
+with gzip.open(FEATHER_FILE) as f:
+    df = feather.read_dataframe(f)
+
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
 df['genus'] = df['genus'].fillna('')
