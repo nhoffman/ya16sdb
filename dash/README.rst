@@ -35,9 +35,9 @@ We'll mostly follow instructions here
 (https://github.com/dokku/dokku/blob/master/docs/getting-started/install/vagrant.md),
 with a few modifications.
 
-After Vagrant is installed on your system, clone the dokku repository
-and create a Vagrant instance, for example (plan on getting a cup of coffee
-after the last command)::
+After Vagrant is installed on your system (eg, ``brew install vagrant``),
+clone the dokku repository and create a Vagrant instance,
+for example (plan on getting a cup of coffee after the last command)::
 
   mkdir -p ~/src
   cd ~/src
