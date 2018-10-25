@@ -898,7 +898,3 @@ def update_table(selected, iso, match, outliers, tstrains, published,
             tds.append(html.Td(children=[cell], style=TABLE_STYLE))
         trs.append(html.Tr(children=tds))
     return trs
-
-
-if __name__ == '__main__':
-    app.run_server()
