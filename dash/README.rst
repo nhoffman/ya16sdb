@@ -9,6 +9,18 @@ Authors: Noah Hoffman, Chris Rosenthal
 
 .. image:: newplot.png
 
+Notes
+=====
+
+Users can browse Bacteria and Archea species using the Genus and 
+Species dropdown menus.  Users can also search for sequences by 
+seqname, species taxonomy id, or species taxonomy name using the 
+search box or by url arguments.  Users can modify scatter plot markers 
+by color and shape and use the Selection and Visibility drop down menus
+to increase the size or visibility of the markers respectively.  Both
+the Selection menu and plot selection tool will update the data table
+below the plot layout and Axes dropdown menus.
+
 standalone dev environment
 ==========================
 
