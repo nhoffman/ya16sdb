@@ -1,8 +1,9 @@
-pandas>=0.20.0
-feather-format
-dash>=0.28.1
+pandas==0.23.4
+pyarrow==0.9.0
+feather-format==0.4.0
+dash==0.28.5
 dash-core-components==0.30.1
-dash-html-components>=0.13.1
-dash-renderer>=0.14.1
-plotly>=3.3.0
-gunicorn>=19.9.0
+dash-html-components==0.13.2
+dash-renderer==0.14.3
+plotly==3.3.0
+gunicorn==19.9.0

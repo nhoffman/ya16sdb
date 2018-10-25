@@ -2,8 +2,7 @@
 '''
 Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 
-TODO:
-1. add Selection dropdown data in html datatable
+TODO: add select/deselect all button
 '''
 import dash
 import dash_core_components as dcc
@@ -14,7 +13,7 @@ import urllib
 from dash.dependencies import Input, State, Output
 
 COLORS = ['blue', 'red', 'black', 'yellow',
-          'gray', 'brown', 'violet', 'silver']
+          'gray', 'green', 'violet', 'silver']
 DEFAULT_GENUS = '497'  # '547'  # Enterobacter
 FEATHER_FILE = 'filter_details.feather'
 LEGEND_OTHER = 'other'
@@ -22,17 +21,14 @@ MAX_TABLE_RECORDS = 500
 SEARCH_OPTS = ['seqname', 'accession', 'version',
                'species_name', 'species', 'genus']
 SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
-          'pentagon', 'hexagon', 'octagon', 'star']
+          'pentagon', 'cross', 'star', 'hourglass']
 
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
 df = pandas.read_feather(FEATHER_FILE)
-
-# temporary data processing. See above TODO
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
 df['genus'] = df['genus'].fillna('')
-###
 info = ['x', 'y', 'match_species', 'dist_pct',
         'match_version', 'match_pct', 'rank_order']
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
@@ -241,7 +237,7 @@ app.layout = html.Div(
                 'border': 'thin lightgrey solid',
                 'borderRadius': 5,
                 'display': 'inline-block',
-                'height': 420,
+                'height': 413,
                 'margin': 5,
                 'overflow-y': 'scroll',
                 'padding': 10,
@@ -717,9 +713,15 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         name = label + '_name'
         dff[name] = LEGEND_OTHER
         dff[label] = styles[0]
-        if col in ['is_out', 'is_type']:
-            dff.loc[dff[col], name] = col
+        if col == 'is_out':
+            dff.loc[dff[col], name] = 'outlier'
             dff.loc[dff[col], label] = styles[1]
+        elif col == 'is_type':
+            dff.loc[dff[col], name] = 'type strain'
+            dff.loc[dff[col], label] = styles[1]
+        elif col == 'pubmed_id':
+            dff.loc[~dff[col].isnull(), name] = 'published'
+            dff.loc[~dff[col].isnull(), label] = styles[1]
         else:
             style_count = len(styles) - 1  # minus styles[0]
             top = dff[col].value_counts().iloc[:style_count].keys()
@@ -744,7 +746,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         data.append({
             'customdata': d.index,
             'hoverinfo': 'text',
-            'marker': {'symbol': d['symbol'], 'color': d['color']},
+            'marker': {'symbol': d['symbol'], 'color': d['color'], 'size': 12},
             'mode': 'markers',
             'name': name,
             'legendgroup': clr_name,
@@ -859,7 +861,7 @@ def update_table(selected, iso, match, outliers, tstrains, published,
             if all(i in dff.index for i in idx):  # equivalent to new tax_id
                 irows |= dff.index.isin(idx)
     if not irows.any():
-        irows[:] = True  # no rows selected
+        irows[:] = True
 
     rows = dff[irows].iloc[:MAX_TABLE_RECORDS].copy()  # pull selected rows
 
