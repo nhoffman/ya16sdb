@@ -9,7 +9,7 @@ Authors: Noah Hoffman, Chris Rosenthal
 
 .. image:: screenshot.png
 
-notes
+summary of features
 =====
 
 Users can browse Bacteria and Archea species using the Genus and 
