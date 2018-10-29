@@ -124,6 +124,8 @@ After dokku is installed, install the ``ya16sdb`` app::
   git remote add ya16sdb dokku@ya16sdb:ya16sdb
   git subtree push --prefix dash ya16sdb master
   ssh dokku@ya16sdb domains:add ya16sdb ya16sdb.labmed.uw.edu
+  ssh dokku@ya16sdb storage:mount ya16sdb /var/lib/dokku/data/storage/ya16sdb:/storage
+  ssh ya16sdb "sudo mkdir -p -m 0777 /var/lib/dokku/data/storage/ya16sdb"
 
 Now you should be able to visit the application at
 http://ya16sdb.labmed.uw.edu
@@ -140,7 +142,7 @@ Updating the data
 
 Upload a new feather file::
 
-  scp ...
+  scp filter_details.feather.gz ya16sdb:/var/lib/dokku/data/storage/ya16sdb
 
 Restart the application::
 
