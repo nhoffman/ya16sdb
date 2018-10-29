@@ -39,6 +39,8 @@ FEATHER_FILE = (FEATHER_FILE_SYSTEM
                 if path.exists(FEATHER_FILE_SYSTEM)
                 else FEATHER_FILE_DEFAULT)
 
+print('FEATHER_FILE:', FEATHER_FILE)
+
 with gzip.open(FEATHER_FILE) as f:
     df = feather.read_dataframe(f)
 
