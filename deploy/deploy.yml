@@ -16,8 +16,11 @@
     SERVER_IP: "35.155.170.9"
 
     CLOUDFORMATION_PARAMS:
+      HostName: "ya16sdb.labmed.uw.edu"
       KeyName: "{{ SSH_KEY_NAME }}"
-      AMIId: "ami-db710fa3"
+      # note that updating ami forces replacement of the instance
+      AMIId: "ami-01e0cf6e025c036e4"
+      # AMIId: "ami-0e32ec5bc225539f5"
       InstanceType: "t2.small"
       # defined by task 'set_eip_id' below:
       # ElasticIPAllocationId: "{{ EIP_ALLOCATION_ID }}"
@@ -44,17 +47,12 @@
         dest: "{{ SSH_KEY_FILE }}"
         owner: "{{ lookup('env', 'USER') }}"
         mode: "0600"
-      when: ssh_config is defined and ssh_config == 'yes'
       tags:
         - ssh-config
 
     - name: define INSTANCE_IP
       set_instance_ip:
         stack_name: "{{ STACK_NAME }}"
-      tags: ssh-config
-
-    - name: print INSTANCE_IP
-      command: echo {{ INSTANCE_IP }}
       tags: ssh-config
 
     # run using -e ssh_config=yes -t ssh-config
@@ -70,7 +68,12 @@
             User ubuntu
             IdentityFile {{ SSH_KEY_FILE }}
             StrictHostKeyChecking no
-      # when: ssh_config is defined and ssh_config == 'yes'
       tags:
         - ssh-config
 
+  # - handlers:
+  #     - name: restart instance
+  #       ec2:
+  #         state: restarted
+  #         instance_ids:
+  #           - {{ INSTANCE_ID }}

@@ -293,11 +293,6 @@
 			  "owner"   : "root",
 			  "group"   : "root"
 		      }
-		  },
-		  "commands" : {
-		      "reboot": {
-			  "command" : "/sbin/reboot"
-		      }
 		  }
 	      },
           "install_and_enable_cfn_hup" : {
