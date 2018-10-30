@@ -127,6 +127,14 @@ After dokku is installed, install the ``ya16sdb`` app::
   ssh dokku@ya16sdb storage:mount ya16sdb /var/lib/dokku/data/storage/ya16sdb:/storage
   ssh ya16sdb "sudo mkdir -p -m 0777 /var/lib/dokku/data/storage/ya16sdb"
 
+Install a robots.txt (https://github.com/dwyl/dokku-robots.txt). ssh into the instance and run this::
+
+  sudo dokku plugin:install https://notabug.org/candlewaster/dokku-robots.txt.git robots.txt
+
+Then::
+
+  ssh dokku@ya16sdb robots.txt:disallow ya16sdb
+
 Now you should be able to visit the application at
 http://ya16sdb.labmed.uw.edu
 
