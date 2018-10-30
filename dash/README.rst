@@ -47,7 +47,7 @@ before starting
 ---------------
 
 Be aware that certain network configurations including an active VPN
-connection can interfer with this setup process.  We recommend disconnecting 
+can interfer with the setup process.  We recommend disconnecting 
 and disabling any VPN or manual network configuration before proceeding.
 
 We'll mostly follow instructions here
