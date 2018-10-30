@@ -40,10 +40,10 @@ Run the app::
 
 The application will be served at ``http://127.0.0.1:8050``
 
-Dokku on local Vagrant instance
+dokku on local Vagrant instance
 ===============================
 
-Before starting
+before starting
 ---------------
 
 Be aware that certain network configurations including an active VPN
@@ -103,8 +103,8 @@ this directory (command must be executed in the root of the repo)::
 Now you should be able to access the application at
 ``http://ya16sdb.dokku.me``
 
-Mounting Storage Data
----------------------
+mounting data
+-------------
 
 Details about the storage mounting plugin are here 
 (https://github.com/dokku/dokku/blob/master/docs/advanced-usage/persistent-storage.md).
@@ -127,7 +127,7 @@ Be aware there could be permission issues you may need to update with your
 data file depending on many factors. Applying a `chmod a+r` to the file should
 fix most issues.
 
-Let's Encrypt Plugin
+Let's Encrypt plugin
 --------------------
 
 https://github.com/dokku/dokku-letsencrypt
