@@ -4,6 +4,7 @@ Create a feather file combining sequence details,
 seq_info, taxonomy and publication annotations
 """
 import argparse
+import gzip
 import pandas
 import sys
 
@@ -119,7 +120,13 @@ def main(arguments):
     details['dist_pct'] = details['dist'].apply(
         lambda x: '{:.2f}'.format(x * 100))
 
-    details.reset_index(drop=True).to_feather(args.out)
+    details = details.reset_index(drop=True)
+
+    if args.out.endswith('.gz'):
+        with gzip.open(args.out, 'w') as out:
+            details.to_feather(out)
+    else:
+        details.to_feather(args.out)
 
 
 if __name__ == '__main__':

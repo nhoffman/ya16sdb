@@ -725,14 +725,12 @@ env.Command(
 
 """
 feather output - https://github.com/wesm/feather
-
-TODO: compress gzip
 """
 filtered_feather = env.Command(
     target='$out/dedup/1200bp/named/filtered/filter_details.feather.gz',
     source=[filtered_details, full_seq_info, full_tax,
             named_type_hits, pubmed_info],
-    action='to_feather.py $SOURCES | gzip > $TARGET')
+    action='to_feather.py --out $TARGET $SOURCES')
 
 """
 Append contributers
