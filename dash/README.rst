@@ -1,6 +1,6 @@
-===========================================
-NCBI Species Level Reference Sequence Plots
-===========================================
+===============================================
+NCBI Species Level 16s Reference Sequence Plots
+===============================================
 
 Web Site: https://deenurp.org/plots
 Github: https://github.com/nhoffman/ya16sdb
@@ -10,7 +10,7 @@ Authors: Noah Hoffman, Chris Rosenthal
 .. image:: screenshot.png
 
 summary of features
-=====
+===================
 
 Users can browse Bacteria and Archea species using the Genus and 
 Species dropdown menus.  Users can also search for sequences by 
@@ -42,6 +42,13 @@ The application will be served at ``http://127.0.0.1:8050``
 
 Dokku on local Vagrant instance
 ===============================
+
+Before starting
+---------------
+
+Be aware that certain network configurations including an active VPN
+connection can interfer with this setup process.  We recommend disconnecting 
+and disabling any VPN or manual network configuration before proceeding.
 
 We'll mostly follow instructions here
 (https://github.com/dokku/dokku/blob/master/docs/getting-started/install/vagrant.md),
@@ -95,6 +102,35 @@ this directory (command must be executed in the root of the repo)::
 
 Now you should be able to access the application at
 ``http://ya16sdb.dokku.me``
+
+Mounting Storage Data
+---------------------
+
+Details about the storage mounting plugin are here 
+(https://github.com/dokku/dokku/blob/master/docs/advanced-usage/persistent-storage.md).
+
+In summary, you will need to setup a folder with correct permissions on the
+dokku instance and transfer your data before mounting::
+
+  ssh dokku@dokku.me
+  mkdir /var/lib/dokku/data/storage/ya16sdb
+
+Exit and transfer your data file up::
+
+  scp file.feather dokku@dokku.me:/var/lib/dokku/data/storage/ya16sdb
+
+And, finally, mount::
+
+  ssh dokku@dokku.me storage:mount ya16sdb /var/lib/dokku/data/storage/ya16sdb:/storage
+
+Be aware there could be permission issues you may need to update with your
+data file depending on many factors. Applying a `chmod a+r` to the file should
+fix most issues.
+
+Let's Encrypt Plugin
+--------------------
+
+https://github.com/dokku/dokku-letsencrypt
 
 troubleshooting dokku
 ---------------------
