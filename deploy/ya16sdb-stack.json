@@ -14,6 +14,11 @@
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
 
+    "HostName": {
+	"Description": "fqdn used to populate /etc/hostname",
+	"Type": "String"
+    },
+
     "KeyName": {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
       "Type" : "AWS::EC2::KeyPair::KeyName",
@@ -84,7 +89,7 @@
 	    "HealthCheck" : {
 		"Target" : "HTTP:80/",
 		"HealthyThreshold" : "3",
-		"UnhealthyThreshold" : "5",
+		"UnhealthyThreshold" : "10",
 		"Interval" : "30",
 		"Timeout" : "5"
 	    }
@@ -274,10 +279,22 @@
         }
       },
       "Metadata" : {
-        "AWS::CloudFormation::Init" : {
-          "configSets" : {
-            "full_install" : [ "install_and_enable_cfn_hup" ]
-          },
+          "AWS::CloudFormation::Init" : {
+              "configSets" : {
+		  "full_install" : [ "install_and_enable_cfn_hup", "set_hostname" ]
+              },
+	      "set_hostname" : {
+		  "files": {
+		      "/etc/hostname": {
+			  "content": { "Fn::Join" : ["", [
+			      { "Ref" : "HostName" }, "\n"
+                          ]]},
+			  "mode"    : "000644",
+			  "owner"   : "root",
+			  "group"   : "root"
+		      }
+		  }
+	      },
           "install_and_enable_cfn_hup" : {
             "files" : {
                         "/etc/cfn/cfn-hup.conf" : {
@@ -313,7 +330,7 @@
                             "Restart=always\n\n",
                             "[Install]\n",
                             "WantedBy=multi-user.target"]]}
-                             }
+                       }
                   },
             "commands" : {
                   "01enable_cfn_hup" : {
@@ -348,8 +365,7 @@
              "/opt/aws/bin/cfn-signal -e $? ",
              "         --stack ", { "Ref" : "AWS::StackName" },
              "         --resource WebServerInstance ",
-             "         --region ", { "Ref" : "AWS::Region" }, "\n"
-
+            "         --region ", { "Ref" : "AWS::Region" }, "\n"
          ]]}},
          "Tags" : [ { "Key" : "Name", "Value" : { "Ref" : "AWS::StackName" }} ]
       }

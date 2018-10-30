@@ -31,8 +31,8 @@ def main():
     # describe the elastic IP associated with this address
     ec2 = boto3.client('ec2')
     response = ec2.describe_instances(
-        Filters=[{'Name': 'tag:aws:cloudformation:stack-name',
-                  'Values': [stack_name]}])
+        Filters=[{'Name': 'tag:aws:cloudformation:stack-name', 'Values': [stack_name]},
+                 {'Name': 'instance-state-name', 'Values': ['running']}])
 
     ip = response['Reservations'][0]['Instances'][0]['PublicIpAddress']
 

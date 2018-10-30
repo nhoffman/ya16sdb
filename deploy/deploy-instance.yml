@@ -1,10 +1,24 @@
-# required for ubuntu 16.04 to ensure python is installed
-- hosts: "webserver"
-  become: yes
-  gather_facts: no
-  pre_tasks:
-    - raw: "sudo apt-get update && sudo apt-get -y install python-simplejson"
+#!/usr/bin/env ansible-playbook
 
 - hosts: "webserver"
   become: yes
 
+  vars:
+    DOKKU_HOSTNAME: "ya16sdb-dokku.labmed.uw.edu"
+    DOKKU_TAG: "v0.12.13"
+
+  tasks:
+    - name: download the dokku install script
+      get_url:
+        url: https://raw.githubusercontent.com/dokku/dokku/{{ DOKKU_TAG }}/bootstrap.sh
+        dest: /home/ubuntu/bootstrap.sh
+
+    # see https://www.caktusgroup.com/blog/2017/10/16/automating-dokku-setup-aws-managed-services/
+    - name: install dokku
+      shell: "bash /home/ubuntu/bootstrap.sh"
+      environment:
+        DOKKU_TAG: "{{ DOKKU_TAG }}"
+        DOKKU_VHOST_ENABLE: true
+        DOKKU_HOSTNAME: "{{ DOKKU_HOSTNAME }}"
+        DOKKU_KEY_FILE: /home/ubuntu/.ssh/authorized_keys
+        DOKKU_WEB_CONFIG: false

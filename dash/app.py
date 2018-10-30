@@ -33,11 +33,13 @@ app.title = 'Species Outlier Plots'
 
 FEATHER_FILE_DEFAULT = path.join(
     path.dirname(__file__), 'filter_details.feather.gz')
-FEATHER_FILE_SYSTEM = '/path/to/filter_details.feather.gz'
+FEATHER_FILE_SYSTEM = '/storage/filter_details.feather.gz'
 
 FEATHER_FILE = (FEATHER_FILE_SYSTEM
                 if path.exists(FEATHER_FILE_SYSTEM)
                 else FEATHER_FILE_DEFAULT)
+
+print('FEATHER_FILE:', FEATHER_FILE)
 
 with gzip.open(FEATHER_FILE) as f:
     df = feather.read_dataframe(f)
