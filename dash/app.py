@@ -20,7 +20,7 @@ from dash.dependencies import Input, State, Output
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
-DEFAULT_GENUS = '497'  # '547'  # Enterobacter
+DEFAULT_GENUS = '1350'  # Enterococcus
 LEGEND_OTHER = 'other'
 MAX_TABLE_RECORDS = 500
 SEARCH_OPTS = ['seqname', 'accession', 'version',
