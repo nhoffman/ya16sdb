@@ -218,7 +218,6 @@ app.layout = html.Div(
         html.Div(
             children=[dcc.Slider(id='year--slider')],
             style={'margin': 15, 'width': '95%'}),
-        dcc.Graph(id='plot'),
         dcc.Markdown(
             children=['**Axes**'],
             containerProps={
@@ -232,8 +231,7 @@ app.layout = html.Div(
                 dcc.Dropdown(
                     clearable=False,
                     id='yaxis-column',
-                    options=[{'label': i, 'value': i} for i in info],
-                    value='y')],
+                    options=[{'label': i, 'value': i} for i in info])],
             style={
                 'width': '14%',
                 'display': 'inline-block',
@@ -243,12 +241,12 @@ app.layout = html.Div(
                 dcc.Dropdown(
                     clearable=False,
                     id='xaxis-column',
-                    options=[{'label': i, 'value': i} for i in info],
-                    value='x')],
+                    options=[{'label': i, 'value': i} for i in info])],
             style={
                 'width': '14%',
                 'display': 'inline-block',
                 'vertical-align': 'middle'}),
+        dcc.Graph(id='plot'),
         html.Table(
             id='table-div',
             style={
@@ -294,6 +292,22 @@ def parse_search_input(dff, state, search, n_clicks, text):
             if text in dff[o].values:
                 request = o
     return request, data
+
+
+@app.callback(
+    Output('yaxis-column', 'value'),
+    [Input('url', 'search')])
+def update_yaxis_value(search):
+    args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+    return args.get('y', ['y'])[0]
+
+
+@app.callback(
+    Output('xaxis-column', 'value'),
+    [Input('url', 'search')])
+def update_xaxis_value(search):
+    args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+    return args.get('x', ['x'])[0]
 
 
 # Setting the url search does not seem to work at the moment in addition
