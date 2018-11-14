@@ -20,7 +20,11 @@ from dash.dependencies import Input, State, Output
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
+DEFAULT_COLOR = 'is_out'
+DEFAULT_SHAPE = 'is_type'
 DEFAULT_GENUS = '1350'  # Enterococcus
+DEFAULT_Y = 'y'
+DEFAULT_X = 'x'
 LEGEND_OTHER = 'other'
 MAX_TABLE_RECORDS = 500
 SEARCH_OPTS = ['seqname', 'accession', 'version',
@@ -155,7 +159,7 @@ app.layout = html.Div(
                         'width': '5%',
                         'display': 'inline-block'}),
                 dcc.RadioItems(
-                    id='symbol-items',
+                    id='shape-items',
                     options=[
                         {'value': 'is_out'},
                         {'value': 'is_type'},
@@ -299,7 +303,7 @@ def parse_search_input(dff, state, search, n_clicks, text):
     [Input('url', 'search')])
 def update_yaxis_value(search):
     args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-    return args.get('y', ['y'])[0]
+    return args.get('y', [DEFAULT_Y])[0]
 
 
 @app.callback(
@@ -307,7 +311,7 @@ def update_yaxis_value(search):
     [Input('url', 'search')])
 def update_xaxis_value(search):
     args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
-    return args.get('x', ['x'])[0]
+    return args.get('x', [DEFAULT_X])[0]
 
 
 # Setting the url search does not seem to work at the moment in addition
@@ -565,88 +569,120 @@ def update_published_visibility(tax_id):
     return options
 
 
+def parse_multi(state, search, option):
+    value = None
+    if state is None:
+        args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+        if option in args:
+            value = args[option][0].split(',')
+    return value
+
+
 @app.callback(
     Output('isolation-source-selection', 'value'),
-    [Input('species-column', 'value')])
-def update_isolation_source_selection_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_isolation_source_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_isolation_source')
 
 
 @app.callback(
     Output('isolation-source-visibility', 'value'),
-    [Input('species-column', 'value')])
-def update_isolation_source_visiblity_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_isolation_source_visiblity_value(_, state, search):
+    return parse_multi(state, search, 'visibility_isolation_source')
 
 
 @app.callback(
     Output('match-species-selection', 'value'),
-    [Input('species-column', 'value')])
-def update_match_species_selection_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_match_species_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_match_species')
 
 
 @app.callback(
     Output('match-species-visibility', 'value'),
-    [Input('species-column', 'value')])
-def update_match_species_visibility_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_match_species_visibility_value(_, state, search):
+    return parse_multi(state, search, 'visibility_match_species')
 
 
 @app.callback(
     Output('outliers-selection', 'value'),
-    [Input('species-column', 'value')])
-def update_outliers_selection_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_outliers_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_is_out')
 
 
 @app.callback(
     Output('outliers-visibility', 'value'),
-    [Input('species-column', 'value')])
-def update_outliers_visibility_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_outliers_visibility_value(_, state, search):
+    return parse_multi(state, search, 'visibility_is_out')
 
 
 @app.callback(
     Output('type-strains-selection', 'value'),
-    [Input('species-column', 'value')])
-def update_type_strain_selection_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_type_strain_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_is_type')
 
 
 @app.callback(
     Output('type-strains-visibility', 'value'),
-    [Input('species-column', 'value')])
-def update_type_strain_visibility_value(tax_id):
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_type_strain_visibility_value(_, state, search):
+    return parse_multi(state, search, 'visibility_is_type')
     return None  # clear values
 
 
 @app.callback(
     Output('published-selection', 'value'),
-    [Input('species-column', 'value')])
-def update_published_selection_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_published_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_pubmed_id')
 
 
 @app.callback(
     Output('published-visibility', 'value'),
-    [Input('species-column', 'value')])
-def update_published_visibility_value(tax_id):
-    return None  # clear values
+    [Input('species-column', 'value')],
+    [State('state', 'hidden'),
+     State('url', 'search')])
+def update_published_visibility_value(_, state, search):
+    return parse_multi(state, search, 'visibility_pubmed_id')
 
 
 @app.callback(
     Output('color-items', 'value'),
-    [Input('species-column', 'value')])
-def update_color_items(tax_id):
-    return 'is_out'
+    [Input('url', 'search')])
+def update_color_items(search):
+    args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+    return args.get('color', [DEFAULT_COLOR])[0]
 
 
 @app.callback(
-    Output('symbol-items', 'value'),
-    [Input('species-column', 'value')])
-def update_symbol_items(tax_id):
-    return 'is_type'
+    Output('shape-items', 'value'),
+    [Input('url', 'search')])
+def update_symbol_items(search):
+    args = urllib.parse.parse_qs(urllib.parse.urlparse(search).query)
+    return args.get('shape', [DEFAULT_SHAPE])[0]
 
 
 @app.callback(
@@ -666,7 +702,7 @@ def update_symbol_items(tax_id):
      Input('published-visibility', 'value'),
      Input('published-selection', 'value'),
      Input('color-items', 'value'),
-     Input('symbol-items', 'value'),
+     Input('shape-items', 'value'),
      Input('submit-button', 'n_clicks')],
     [State('state', 'hidden'),
      State('text-input', 'value'),
@@ -842,7 +878,7 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
     '''
     return {
         'n_clicks': n_clicks,  # determine if button was clicked
-        'tax_id': tax_id,  # if tax_id changes we reset everything
+        'tax_id': tax_id,  # to check if tax_id has changed
         'xrange': figure['layout']['xaxis']['range'],  # preserve axes ranges
         'yrange': figure['layout']['yaxis']['range'],
         'xaxis': xaxis,
