@@ -67,12 +67,21 @@ Now you should be able to test your credentials::
 Deployment
 ==========
 
+Installing/Updating Ansible
+---------------------------
+
+A version of Ansible greater than 2.7 and the boto3 package is required.
+Install using pip::
+
+  pip install --upgrade ansible>=2.7 boto3
+
 Deploying the CloudFormation stack
 ----------------------------------
 
 Deploy the entire stack and application::
 
   deploy/deploy.yml -i deploy/hosts --vault-password-file vault_pass.txt
+  chmod 600 ~/.ssh/config
 
 This will also update ``~/.ssh/config`` to define an ssh alias for the
 instance.  After the above, you should be able to ssh into the
@@ -141,6 +150,14 @@ http://ya16sdb.labmed.uw.edu
 Updating the application
 ------------------------
 
+If ya16sdb has not been added as a remote host::
+
+  git remote --verbose
+
+Then you will need to add it::
+
+  git remote add ya16sdb dokku@ya16sdb:ya16sdb
+
 After initial deployment, you can update the app with a git push::
 
   git subtree push --prefix dash ya16sdb master
@@ -155,7 +172,6 @@ Upload a new feather file::
 Restart the application::
 
   ssh dokku@ya16sdb ps:restart ya16sdb
-
 
 
 Notes
