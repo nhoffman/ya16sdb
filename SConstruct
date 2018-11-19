@@ -733,16 +733,6 @@ filtered_feather = env.Command(
     action='to_feather.py --out $TARGET $SOURCES')
 
 """
-Append contributers
-
-FIXME: why are there two entries for crosenth
-"""
-contributors = env.Command(
-    source='.git/logs/HEAD',
-    target='contributors.txt',
-    action='git log --all --format="%cN <%cE>" | sort | uniq > $TARGET')
-
-"""
 git version used to generate output
 """
 commit = env.Command(
