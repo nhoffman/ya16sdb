@@ -54,14 +54,25 @@ def build_parser():
     flt.add_argument(
         '--tax-ids',
         help='column tax_id')
+    keep = p.add_argument_group('keep group')
+    keep.add_argument(
+        '--versions',
+        help='column version')
     return p
 
 
 def main():
     args = build_parser().parse_args()
 
+    keep = []
+
     annotations = pandas.read_csv(args.annotations, dtype=str)
     annotations = annotations.set_index('seqname')
+
+    if args.versions:
+        versions = (v.strip() for v in open(args.versions))
+        versions = set(v for v in versions if v)
+        keep.append(annotations[annotations['version'].isin(versions)])
 
     # raw min_length filtering
     if args.min_length:
@@ -88,6 +99,10 @@ def main():
 
     if args.species:
         annotations = annotations[~annotations['species'].isna()]
+
+    if keep:
+        annotations = annotations.append(pandas.concat(keep))
+        annotations = annotations[~annotations.index.duplicated()]
 
     for s in SeqIO.parse(args.fasta, 'fasta'):
         if s.id in annotations.index:

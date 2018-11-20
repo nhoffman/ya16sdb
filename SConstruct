@@ -145,6 +145,16 @@ types = env.Command(
     action=('esearch -db nucleotide -query "' + rrna_16s +
             ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
 
+"""
+Download TM7 accessions
+"""
+tm7 = env.Command(
+    source=None,
+    target='$out/esearch/tm7.txt',
+    action=('esearch -db nucleotide -query "' + rrna_16s +
+            ' AND Candidatus Saccharibacteria[Organism]" | '
+            '' + mefetch_acc))
+
 if test:
     tax_ids = (i.strip() for i in open('testfiles/tax_ids.txt') if i)
     tax_ids = ('txid' + i + '[Organism]' for i in tax_ids)
@@ -168,16 +178,6 @@ else:
         action=('esearch -db nucleotide -query "' + rrna_16s +
                 'NOT(environmental samples[Organism] '
                 'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
-
-    """
-    Download TM7 accessions
-    """
-    tm7 = env.Command(
-        source=None,
-        target='$out/esearch/tm7.txt',
-        action=('esearch -db nucleotide -query "' + rrna_16s +
-                ' AND Candidatus Saccharibacteria[Organism]" | '
-                '' + mefetch_acc))
 
     """
     concat our download set
@@ -478,14 +478,17 @@ types_mothur = env.Command(
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
 """
-filter for named seqs and seq_info
+filter for named and tm7 sequence records
 """
 named_fa, named_info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
             '$out/dedup/1200bp/named/seq_info.csv'],
-    source=[fa, full_seq_info],
+    source=[fa, full_seq_info, tm7],
     action=('named.py $tax_url | '
-            'partition_refs.py --tax-ids /dev/stdin $SOURCES $TARGETS'))
+            'partition_refs.py '
+            '--versions ${SOURCES[2]} '
+            '--tax-ids /dev/stdin '
+            '${SOURCES[:2]} $TARGETS'))
 
 """
 Make general named taxtable with all ranks included for filter_outliers
