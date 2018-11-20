@@ -34,6 +34,7 @@ DTYPES = {
     'name': str,
     'organism': str,
     'pubmed_id': str,
+    'rank': str,
     'seq_start': int,
     'seq_stop': int,
     'seqname': str,
@@ -70,7 +71,7 @@ def main(arguments):
     taxonomy = pandas.read_csv(
         args.taxonomy,
         dtype=DTYPES,
-        usecols=['tax_id', 'tax_name', 'species', 'genus'])
+        usecols=['tax_id', 'tax_name', 'rank', 'species', 'genus'])
     hits = pandas.read_table(
         args.hits,
         dtype=DTYPES,

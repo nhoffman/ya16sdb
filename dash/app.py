@@ -548,7 +548,7 @@ def update_published_selection(tax_id):
     '''
     '''
     dff = df[df['species'] == tax_id]
-    published = dff['is_type'].apply(lambda x: 'Yes' if x else 'No')
+    published = dff['pubmed_id'].apply(lambda x: 'Yes' if x else 'No')
     options = []
     for k, v in published.value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
@@ -562,7 +562,7 @@ def update_published_visibility(tax_id):
     '''
     '''
     dff = df[df['species'] == tax_id]
-    published = dff['is_type'].apply(lambda x: 'Yes' if x else 'No')
+    published = dff['pubmed_id'].apply(lambda x: 'Yes' if x else 'No')
     options = []
     for k, v in published.value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
