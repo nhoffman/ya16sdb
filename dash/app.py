@@ -66,6 +66,16 @@ app.layout = html.Div(
     children=[
         html.Div(id='state'),
         dcc.Location(id='url', refresh=False),
+        dcc.Markdown(
+            children=[
+                str(df['download_date'].max().strftime('%A, %B %d, %Y'))
+            ],
+            containerProps={
+                'style': {
+                    'text-align': 'right',
+                    'font-style': 'italic',
+                    'height': 0,
+                    'width': '100%'}}),
         html.Div(
             children=[
                 dcc.Input(type='text', id='text-input'),
