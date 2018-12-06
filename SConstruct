@@ -66,9 +66,9 @@ else:
     vrs.Add('base', help='Path to output directory', default='output')
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
-vrs.Add('retry', 'ncbi retry milliseconds', '60000')
+vrs.Add('retry', 'ncbi retry milliseconds', '1000')
 # nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 12)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 1)
 vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
@@ -525,6 +525,17 @@ named_mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 """
+get all taxid descendants from trusted_taxids.txt file
+"""
+trusted_taxids = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted_taxids.txt',
+    source=paths['trusted_taxids'],
+    action=[
+        # copy trusted_taxids.txt to current dir bind point
+        'cp $SOURCE $$(dirname $TARGET)/$$(basename $SOURCE)',
+        '$taxit get_descendants --out $TARGET $tax_url $SOURCE'])
+
+"""
 update tax_ids in details_in cache
 """
 filtered_details_in = env.Command(
@@ -541,26 +552,28 @@ Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
 filtered_fa, filtered_taxid_map, filtered_details, deenurp_log = env.Command(
-    source=[named_fa, named_taxid_map, named_tax, filtered_details_in],
+    source=[named_fa, named_taxid_map, named_tax,
+            filtered_details_in, trusted_taxids],
     target=['$out/dedup/1200bp/named/filtered/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/tax_id_map.csv',
             '$out/dedup/1200bp/named/filtered/details_out.csv',
             '$out/dedup/1200bp/named/filtered/deenurp.log'],
     action=['$deenurp -vvv filter_outliers '
-            '--log ${TARGETS[3]} '
-            '--filter-rank species '
-            '--threads-per-job 14 '
-            '--jobs 1 '
-            '--output-seqs ${TARGETS[0]}  '
-            '--filtered-seqinfo ${TARGETS[1]} '
+            '--cluster-type single '
             '--detailed-seqinfo ${TARGETS[2]} '
+            '--distance-percentile 90.0 '
+            '--filter-rank species '
+            '--filtered-seqinfo ${TARGETS[1]} '
+            '--jobs 1 '
+            '--log ${TARGETS[3]} '
+            '--max-distance 0.02 '
+            '--min-distance 0.01 '
+            '--min-seqs-for-filtering 5 '
+            '--no-filter ${SOURCES[4]} '
+            '--output-seqs ${TARGETS[0]}  '
             '--previous-details ${SOURCES[3]} '
             '--strategy cluster '
-            '--cluster-type single '
-            '--distance-percentile 90.0 '
-            '--min-distance 0.01 '
-            '--max-distance 0.02 '
-            '--min-seqs-for-filtering 5 '
+            '--threads-per-job 14 '
             '${SOURCES[:3]}',
             # cache it
             'cp ${TARGETS[2]} $outliers_cache'])
