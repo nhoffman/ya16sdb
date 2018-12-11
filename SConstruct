@@ -66,9 +66,9 @@ else:
     vrs.Add('base', help='Path to output directory', default='output')
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
-vrs.Add('retry', 'ncbi retry milliseconds', '1000')
+vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 1)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 8)
 vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
@@ -372,7 +372,7 @@ env.Command(
     action='cat $SOURCE >> $genbank_cache')
 
 """
-update all tax_ids and add is_type columns
+update all tax_ids
 """
 update_seq_info = env.Command(
     target='$out/refresh/taxit/seq_info.csv',
@@ -383,11 +383,22 @@ update_seq_info = env.Command(
 is_type column
 
 https://github.com/nhoffman/ya16sdb/issues/11 about is_type column
+https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40 about confidence col
 """
 is_type_seq_info = env.Command(
     target='$out/refresh/taxit/is_type/seq_info.csv',
     source=[update_seq_info, types],
     action='is_type.py --out $TARGET $SOURCES')
+
+"""
+confidence column
+
+https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40 about confidence col
+"""
+confidence_seq_info = env.Command(
+    target='$out/refresh/taxit/is_type/confidence/seq_info.csv',
+    source=[is_type_seq_info, pubmed_info],
+    action='confidence.py --out $TARGET $SOURCES')
 
 """
 taxonomy
@@ -402,7 +413,7 @@ seq_info with species column
 """
 seq_info = env.Command(
     target='$out/seq_info.csv',
-    source=[is_type_seq_info, taxonomy],
+    source=[confidence_seq_info, taxonomy],
     action='merge.py --right-columns tax_id,species --out $TARGET $SOURCES')
 
 """

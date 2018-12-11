@@ -15,6 +15,7 @@ DTYPES = {
     'centroid': str,
     'cluster': float,
     'comment': str,
+    'confidence': str,
     'consrtm': str,
     'description': str,
     'dist': float,
