@@ -21,7 +21,7 @@ from dash.dependencies import Input, State, Output
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
 DEFAULT_COLOR = 'is_out'
-DEFAULT_SHAPE = 'is_type'
+DEFAULT_SHAPE = 'confidence'
 DEFAULT_GENUS = '1350'  # Enterococcus
 DEFAULT_Y = 'y'
 DEFAULT_X = 'x'
@@ -145,9 +145,8 @@ app.layout = html.Div(
                 html.Div(
                     children=[
                         dcc.Markdown(children=['**Outliers**']),
-                        dcc.Markdown(children=['**Type Strains**']),
+                        dcc.Markdown(children=['**Confidence**']),
                         dcc.Markdown(children=['**Match Species**']),
-                        dcc.Markdown(children=['**Published**']),
                         dcc.Markdown(children=['**Isolation Source**']),
                         ],
                     style={
@@ -159,9 +158,8 @@ app.layout = html.Div(
                     id='color-items',
                     options=[
                         {'value': 'is_out'},
-                        {'value': 'is_type'},
+                        {'value': 'confidence'},
                         {'value': 'match_species'},
-                        {'value': 'pubmed_id'},
                         {'value': 'isolation_source'}],
                     inputStyle={'height': 15, 'width': 15, 'margin': 11},
                     style={
@@ -172,9 +170,8 @@ app.layout = html.Div(
                     id='shape-items',
                     options=[
                         {'value': 'is_out'},
-                        {'value': 'is_type'},
+                        {'value': 'confidence'},
                         {'value': 'match_species'},
-                        {'value': 'pubmed_id'},
                         {'value': 'isolation_source'}],
                     inputStyle={'height': 15, 'width': 15, 'margin': 11},
                     style={
@@ -187,13 +184,10 @@ app.layout = html.Div(
                             id='outliers-selection',
                             multi=True),
                         dcc.Dropdown(
-                            id='type-strains-selection',
+                            id='confidence-selection',
                             multi=True),
                         dcc.Dropdown(
                             id='match-species-selection',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='published-selection',
                             multi=True),
                         dcc.Dropdown(
                             id='isolation-source-selection',
@@ -208,13 +202,10 @@ app.layout = html.Div(
                             id='outliers-visibility',
                             multi=True),
                         dcc.Dropdown(
-                            id='type-strains-visibility',
+                            id='confidence-visibility',
                             multi=True),
                         dcc.Dropdown(
                             id='match-species-visibility',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='published-visibility',
                             multi=True),
                         dcc.Dropdown(
                             id='isolation-source-visibility',
@@ -524,57 +515,27 @@ def update_outliers_visibility(tax_id):
 
 
 @app.callback(
-    Output('type-strains-selection', 'options'),
+    Output('confidence-selection', 'options'),
     [Input('species-column', 'value')])
-def update_type_strains_selection(tax_id):
+def update_confidence_selection(tax_id):
     '''
     '''
     dff = df[df['species'] == tax_id]
-    types = dff['is_type'].apply(lambda x: 'Yes' if x else 'No')
     options = []
-    for k, v in types.value_counts().items():
+    for k, v in dff['confidence'].value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
     return options
 
 
 @app.callback(
-    Output('type-strains-visibility', 'options'),
+    Output('confidence-visibility', 'options'),
     [Input('species-column', 'value')])
-def update_type_strains_visiblity(tax_id):
+def update_confidence_visibility(tax_id):
     '''
     '''
     dff = df[df['species'] == tax_id]
-    types = dff['is_type'].apply(lambda x: 'Yes' if x else 'No')
     options = []
-    for k, v in types.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@app.callback(
-    Output('published-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_published_selection(tax_id):
-    '''
-    '''
-    dff = df[df['species'] == tax_id]
-    published = dff['pubmed_id'].apply(lambda x: 'Yes' if x else 'No')
-    options = []
-    for k, v in published.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@app.callback(
-    Output('published-visibility', 'options'),
-    [Input('species-column', 'value')])
-def update_published_visibility(tax_id):
-    '''
-    '''
-    dff = df[df['species'] == tax_id]
-    published = dff['pubmed_id'].apply(lambda x: 'Yes' if x else 'No')
-    options = []
-    for k, v in published.value_counts().items():
+    for k, v in dff['confidence'].value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
     return options
 
@@ -643,40 +604,21 @@ def update_outliers_visibility_value(_, state, search):
 
 
 @app.callback(
-    Output('type-strains-selection', 'value'),
+    Output('confidence-selection', 'value'),
     [Input('species-column', 'value')],
     [State('state', 'hidden'),
      State('url', 'search')])
-def update_type_strain_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_is_type')
+def update_confidence_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_confidence')
 
 
 @app.callback(
-    Output('type-strains-visibility', 'value'),
+    Output('confidence-visibility', 'value'),
     [Input('species-column', 'value')],
     [State('state', 'hidden'),
      State('url', 'search')])
-def update_type_strain_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_is_type')
-    return None  # clear values
-
-
-@app.callback(
-    Output('published-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'hidden'),
-     State('url', 'search')])
-def update_published_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_pubmed_id')
-
-
-@app.callback(
-    Output('published-visibility', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'hidden'),
-     State('url', 'search')])
-def update_published_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_pubmed_id')
+def update_confidence_visibility_value(_, state, search):
+    return parse_multi(state, search, 'visibility_confidence')
 
 
 @app.callback(
@@ -707,10 +649,8 @@ def update_symbol_items(search):
      Input('match-species-selection', 'value'),
      Input('outliers-visibility', 'value'),
      Input('outliers-selection', 'value'),
-     Input('type-strains-visibility', 'value'),
-     Input('type-strains-selection', 'value'),
-     Input('published-visibility', 'value'),
-     Input('published-selection', 'value'),
+     Input('confidence-visibility', 'value'),
+     Input('confidence-selection', 'value'),
      Input('color-items', 'value'),
      Input('shape-items', 'value'),
      Input('submit-button', 'n_clicks')],
@@ -721,8 +661,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
                  viso_source, siso_source,
                  vmatch, smatch,
                  vout, sout,
-                 vtypes, stypes,
-                 vpubs, spubs,
+                 vconf, sconf,
                  color, symbol,
                  n_clicks, state, text, search):
     dff = df[df['species'] == tax_id]
@@ -752,13 +691,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         dff = dff[dff['match_species'].isin(vmatch)]
     if vout:
         dff = dff[dff['is_out'].isin(set(i == 'Yes' for i in vout))]
-    if vtypes:
-        dff = dff[dff['is_type'].isin(set(i == 'Yes' for i in vtypes))]
-    if vpubs and len(vpubs) == 1:
-        if 'Yes' in vpubs:
-            dff = dff[~dff['pubmed_id'].isnull()]
-        else:  # 'No' in vpubs:
-            dff = dff[dff['pubmed_id'].isnull()]
+    if vconf:
+        dff = dff[dff['confidence'].isin(vconf)]
 
     # decide selected points
     dff['selected'] = False
@@ -772,16 +706,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     if sout:
         is_out = dff['is_out'].isin(set(i == 'Yes' for i in sout))
         dff.loc[is_out, 'selected'] = True
-    if stypes:
-        is_type = dff['is_type'].isin(set(i == 'Yes' for i in stypes))
-        dff.loc[is_type, 'selected'] = True
-    if spubs:
-        if len(spubs) == 2:
-            dff.loc[:, 'selected'] = True
-        elif 'Yes' in spubs:
-            dff.loc[~dff['pubmed_id'].isnull(), 'selected'] = True
-        else:  # 'No' in spubs:
-            dff.loc[dff['pubmed_id'].isnull(), 'selected'] = True
+    if sconf:
+        dff.loc[dff['confidence'].isin(sconf), 'selected'] = True
 
     dff['text'] = dff.apply(assign_hover_text, axis='columns')
 
@@ -794,12 +720,6 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         if col == 'is_out':
             dff.loc[dff[col], name] = 'outlier'
             dff.loc[dff[col], label] = styles[1]
-        elif col == 'is_type':
-            dff.loc[dff[col], name] = 'type strain'
-            dff.loc[dff[col], label] = styles[1]
-        elif col == 'pubmed_id':
-            dff.loc[~dff[col].isnull(), name] = 'published'
-            dff.loc[~dff[col].isnull(), label] = styles[1]
         else:
             style_count = len(styles) - 1  # minus styles[0]
             top = dff[col].value_counts().iloc[:style_count].keys()
@@ -901,14 +821,13 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
      Input('isolation-source-selection', 'value'),
      Input('match-species-selection', 'value'),
      Input('outliers-selection', 'value'),
-     Input('type-strains-selection', 'value'),
-     Input('published-selection', 'value')],
+     Input('confidence-selection', 'value')],
     [State('submit-button', 'n_clicks'),
      State('species-column', 'value'),
      State('text-input', 'value'),
      State('url', 'search'),
      State('state', 'hidden')])
-def update_table(selected, iso, match, outliers, tstrains, published,
+def update_table(selected, iso, match, outliers, confidence,
                  n_clicks, tax_id, text, search, state):
     dff = df[df['species'] == tax_id]
     dff = dff.sort_values(by='dist_pct', ascending=False)
@@ -925,15 +844,8 @@ def update_table(selected, iso, match, outliers, tstrains, published,
             irows |= dff['match_species'].isin(match)
         if outliers:
             irows |= dff['is_out'].isin(i == 'Yes' for i in outliers)
-        if tstrains:
-            irows |= dff['is_type'].isin(i == 'Yes' for i in tstrains)
-        if published:
-            if len(published) == 2:
-                irows |= True
-            elif 'Yes' in published:
-                irows |= ~dff['pubmed_id'].isnull()
-            else:  # 'No' in spubs:
-                irows |= dff['pubmed_id'].isnull()
+        if confidence:
+            irows |= dff['confidence'].isin(confidence)
         if selected is not None:
             idx = [i['customdata'] for i in selected['points']]
             if all(i in dff.index for i in idx):  # equivalent to new tax_id
@@ -944,7 +856,6 @@ def update_table(selected, iso, match, outliers, tstrains, published,
     rows = dff[irows].iloc[:MAX_TABLE_RECORDS].copy()  # pull selected rows
 
     # clean up boolean text and sort by dist
-    rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
 
     TABLE_STYLE = {
