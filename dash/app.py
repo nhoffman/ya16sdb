@@ -856,6 +856,7 @@ def update_table(selected, iso, match, outliers, confidence,
     rows = dff[irows].iloc[:MAX_TABLE_RECORDS].copy()  # pull selected rows
 
     # clean up boolean text and sort by dist
+    rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
 
     TABLE_STYLE = {
