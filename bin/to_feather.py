@@ -19,6 +19,7 @@ DTYPES = {
     'consrtm': str,
     'description': str,
     'dist': float,
+    'dist_pct': float,
     'download_date': str,
     'genus': str,
     'is_out': bool,
@@ -119,8 +120,7 @@ def main(arguments):
     details = details.sort_values(by='dist')
     species_groups = details.groupby(by='species')['species']
     details['rank_order'] = species_groups.transform(lambda x: range(len(x)))
-    details['dist_pct'] = details['dist'].apply(
-        lambda x: '{:.2f}'.format(x * 100))
+    details['dist_pct'] = details['dist'] * 100
 
     details = details.reset_index(drop=True)
 

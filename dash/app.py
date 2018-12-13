@@ -858,6 +858,7 @@ def update_table(selected, iso, match, outliers, confidence,
     # clean up boolean text and sort by dist
     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
     rows['is_out'] = rows['is_out'].apply(lambda x: 'Yes' if x else '')
+    rows['dist_pct'] = rows['dist_pct'].apply(lambda x: '{:.2f}'.format(x))
 
     TABLE_STYLE = {
         'width': 500,
