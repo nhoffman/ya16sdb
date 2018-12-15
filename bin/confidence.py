@@ -29,7 +29,9 @@ def main():
     for row in info:
         if row['is_type'] == 'True':
             row['confidence'] = 'type'
-        elif row['version'] in pids and row['is_type'] == 'False':
+        elif '_' in row['accession']:
+            row['confidence'] = 'refseq'
+        elif row['version'] in pids:
             row['confidence'] = 'published'
         else:
             row['confidence'] = 'direct'
