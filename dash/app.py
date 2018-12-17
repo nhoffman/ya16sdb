@@ -1,22 +1,18 @@
 #! /usr/bin/env python3
 '''
 Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
-
-TODO: add select/deselect all button
 '''
-import urllib
-import gzip
-from os import path
 
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import pandas
 import feather
+import gzip
+import os
+import pandas
+import urllib
 
 from dash.dependencies import Input, State, Output
-
-# import config
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
@@ -35,12 +31,12 @@ SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
 
-FEATHER_FILE_DEFAULT = path.join(
-    path.dirname(__file__), 'filter_details.feather.gz')
+FEATHER_FILE_DEFAULT = os.path.join(
+    os.path.dirname(__file__), 'filter_details.feather.gz')
 FEATHER_FILE_SYSTEM = '/storage/filter_details.feather.gz'
 
 FEATHER_FILE = (FEATHER_FILE_SYSTEM
-                if path.exists(FEATHER_FILE_SYSTEM)
+                if os.path.exists(FEATHER_FILE_SYSTEM)
                 else FEATHER_FILE_DEFAULT)
 
 print('FEATHER_FILE:', FEATHER_FILE)
@@ -51,8 +47,8 @@ with gzip.open(FEATHER_FILE) as f:
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
 df['genus'] = df['genus'].fillna('')
-info = ['x', 'y', 'match_species', 'dist_pct',
-        'match_version', 'match_pct', 'rank_order']
+axes = ['confidence', 'dist_pct', 'x', 'y', 'match_pct',
+        'match_species', 'match_version', 'rank_order']
 tax = df[['genus', 'genus_name', 'species', 'species_name']]
 tax = tax.drop_duplicates().sort_values(by=['genus_name', 'species_name'])
 species_genus = dict(tax[['species', 'genus']].drop_duplicates().values)
@@ -236,7 +232,7 @@ app.layout = html.Div(
                 dcc.Dropdown(
                     clearable=False,
                     id='yaxis-column',
-                    options=[{'label': i, 'value': i} for i in info])],
+                    options=[{'label': i, 'value': i} for i in axes])],
             style={
                 'width': '14%',
                 'display': 'inline-block',
@@ -246,7 +242,7 @@ app.layout = html.Div(
                 dcc.Dropdown(
                     clearable=False,
                     id='xaxis-column',
-                    options=[{'label': i, 'value': i} for i in info])],
+                    options=[{'label': i, 'value': i} for i in axes])],
             style={
                 'width': '14%',
                 'display': 'inline-block',
