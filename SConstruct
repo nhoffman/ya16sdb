@@ -65,10 +65,11 @@ if test:
 else:
     vrs.Add('base', help='Path to output directory', default='output')
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
+vrs.Add('api_key', 'ncbi api_key for downloading data', paths['api_key'])
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 # nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 8)
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 10)
 vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
@@ -125,14 +126,15 @@ rrna_16s = ('16s[All Fields] '
             'AND 500 : 99999999999[Sequence Length]')
 
 mefetch_acc = ('mefetch -vv '
+               '-api-key $api_key '
                '-email $email '
-               '-mode text '
                '-format acc '
-               '-max-retry -1 '  # continuous retries
-               '-retry $retry '
-               '-proc $nreq '
                '-log $out/ncbi.log '
-               '-out $TARGET')
+               '-max-retry -1 '  # continuous retries
+               '-mode text '
+               '-out $TARGET '
+               '-proc $nreq '
+               '-retry $retry')
 
 """
 get accessions (versions) of records considered type strains
@@ -215,31 +217,34 @@ gbs = env.Command(
     target='$out/new/records.gb',
     source=new,
     action=['mefetch -vv '  # download feature tables
-            '-email $email '
-            '-retry $retry '
-            '-id $SOURCE '
+            '-api-key $api_key '
             '-db nucleotide '
+            '-email $email '
             '-format ft '
-            '-mode text '
-            '-retmax 1 '
-            '-max-retry -1 '  # continuous retry
+            '-id $SOURCE '
             '-log $out/ncbi.log '
-            '-proc $nreq | '
+            '-max-retry -1 '  # continuous retry
+            '-mode text '
+            '-proc $nreq '
+            '-retmax 1 '
+            '-retry $retry '
+            '| '
             # extract 16s features
             'ftract -feature "rrna:product:16S ribosomal RNA" '
             '-log $out/ncbi.log -on-error continue | '
             'accession_version.py | '  # parse accession.version from id column
             'mefetch '  # download genbank records
             '-vv '
-            '-email $email '
-            '-max-retry -1 '  # continuous retry
-            '-retmax 1 '
+            '-api-key $api_key '
             '-csv '
             '-db nucleotide '
+            '-email $email '
             '-format gbwithparts '
-            '-mode text '
             '-log $out/ncbi.log '
+            '-max-retry -1 '  # continuous retry
+            '-mode text '
             '-proc $nreq '
+            '-retmax 1 '
             '-retry $retry > $TARGET'])
 
 """
@@ -405,7 +410,7 @@ taxonomy
 """
 taxonomy = env.Command(
     target='$out/taxonomy.csv',
-    source=update_seq_info,
+    source=confidence_seq_info,
     action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
