@@ -20,7 +20,7 @@ if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
 conf = configparser.SafeConfigParser()
 conf.read('settings.conf')
-paths = conf['paths']
+settings = conf['settings']
 
 
 def PathIsFileCreate(key, val, env):
@@ -65,10 +65,10 @@ if test:
 else:
     vrs.Add('base', help='Path to output directory', default='output')
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
-vrs.Add('api_key', 'ncbi api_key for downloading data', paths['api_key'])
-vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
+vrs.Add('api_key', 'ncbi api_key for downloading data', settings['api_key'])
+vrs.Add('email', 'email address for ncbi', settings['email'])
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
+vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
     'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
@@ -106,12 +106,12 @@ env = Environment(
         '--bind {taxonomy} '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '{taxtastic} taxit'.format(**paths)),
+        '{taxtastic} taxit'.format(**settings)),
     deenurp=(
         '{singularity} exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '{deenurp} deenurp'.format(**paths))
+        '{deenurp} deenurp'.format(**settings))
 )
 
 env.Decider('MD5-timestamp')
@@ -540,7 +540,7 @@ get all taxid descendants from trusted_taxids.txt file
 """
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted_taxids.txt',
-    source=paths['trusted_taxids'],
+    source=settings['trusted_taxids'],
     action=[
         # copy trusted_taxids.txt to current dir bind point
         'cp $SOURCE $$(dirname $TARGET)/$$(basename $SOURCE)',
@@ -632,7 +632,7 @@ doing a reverse grep into partition_refs.py
 trusted_fa, trusted_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
-    source=[paths['do_not_trust'], filtered_fa, named_info],
+    source=[settings['do_not_trust'], filtered_fa, named_info],
     action='do_not_trust.py $SOURCES $TARGETS')
 
 """
@@ -724,31 +724,6 @@ named_type_hits = env.Command(
             '--threads 12 '
             '--maxaccepts 1 '
             '--strand plus'))
-
-'''
-bokeh plot filtered sequences
-
-hard coded: sort column 2 (records) desc
-'''
-env.Command(
-    target=['$out/dedup/1200bp/named/filtered/index.html',
-            '$out/dedup/1200bp/named/filtered/plots/map.csv'],
-    source=[filtered_details,
-            named_type_hits,
-            seq_info,
-            named_tax,
-            types,
-            deenurp_log],
-    action=('plot_details.py ${SOURCES[:5]} '
-            '--param strategy:cluster '
-            '--param cluster_type:single '
-            '--param distance_percentile:90.0 '
-            '--param min_distance:0.01 '
-            '--param max_distance:0.02 '
-            '--log-in ${SOURCES[5]} '
-            '--plot-dir $out/dedup/1200bp/named/filtered/plots '
-            '--plot-map ${TARGETS[1]} '
-            '--plot-index ${TARGETS[0]}'))
 
 """
 feather output - https://github.com/wesm/feather
