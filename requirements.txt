@@ -1,8 +1,6 @@
 pandas>=0.20.0
 #scons>=3.0.1
-medirect>=0.8.0
+medirect>=0.11.0
 sqlalchemy
 psycopg2
-bokeh==0.12.5
-git+https://github.com/google/google-visualization-python.git
-psycopg2
+feather-format
