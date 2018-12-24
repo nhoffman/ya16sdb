@@ -68,8 +68,6 @@ vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('api_key', 'ncbi api_key for downloading data', paths['api_key'])
 vrs.Add('email', 'email address for ncbi', 'crosenth@uw.edu')
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-# nreq should be set to 3 during weekdays
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 10)
 vrs.Add('tax_url', default=paths['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
@@ -133,7 +131,6 @@ mefetch_acc = ('mefetch -vv '
                '-max-retry -1 '  # continuous retries
                '-mode text '
                '-out $TARGET '
-               '-proc $nreq '
                '-retry $retry')
 
 """
@@ -225,7 +222,6 @@ gbs = env.Command(
             '-log $out/ncbi.log '
             '-max-retry -1 '  # continuous retry
             '-mode text '
-            '-proc $nreq '
             '-retmax 1 '
             '-retry $retry '
             '| '
@@ -243,7 +239,6 @@ gbs = env.Command(
             '-log $out/ncbi.log '
             '-max-retry -1 '  # continuous retry
             '-mode text '
-            '-proc $nreq '
             '-retmax 1 '
             '-retry $retry > $TARGET'])
 
