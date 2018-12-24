@@ -2,6 +2,13 @@
 Changes for ya16sdb
 ===================
 
+0.5
+===
+* New dash based filter outlier plots (GL: 37)
+* Inclusion of tm7 Candidatus Saccharibacteria records (GL: 36)
+* Updated medirect to fix "Too Many Requests" issue with NCBI (GL: 42)
+* New api-key feature to increase the number of NCBI reqs/sec to 10 (GL: 43)
+
 0.4
 =======
 * all paths (binaries, image locations, database credentials, etc) will be defined in a user defined file paths.conf (GH: 8, 9)
