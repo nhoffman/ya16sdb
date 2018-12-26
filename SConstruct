@@ -66,6 +66,7 @@ else:
     vrs.Add('base', help='Path to output directory', default='output')
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('api_key', 'ncbi api_key for downloading data', settings['api_key'])
+vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 8)
 vrs.Add('email', 'email address for ncbi', settings['email'])
 vrs.Add('retry', 'ncbi retry milliseconds', '60000')
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
@@ -130,6 +131,7 @@ mefetch_acc = ('mefetch -vv '
                '-log $out/ncbi.log '
                '-max-retry -1 '  # continuous retries
                '-mode text '
+               '-proc $nreq '
                '-out $TARGET '
                '-retry $retry')
 
@@ -222,6 +224,7 @@ gbs = env.Command(
             '-log $out/ncbi.log '
             '-max-retry -1 '  # continuous retry
             '-mode text '
+            '-proc $nreq '
             '-retmax 1 '
             '-retry $retry '
             '| '
@@ -239,6 +242,7 @@ gbs = env.Command(
             '-log $out/ncbi.log '
             '-max-retry -1 '  # continuous retry
             '-mode text '
+            '-proc $nreq '
             '-retmax 1 '
             '-retry $retry > $TARGET'])
 
@@ -290,11 +294,9 @@ known_info, _ = env.Command(
 """
 vsearch new sequences with training set to test sequence orientation
 and 16s region
-
-TODO: move to cmsearch
 """
 vsearch = env.Command(
-    target='$out/new/vsearch.csv',
+    target='$out/new/vsearch/vsearch.csv',
     source=[new_fa, 'data/rdp_16s_type_strains.fasta.bz2'],
     action=('vsearch '
             '--usearch_global ${SOURCES[0]} '
