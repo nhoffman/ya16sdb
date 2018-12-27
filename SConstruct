@@ -104,7 +104,7 @@ env = Environment(
     shell='bash',
     taxit=(
         '{singularity} exec '
-        '--bind {taxonomy} '
+        '--bind {trusted_taxids} '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
         '{taxtastic} taxit'.format(**settings)),
@@ -385,7 +385,6 @@ update_seq_info = env.Command(
 is_type column
 
 https://github.com/nhoffman/ya16sdb/issues/11 about is_type column
-https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40 about confidence col
 """
 is_type_seq_info = env.Command(
     target='$out/refresh/taxit/is_type/seq_info.csv',
@@ -543,10 +542,7 @@ get all taxid descendants from trusted_taxids.txt file
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted_taxids.txt',
     source=settings['trusted_taxids'],
-    action=[
-        # copy trusted_taxids.txt to current dir bind point
-        'cp $SOURCE $$(dirname $TARGET)/$$(basename $SOURCE)',
-        '$taxit get_descendants --out $TARGET $tax_url $SOURCE'])
+    action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 """
 update tax_ids in details_in cache
