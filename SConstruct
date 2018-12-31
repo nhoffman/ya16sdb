@@ -104,6 +104,7 @@ env = Environment(
     shell='bash',
     taxit=(
         '{singularity} exec '
+        '--bind {taxonomy} '
         '--bind {trusted_taxids} '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
