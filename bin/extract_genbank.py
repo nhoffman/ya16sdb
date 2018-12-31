@@ -208,7 +208,7 @@ def parse_refseq_source(record):
     acc = re.search(REFSEQ_SOURCE, record.annotations['comment'])
     gi = re.search(GI_SOURCE, record.annotations['comment'])
 
-    if not acc and not gi:
+    if not acc:
         raise ValueError('Cannot parse record')
 
     result = {}
