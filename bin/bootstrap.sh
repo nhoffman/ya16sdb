@@ -29,16 +29,6 @@ else
   echo "makeblastdb is already installed: $(makeblastdb -version)"
 fi
 
-if [[ ! -f $venv/bin/esearch ]]; then
-  (cd src &&
-   wget ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz &&
-   tar tzf edirect.tar.gz |
-   grep -E "esearch|edirect.pl" |
-   xargs tar xzf edirect.tar.gz --strip-components 1 --directory $venv/bin)
-else
-  echo "esearch already installed: $(esearch -version)"
-fi
-
 if [[ ! -f $venv/bin/vsearch ]]; then
   (cd src &&
    wget https://github.com/torognes/vsearch/releases/download/v2.5.0/vsearch-2.5.0-linux-x86_64.tar.gz &&

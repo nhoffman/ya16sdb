@@ -113,7 +113,12 @@ env = Environment(
         '{singularity} exec '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
-        '{deenurp} deenurp'.format(**settings))
+        '{deenurp} deenurp'.format(**settings)),
+    eutils=(
+        '{singularity} exec '
+        '--bind $$(readlink -f $$(pwd)) '
+        '--pwd $$(readlink -f $$(pwd)) '
+        '{eutils}'.format(**settings))
 )
 
 env.Decider('MD5-timestamp')
@@ -144,7 +149,7 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 types = env.Command(
     source=None,
     target='$out/dedup/1200bp/types/esearch.txt',
-    action=('esearch -db nucleotide -query "' + rrna_16s +
+    action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
             ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
 
 """
@@ -153,7 +158,7 @@ Download TM7 accessions
 tm7 = env.Command(
     source=None,
     target='$out/esearch/tm7.txt',
-    action=('esearch -db nucleotide -query "' + rrna_16s +
+    action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
             ' AND Candidatus Saccharibacteria[Organism]" | '
             '' + mefetch_acc))
 
@@ -163,7 +168,7 @@ if test:
     esearch = env.Command(
         target='$out/esearch/records.txt',
         source='testfiles/tax_ids.txt',
-        action=('esearch -db nucleotide -query "' + rrna_16s +
+        action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
                 ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
 else:
     """
@@ -177,7 +182,7 @@ else:
     classified = env.Command(
         source=None,
         target='$out/esearch/classified.txt',
-        action=('esearch -db nucleotide -query "' + rrna_16s +
+        action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
                 'NOT(environmental samples[Organism] '
                 'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
 
