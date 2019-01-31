@@ -8,15 +8,36 @@ Requirements
 ============
 
 * python 3.6+
-* Credentials for an AWS IAM user with necessary privileges
 * An existing dokku (or Heroku, maybe) instance
-* An SSH key (created in the AWS console and saved in ``secrets.yml``)
+* Credentials for an AWS IAM user with necessary privileges to create
+  an S3 bucket and IAM user
+* An ssh key for a dokku server
+* vault password in ``vault_pass.txt``
 
-Initial setup
-=============
+Running the application locally
+===============================
 
-Virtualenv for deployment
--------------------------
+Create the virtualenv::
+
+  python3 -m venv py3-env
+  source py3-env/bin/activate
+  pip install -U pip wheel
+  pip install -r requirements.txt
+
+Run the application using flask's internal server::
+
+  export LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 FLASK_DEBUG=1
+  flask run
+
+Or using gunicorn::
+
+  gunicorn app:app.server
+
+Installation to a Dokku serer
+=============================
+
+set up an environment
+---------------------
 
 ::
 
@@ -31,23 +52,48 @@ NOTE: mitogen will be installed to the virtualenv and so the path to the ansible
   strategy = mitogen_linear
 
 Deployment
-==========
+----------
 
-Add a git remote::
+Create the S3 bucket and IAM role, and install and configure the
+application (only needs to be done once, or to update dokku
+configuration)::
 
-  git remote add dokku-stack-dev dokku@dokku-stack-dev:ya16sdb
+  deploy/deploy-dash.yml -i deploy/hosts --vault-password-file vault_pass.txt -e TARGET=dokku-stack-prod
+
+After the IAM role is created, create credentials and add them to
+``secrets.yml``::
+
+  aws iam create-access-key --user-name Ya16sdbUser > Ya16sdbUser.json
+
+Add a git remote (once for each newly-cloned repo)::
+
+  git remote add dokku-stack-prod dokku@dokku-stack-prod:ya16sdb
+
+Push the application to the Dokku instance::
+
+  git subtree push --prefix dash dokku-stack-prod master
+
+Updating the data file
+----------------------
 
 Copy the feather file to the S3 bucket::
 
   aws s3 cp filter_details.feather.gz s3://ya16sdb-data/filter_details.feather.gz
 
-Install and configure the application::
+Note that this above assumes that your default AWS profile has access
+to this bucket. If not, add the following to ``~/.aws/credentials``::
 
-  deploy/deploy-dash.yml -i deploy/hosts --vault-password-file vault_pass.txt -e TARGET=dokku-stack-dev
+  [ya16sdb]
+  aws_access_key_id = xxxx
+  aws_secret_access_key = xxxx
 
-Push the application to the Dokku instance::
+And indicate the profile in the call to ``aws``::
 
-  git subtree push --prefix dash dokku-stack-dev master
+  aws --profile ya16sdb s3 cp filter_details.feather.gz s3://ya16sdb-data/filter_details.feather.gz
+
+Restart the server to recognize the new file::
+
+  ssh dokku@dokku-stack-prod ps:restart ya16sdb
 
 Notes
 =====
