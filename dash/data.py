@@ -10,9 +10,12 @@ import pandas as pd
 import feather
 
 
-def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None):
+def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
+                 get_data=True):
     """Reads gzip-compressed feather file into a pandas data_frame from s3
-    bucket (if pathspec starts with 's3://') or file path.
+    bucket (if pathspec starts with 's3://') or file path. If get_data
+    is False, return None for the data_frame and provide the
+    modification time only.
 
     """
 
@@ -25,14 +28,20 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None):
             aws_secret_access_key=aws_secret_access_key)
         s3obj = s3client.get_object(Bucket=s3_bucket, Key=s3_key)
         last_modified = s3obj['LastModified']
-        compressed = BytesIO(s3obj['Body'].read())
-        with gzip.GzipFile(mode='rb', fileobj=compressed) as f:
-            df = feather.read_dataframe(f)
+        if get_data:
+            compressed = BytesIO(s3obj['Body'].read())
+            with gzip.GzipFile(mode='rb', fileobj=compressed) as f:
+                df = feather.read_dataframe(f)
+        else:
+            df = None
     else:
         last_modified = datetime.fromtimestamp(
             os.path.getmtime(pathspec)).isoformat()
-        with gzip.open(pathspec) as f:
-            df = feather.read_dataframe(f)
+        if get_data:
+            with gzip.open(pathspec) as f:
+                df = feather.read_dataframe(f)
+        else:
+            df = None
 
     return df, last_modified
 
