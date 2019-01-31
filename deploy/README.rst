@@ -26,12 +26,15 @@ Create the virtualenv::
 
 Run the application using flask's internal server::
 
-  export LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 FLASK_DEBUG=1
-  flask run
+  ./app.py
 
 Or using gunicorn::
 
   gunicorn app:app.server
+
+If you want to run the application locally but load the data from the S3 bucket::
+
+  DATA_FILE=s3://ya16sdb-data/filter_details.feather.gz ./app.py
 
 Installation to a Dokku serer
 =============================
