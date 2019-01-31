@@ -104,4 +104,4 @@ Editing the vault
 
   EDITOR="$EMACSCLIENT -nw" ansible-vault edit --vault-password-file vault_pass.txt deploy/secrets.yml
 
-Don't commit ``vault_pass.txt``!
+Don't commit ``vault_pass.txt``, and make sure the file mode is ``0600``!
