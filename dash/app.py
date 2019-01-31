@@ -14,6 +14,8 @@ import urllib
 
 from dash.dependencies import Input, State, Output
 
+from data import read_feather
+
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
 DEFAULT_COLOR = 'is_out'
@@ -31,18 +33,16 @@ SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
 app = dash.Dash()
 app.title = 'Species Outlier Plots'
 
-FEATHER_FILE_DEFAULT = os.path.join(
-    os.path.dirname(__file__), 'filter_details.feather.gz')
-FEATHER_FILE_SYSTEM = '/storage/filter_details.feather.gz'
+# access all environment variables here
+FEATHER_FILE = os.environ.get('DATA_FILE', 'filter_details.feather.gz')
+AWS_ACCESS_KEY_ID = os.environ.get('BUCKET_ACCESS_KEY')
+AWS_SECRET_KEY_ID = os.environ.get('BUCKET_SECRET_KEY')
 
-FEATHER_FILE = (FEATHER_FILE_SYSTEM
-                if os.path.exists(FEATHER_FILE_SYSTEM)
-                else FEATHER_FILE_DEFAULT)
+df, df_last_modified = read_feather(
+    FEATHER_FILE,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_KEY_ID)
 
-print('FEATHER_FILE:', FEATHER_FILE)
-
-with gzip.open(FEATHER_FILE) as f:
-    df = feather.read_dataframe(f)
 
 df = df[~df['x'].isna() & ~df['y'].isna()]
 df['genus_name'] = df['genus_name'].fillna('Unclassified')
