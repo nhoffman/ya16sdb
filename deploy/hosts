@@ -1,3 +1,6 @@
-[webserver]
+[dokku-hosts]
 
-ya16sdb
+dokku-stack-dev
+dokku-stack-prod
+
+

@@ -1,0 +1,6 @@
+---
+
+APPNAME: ya16sdb
+HOSTNAME: ya16sdb-test.labmed.uw.edu
+STACK_NAME: "{{ APPNAME }}-data-stack"
+S3_BUCKET: "{{ APPNAME }}-data"

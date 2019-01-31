@@ -1,0 +1,85 @@
+#!/usr/bin/env ansible-playbook
+
+- hosts: localhost
+  become: no
+
+  vars_files:
+    - dash-vars.yml
+
+  vars:
+    BASENAME: "{{ APPNAME.split('-') | map('title') | join('') }}"
+    CLOUDFORMATION_PARAMS:
+      BucketName: "{{ APPNAME }}-data"
+      PolicyName: "{{ BASENAME }}Policy"
+      UserName: "{{ BASENAME }}User"
+    TARGETS:
+      - dokku-stack-dev
+      - dokku-stack-prod
+
+  tasks:
+    - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.7"
+      when: ansible_version['full'] is version('2.7', '<')
+      tags:
+        - always
+        - ansible-version
+
+    - fail: msg="specify stack to deploy to using -e TARGET=<stack name>"
+      when: TARGET is undefined or TARGET not in TARGETS
+      tags:
+        - always
+        - set-target
+
+    # "Outputs" are stored in stack_vars['stack_outputs']
+    - name: create s3 bucket and role for application data
+      cloudformation:
+        stack_name: "{{ STACK_NAME }}"
+        state: "present"
+        region: "us-west-2"
+        template: "s3-bucket-and-role.json"
+        template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
+      register: stack_vars
+      tags:
+        - s3
+
+- hosts: "{{ TARGET }}"
+  become: yes
+  become_user: dokku
+
+  vars:
+    - DATA_FILE: s3://{{ S3_BUCKET }}/filter_details.feather.gz
+
+  vars_files:
+    - secrets.yml
+    - dash-vars.yml
+
+  tasks:
+    - name: "check if {{ APPNAME }} exists"
+      shell: "dokku apps:exists {{ APPNAME }}"
+      register: app_exists
+      ignore_errors: True
+
+    - name: "create {{ APPNAME }}"
+      shell: "dokku apps:create {{ APPNAME }}"
+      when: app_exists.rc == 1
+
+    - name: configure the application
+      shell: "dokku {{ item }}"
+      with_items:
+        - "domains:add {{ APPNAME }} {{ HOSTNAME }}"
+        - "robots.txt:disallow {{ APPNAME }}"
+
+    # some of the values contain spaces and newlines, so we base64
+    # encode all of them using a jinja2 filter and identify them as
+    # --encoded
+    - name: set environment variables
+      shell: "dokku config:set --encoded --no-restart {{ APPNAME }} {{ item }}"
+      with_items:
+        - "DATA_FILE={{ DATA_FILE | b64encode }}"
+        - "BUCKET_ACCESS_KEY='{{ BUCKET_ACCESS_KEY | b64encode }}'"
+        - "BUCKET_SECRET_KEY='{{ BUCKET_SECRET_KEY | b64encode }}'"
+      no_log: true
+      tags:
+        - env-vars
+
+    - name: restart dokku app
+      shell: "dokku ps:restart {{ APPNAME }}"
