@@ -33,6 +33,10 @@ NOTE: mitogen will be installed to the virtualenv and so the path to the ansible
 Deployment
 ==========
 
+Add a git remote::
+
+  git remote add dokku-stack-dev dokku@dokku-stack-dev:ya16sdb
+
 Copy the feather file to the S3 bucket::
 
   aws s3 cp filter_details.feather.gz s3://ya16sdb-data/filter_details.feather.gz
