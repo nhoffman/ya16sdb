@@ -6,15 +6,12 @@ Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import feather
-import gzip
+import data
 import os
 import pandas
 import urllib
 
 from dash.dependencies import Input, State, Output
-
-from data import read_feather
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
@@ -38,227 +35,257 @@ FEATHER_FILE = os.environ.get('DATA_FILE', 'filter_details.feather.gz')
 AWS_ACCESS_KEY_ID = os.environ.get('BUCKET_ACCESS_KEY')
 AWS_SECRET_KEY_ID = os.environ.get('BUCKET_SECRET_KEY')
 
-df, df_last_modified = read_feather(
-    FEATHER_FILE,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_KEY_ID)
+# GLOBAL VARS
+df = None
+genera = None
+last_modified = None
+tax = None
+species_to_genus = None
+species_to_id = None
 
 
-df = df[~df['x'].isna() & ~df['y'].isna()]
-df['genus_name'] = df['genus_name'].fillna('Unclassified')
-df['genus'] = df['genus'].fillna('')
-axes = ['confidence', 'dist_pct', 'x', 'y', 'match_pct',
-        'match_species', 'match_version', 'rank_order']
-tax = df[['genus', 'genus_name', 'species', 'species_name']]
-tax = tax.drop_duplicates().sort_values(by=['genus_name', 'species_name'])
-species_genus = dict(tax[['species', 'genus']].drop_duplicates().values)
-species_id = dict(tax[['species_name', 'species']].drop_duplicates().values)
-genera = tax.groupby(by='genus')
-genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
-genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
+def set_global_data():
+    global df, genera, last_modified, species_to_genus, species_to_id, tax
+    _, modified = data.read_feather(
+        FEATHER_FILE,
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_KEY_ID,
+        get_data=False)
+    if last_modified != modified:
+        df, last_modified = data.read_feather(
+            FEATHER_FILE,
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_KEY_ID,
+            get_data=True)
+        df = df[~df['x'].isna() & ~df['y'].isna()]
+        df['genus_name'] = df['genus_name'].fillna('Unclassified')
+        df['genus'] = df['genus'].fillna('')
+        tax = df[['genus', 'genus_name', 'species', 'species_name']]
+        tax = tax.drop_duplicates().sort_values(
+            by=['genus_name', 'species_name'])
+        species_to_genus = dict(
+            tax[['species', 'genus']].drop_duplicates().values)
+        species_to_id = dict(
+            tax[['species_name', 'species']].drop_duplicates().values)
+        genera = tax.groupby(by='genus')
 
-app.layout = html.Div(
-    style={'width': 1175},
-    children=[
-        html.Div(id='state'),
-        dcc.Location(id='url', refresh=False),
-        dcc.Markdown(
-            children=[
-                str(df['download_date'].max().strftime('%A, %B %d, %Y'))
-            ],
-            containerProps={
-                'style': {
-                    'text-align': 'right',
-                    'font-style': 'italic',
-                    'height': 0,
-                    'width': '100%'}}),
-        html.Div(
-            children=[
-                dcc.Input(type='text', id='text-input'),
-                html.Button(
-                    id='submit-button',
-                    n_clicks=0,
-                    children='Search')]),
-        dcc.Markdown(
-            children=['**Genus**'],
-            containerProps={
-                'style': {
-                    'display': 'inline-block',
-                    'text-align': 'center',
-                    'vertical-align': 'middle',
-                    'width': '5%'}}),
-        html.Div(
-            children=[
-                dcc.Dropdown(
-                    id='genus-column',
-                    options=genus_opts,
-                    clearable=False)],
-            style={
-                'display': 'inline-block',
-                'vertical-align': 'middle',
-                'width': '40%'}),
-        dcc.Markdown(
-            children=['**Species**'],
-            containerProps={
-                'style': {
-                    'display': 'inline-block',
-                    'text-align': 'center',
-                    'vertical-align': 'middle',
-                    'width': '6%'}}),
-        html.Div(
-            children=[dcc.Dropdown(id='species-column', clearable=False)],
-            style={
-                'display': 'inline-block',
-                'vertical-align': 'middle',
-                'width': '48%'}),
-        html.Div(
-            children=[
-                html.Div(style={'width': '11%', 'display': 'inline-block'}),
-                dcc.Markdown(
-                    children=['**Color**'],
-                    containerProps={
-                        'style': {
-                            'width': '5%',
-                            'display': 'inline-block'}}),
-                dcc.Markdown(
-                    children=['**Shape**'],
-                    containerProps={
-                        'style': {
-                            'width': '10%',
-                            'display': 'inline-block'}}),
-                dcc.Markdown(
-                     children=['**Selection**'],
-                     containerProps={
-                         'style': {
-                             'width': '39%',
-                             'display': 'inline-block'}}),
-                dcc.Markdown(
-                    children=['**Visibility**'],
-                    containerProps={
-                        'style': {
-                            'width': '35%',
-                            'display': 'inline-block'}}),
-                html.Div(
-                    children=[
-                        dcc.Markdown(children=['**Outliers**']),
-                        dcc.Markdown(children=['**Confidence**']),
-                        dcc.Markdown(children=['**Match Species**']),
-                        dcc.Markdown(children=['**Isolation Source**']),
-                        ],
-                    style={
-                        'vertical-align': 'middle',
-                        'width': '11%',
+
+def write_layout():
+    '''
+    This is done using a function so Dash will not cache it allowing us to
+    update the underlining data.
+    '''
+    set_global_data()
+    genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
+    genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
+    axes = ['confidence', 'dist_pct', 'x', 'y', 'match_pct',
+            'match_species', 'match_version', 'rank_order']
+    return html.Div(
+        style={'width': 1175},
+        children=[
+            html.Div(id='state'),
+            dcc.Location(id='url', refresh=False),
+            dcc.Markdown(
+                children=[
+                    str(df['download_date'].max().strftime('%A, %B %d, %Y'))
+                ],
+                containerProps={
+                    'style': {
+                        'text-align': 'right',
+                        'font-style': 'italic',
+                        'height': 0,
+                        'width': '100%'}}),
+            html.Div(
+                children=[
+                    dcc.Input(type='text', id='text-input'),
+                    html.Button(
+                        id='submit-button',
+                        n_clicks=0,
+                        children='Search')]),
+            dcc.Markdown(
+                children=['**Genus**'],
+                containerProps={
+                    'style': {
                         'display': 'inline-block',
-                        }),
-                dcc.RadioItems(
-                    id='color-items',
-                    options=[
-                        {'value': 'is_out'},
-                        {'value': 'confidence'},
-                        {'value': 'match_species'},
-                        {'value': 'isolation_source'}],
-                    inputStyle={'height': 15, 'width': 15, 'margin': 11},
-                    style={
+                        'text-align': 'center',
                         'vertical-align': 'middle',
-                        'width': '5%',
-                        'display': 'inline-block'}),
-                dcc.RadioItems(
-                    id='shape-items',
-                    options=[
-                        {'value': 'is_out'},
-                        {'value': 'confidence'},
-                        {'value': 'match_species'},
-                        {'value': 'isolation_source'}],
-                    inputStyle={'height': 15, 'width': 15, 'margin': 11},
-                    style={
-                        'vertical-align': 'middle',
-                        'width': '5%',
-                        'display': 'inline-block'}),
-                html.Div(
-                    children=[
-                        dcc.Dropdown(
-                            id='outliers-selection',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='confidence-selection',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='match-species-selection',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='isolation-source-selection',
-                            multi=True)],
-                    style={
-                        'vertical-align': 'middle',
-                        'width': '39%',
-                        'display': 'inline-block'}),
-                html.Div(
-                    children=[
-                        dcc.Dropdown(
-                            id='outliers-visibility',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='confidence-visibility',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='match-species-visibility',
-                            multi=True),
-                        dcc.Dropdown(
-                            id='isolation-source-visibility',
-                            multi=True)],
-                    style={
-                        'vertical-align': 'middle',
-                        'width': '39%',
-                        'display': 'inline-block'})],
-            style={
-                'border': 'thin lightgrey solid',
-                'borderRadius': 5,
-                'margin': 5,
-                'padding': 10,
-                'width': '97%'}),
-        html.Div(
-            children=[dcc.Slider(id='year--slider')],
-            style={'margin': 15, 'width': '95%'}),
-        dcc.Markdown(
-            children=['**Axes**'],
-            containerProps={
-                'style': {
+                        'width': '5%'}}),
+            html.Div(
+                children=[
+                    dcc.Dropdown(
+                        id='genus-column',
+                        options=genus_opts,
+                        clearable=False)],
+                style={
                     'display': 'inline-block',
-                    'text-align': 'center',
                     'vertical-align': 'middle',
-                    'width': '4%'}}),
-        html.Div(
-            children=[
-                dcc.Dropdown(
-                    clearable=False,
-                    id='yaxis-column',
-                    options=[{'label': i, 'value': i} for i in axes])],
-            style={
-                'width': '14%',
-                'display': 'inline-block',
-                'vertical-align': 'middle'}),
-        html.Div(
-            children=[
-                dcc.Dropdown(
-                    clearable=False,
-                    id='xaxis-column',
-                    options=[{'label': i, 'value': i} for i in axes])],
-            style={
-                'width': '14%',
-                'display': 'inline-block',
-                'vertical-align': 'middle'}),
-        dcc.Graph(id='plot'),
-        html.Table(
-            id='table-div',
-            style={
-                'border': 'thin lightgrey solid',
-                'borderRadius': 5,
-                'display': 'inline-block',
-                'height': 413,
-                'margin': 5,
-                'overflow-y': 'scroll',
-                'padding': 10,
-                'width': '97%'})])
+                    'width': '40%'}),
+            dcc.Markdown(
+                children=['**Species**'],
+                containerProps={
+                    'style': {
+                        'display': 'inline-block',
+                        'text-align': 'center',
+                        'vertical-align': 'middle',
+                        'width': '6%'}}),
+            html.Div(
+                children=[dcc.Dropdown(id='species-column', clearable=False)],
+                style={
+                    'display': 'inline-block',
+                    'vertical-align': 'middle',
+                    'width': '48%'}),
+            html.Div(
+                children=[
+                    html.Div(
+                        style={'width': '11%', 'display': 'inline-block'}),
+                    dcc.Markdown(
+                        children=['**Color**'],
+                        containerProps={
+                            'style': {
+                                'width': '5%',
+                                'display': 'inline-block'}}),
+                    dcc.Markdown(
+                        children=['**Shape**'],
+                        containerProps={
+                            'style': {
+                                'width': '10%',
+                                'display': 'inline-block'}}),
+                    dcc.Markdown(
+                         children=['**Selection**'],
+                         containerProps={
+                             'style': {
+                                 'width': '39%',
+                                 'display': 'inline-block'}}),
+                    dcc.Markdown(
+                        children=['**Visibility**'],
+                        containerProps={
+                            'style': {
+                                'width': '35%',
+                                'display': 'inline-block'}}),
+                    html.Div(
+                        children=[
+                            dcc.Markdown(children=['**Outliers**']),
+                            dcc.Markdown(children=['**Confidence**']),
+                            dcc.Markdown(children=['**Match Species**']),
+                            dcc.Markdown(children=['**Isolation Source**']),
+                            ],
+                        style={
+                            'vertical-align': 'middle',
+                            'width': '11%',
+                            'display': 'inline-block',
+                            }),
+                    dcc.RadioItems(
+                        id='color-items',
+                        options=[
+                            {'value': 'is_out'},
+                            {'value': 'confidence'},
+                            {'value': 'match_species'},
+                            {'value': 'isolation_source'}],
+                        inputStyle={'height': 15, 'width': 15, 'margin': 11},
+                        style={
+                            'vertical-align': 'middle',
+                            'width': '5%',
+                            'display': 'inline-block'}),
+                    dcc.RadioItems(
+                        id='shape-items',
+                        options=[
+                            {'value': 'is_out'},
+                            {'value': 'confidence'},
+                            {'value': 'match_species'},
+                            {'value': 'isolation_source'}],
+                        inputStyle={'height': 15, 'width': 15, 'margin': 11},
+                        style={
+                            'vertical-align': 'middle',
+                            'width': '5%',
+                            'display': 'inline-block'}),
+                    html.Div(
+                        children=[
+                            dcc.Dropdown(
+                                id='outliers-selection',
+                                multi=True),
+                            dcc.Dropdown(
+                                id='confidence-selection',
+                                multi=True),
+                            dcc.Dropdown(
+                                id='match-species-selection',
+                                multi=True),
+                            dcc.Dropdown(
+                                id='isolation-source-selection',
+                                multi=True)],
+                        style={
+                            'vertical-align': 'middle',
+                            'width': '39%',
+                            'display': 'inline-block'}),
+                    html.Div(
+                        children=[
+                            dcc.Dropdown(
+                                id='outliers-visibility',
+                                multi=True),
+                            dcc.Dropdown(
+                                id='confidence-visibility',
+                                multi=True),
+                            dcc.Dropdown(
+                                id='match-species-visibility',
+                                multi=True),
+                            dcc.Dropdown(
+                                id='isolation-source-visibility',
+                                multi=True)],
+                        style={
+                            'vertical-align': 'middle',
+                            'width': '39%',
+                            'display': 'inline-block'})],
+                style={
+                    'border': 'thin lightgrey solid',
+                    'borderRadius': 5,
+                    'margin': 5,
+                    'padding': 10,
+                    'width': '97%'}),
+            html.Div(
+                children=[dcc.Slider(id='year--slider')],
+                style={'margin': 15, 'width': '95%'}),
+            dcc.Markdown(
+                children=['**Axes**'],
+                containerProps={
+                    'style': {
+                        'display': 'inline-block',
+                        'text-align': 'center',
+                        'vertical-align': 'middle',
+                        'width': '4%'}}),
+            html.Div(
+                children=[
+                    dcc.Dropdown(
+                        clearable=False,
+                        id='yaxis-column',
+                        options=[{'label': i, 'value': i} for i in axes])],
+                style={
+                    'width': '14%',
+                    'display': 'inline-block',
+                    'vertical-align': 'middle'}),
+            html.Div(
+                children=[
+                    dcc.Dropdown(
+                        clearable=False,
+                        id='xaxis-column',
+                        options=[{'label': i, 'value': i} for i in axes])],
+                style={
+                    'width': '14%',
+                    'display': 'inline-block',
+                    'vertical-align': 'middle'}),
+            dcc.Graph(id='plot'),
+            html.Table(
+                id='table-div',
+                style={
+                    'border': 'thin lightgrey solid',
+                    'borderRadius': 5,
+                    'display': 'inline-block',
+                    'height': 413,
+                    'margin': 5,
+                    'overflow-y': 'scroll',
+                    'padding': 10,
+                    'width': '97%'})])
+
+
+app.layout = write_layout
 
 
 def assign_hover_text(s):
@@ -318,7 +345,7 @@ def update_xaxis_value(search):
 #     Output('url', 'search'),
 #     [Input('species-column', 'value')])
 # def update_url_search(value):
-#     return '?' + urllib.parse.urlencode({'species_id': value})
+#     return '?' + urllib.parse.urlencode({'species_to_id': value})
 
 
 @app.callback(
@@ -332,7 +359,7 @@ def update_genus_value(search, n_clicks, text, state):
     if request is None:
         value = DEFAULT_GENUS
     elif request == 'species_name':
-        value = species_genus.get(data, DEFAULT_GENUS)
+        value = species_to_genus.get(data, DEFAULT_GENUS)
     else:
         value = df[df[request] == data].iloc[0]['genus']
     return value
@@ -361,7 +388,7 @@ def update_species_value(options, search, n_clicks, text, state, tax_id):
     if request is None:  # no request
         value = options[0]['value']  # return first item in dropdown
     elif request == 'species_name':
-        value = species_id.get(data, options[0]['value'])
+        value = species_to_id.get(data, options[0]['value'])
     else:
         value = dff[dff[request] == data].iloc[0]['species']
     return value
