@@ -4,3 +4,7 @@ medirect>=0.11.0
 sqlalchemy
 psycopg2
 feather-format
+
+# bokeh requirements to-be-retired
+bokeh==0.12.5
+git+https://github.com/google/google-visualization-python.git
