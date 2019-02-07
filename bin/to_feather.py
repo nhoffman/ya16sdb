@@ -42,6 +42,8 @@ DTYPES = {
     'seqname': str,
     'source': str,
     'species': str,
+    'species_group': str,
+    'species_subgroup': str,
     'strain': str,
     'tax_id': str,
     'title': str,
@@ -73,7 +75,7 @@ def main(arguments):
     taxonomy = pandas.read_csv(
         args.taxonomy,
         dtype=DTYPES,
-        usecols=['tax_id', 'tax_name', 'rank', 'species', 'genus'])
+        usecols=['tax_id', 'tax_name', 'rank', 'species', 'species_group', 'species_subgroup', 'genus'])
     hits = pandas.read_table(
         args.hits,
         dtype=DTYPES,
@@ -108,6 +110,18 @@ def main(arguments):
         taxonomy.rename(columns={'tax_name': 'genus_name'}),
         how='left',
         left_on='genus',
+        right_on='tax_id',
+        suffixes=('', '_')).drop(columns='tax_id_', axis='columns')
+    details = details.merge(
+        taxonomy.rename(columns={'tax_name': 'species_group_name'}),
+        how='left',
+        left_on='species_group',
+        right_on='tax_id',
+        suffixes=('', '_')).drop(columns='tax_id_', axis='columns')
+    details = details.merge(
+        taxonomy.rename(columns={'tax_name': 'species_subgroup_name'}),
+        how='left',
+        left_on='species_subgroup',
         right_on='tax_id',
         suffixes=('', '_')).drop(columns='tax_id_', axis='columns')
     details = details.merge(
