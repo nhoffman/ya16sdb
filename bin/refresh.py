@@ -148,7 +148,12 @@ def main():
     refseqs = refseqs[~refseqs['accession'].isnull()]  # avoid Null TypeError
     annos = annos[~annos['accession'].isin(refseqs['accession'])]
 
-    assert(len(annos['seqname']) == len(annos['seqname'].drop_duplicates()))
+    # check for and raise exception if duplicate seqname rows
+    if len(annos['seqname']) != len(annos['seqname'].drop_duplicates()):
+        dups = annos.groupby(by='seqname').filter(lambda x: len(x) > 1)
+        dups = dups['seqname'].drop_duplicates()
+        err = ', '.join(dups.values)
+        raise DuplicateSeqnameError(err)
 
     """
     deduplicate and write fasta
@@ -214,6 +219,11 @@ def main():
     for v in sorted(versions):
         if v:
             args.records_out.write(v + '\n')
+
+
+class DuplicateSeqnameError(Exception):
+    """Raised when a seqname has more than one row of annotations"""
+    pass
 
 
 if __name__ == '__main__':
