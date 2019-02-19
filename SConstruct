@@ -198,7 +198,7 @@ else:
 filter out ignored accessions
 '''
 esearch = env.Command(
-    source=['data/ignore.txt', esearch],
+    source=[settings['ignore'], esearch],
     target='$out/esearch.txt',
     action='grep --invert-match --file $SOURCES > $TARGET')
 
