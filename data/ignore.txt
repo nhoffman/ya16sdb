@@ -10,3 +10,7 @@ MK240093.1
 MK240094.1
 MK240095.1
 MK240096.1
+# part of the 565 tax_id group not currently considered Bacteria
+MK389430
+MG835966
+MG835949
