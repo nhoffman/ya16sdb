@@ -761,7 +761,7 @@ can be built again in the future if needed
 """
 taxdmp = env.Command(
     source=settings['taxdmp'],
-    target='$out/taxdmp.zip',
+    target='$out/' + os.path.basename(settings['taxdmp']),
     action='cp $SOURCE $TARGET')
 
 """
