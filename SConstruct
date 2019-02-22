@@ -36,23 +36,19 @@ def PathIsFileCreate(key, val, env):
         open(val, 'w').close()
 
 
-def blast_db(env, sequence_file, output_base, dbtype='nucl'):
+def blast_db(env, sequence_file, output_base):
     '''
-    Create a blast database
+    Create a blast database and file md5sum
     '''
-    prefix = dbtype[0]
-    extensions = ['.{0}{1}'.format(prefix, suffix)
-                  for suffix in ('hr', 'in', 'sq')]
+    extensions = ['.nhr', '.nin', '.nsq']
     blast_out = env.Command(
         target=[output_base + ext for ext in extensions],
         source=sequence_file,
-        action=('makeblastdb -dbtype {0} '
-                '-in $SOURCE '
-                '-out {1}'.format(dbtype, output_base)))
+        action='makeblastdb -dbtype nucl -in $SOURCE -out ' + output_base)
     env.Command(
         target=output_base,
         source=blast_out,
-        action=('md5sum $SOURCES > $TARGET'))
+        action='md5sum $SOURCES > $TARGET')
     return blast_out
 
 
@@ -371,8 +367,7 @@ fa, refresh_info, pubmed_info, references, refseq_info, _ = env.Command(
 """
 append new records to global list
 
-NOTE: see bin/dedup_gb.py for genbank record cache maintenance
-TODO: create bin/dedup_gb.py
+TODO: create bin/dedup_gb.py for genbank record cache maintenance
 """
 env.Command(
     target=None,
@@ -434,7 +429,7 @@ dedup_fa, dedup_info = env.Command(
     action=('$deenurp deduplicate_sequences '
             '--group-by accession '
             '$SOURCES ${TARGETS[0]} /dev/stdout | '
-            # remove weight column because it is meaningless
+            # remove meaningless weight column
             'csvcut.py --not-columns weight --out ${TARGETS[1]}'))
 
 """
@@ -656,9 +651,7 @@ trusted_lineages = env.Command(
     action='$taxit lineage_table --csv-table $TARGET $SOURCES')
 
 """
-Mothur output
-
-https://mothur.org/wiki/Taxonomy_File
+Mothur output - https://mothur.org/wiki/Taxonomy_File
 """
 trusted_mothur = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/lineages.txt',
@@ -761,6 +754,15 @@ env.Command(
             '--plot-dir $out/dedup/1200bp/named/filtered/plots '
             '--plot-map ${TARGETS[1]} '
             '--plot-index ${TARGETS[0]}'))
+
+"""
+copy taxdmp file into output dir so a ``taxit new_database``
+can be built again in the future if needed
+"""
+taxdmp = env.Command(
+    source=settings['taxdmp'],
+    target='$out/taxdmp.zip',
+    action='cp $SOURCE $TARGET')
 
 """
 git version used to generate output
