@@ -7,3 +7,5 @@ test_output
 settings.conf
 vault_pass.txt
 __pycache__
+ncbi_taxonomy.db
+taxonomy.conf
