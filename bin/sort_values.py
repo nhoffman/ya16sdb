@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+sort sequences in REVERSE preferred order for makeblastdb
 """
 import argparse
 import hashlib
@@ -7,15 +8,15 @@ import pandas
 import sys
 
 ascending = {
-    'ambig_count': True,
-    'download_date': False,
-    'is_published': False,
-    'is_refseq': False,
-    'is_type': False,
-    'length': False,
-    'modified_date': False,
-    'seqhash': True,
-    'version_num': False
+    'ambig_count': False,
+    'download_date': True,
+    'is_published': True,
+    'is_refseq': True,
+    'is_type': True,
+    'length': True,
+    'modified_date': True,
+    'seqhash': False,
+    'version_num': True
 }
 
 
