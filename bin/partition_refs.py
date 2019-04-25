@@ -13,103 +13,102 @@ def build_parser():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # inputs
-    p.add_argument(
-        'fasta',
-        metavar='FASTA',
-        help="""sequence file""",
-        type=argparse.FileType('r'))
-    p.add_argument(
-        'annotations',
-        metavar='CSV',
-        help="""Sequence metadata""")
+    p.add_argument('fasta')
+    p.add_argument('feather')
     # outputs
+    p.add_argument('out_fa')
+    p.add_argument('out_info')
     p.add_argument(
-        'out_fa',
-        type=argparse.FileType('w'),
-        help='fasta out')
-    p.add_argument(
-        'out_annotations',
-        metavar='CSV',
-        type=argparse.FileType('w'),
-        help='seq info out')
-    # filtering switches
-    flt = p.add_argument_group('filtering options')
-    flt.add_argument(
-        '--is_type',
+        '--drop-duplicate-sequences',
         action='store_true',
-        help='filter for records is_type=True')
-    flt.add_argument(
-        '--species',
+        help='group by accession and drop rows with duplicate seqhashes')
+    # filtering switches
+    o = p.add_argument_group('OR options')
+    o.add_argument(
+        '--is_valid',
+        action='store_true',
+        help='filter for named (is_valid=true) records')
+    o.add_argument(
+        '--tax-ids',
+        metavar='FILE',
+        help='if tax_id is in FILE')
+    a = p.add_argument_group('AND options')
+    a.add_argument(
+        '--is_species',
         action='store_true',
         help='filter for records with tax id in species column')
-    flt.add_argument(
-        '-a', '--prop-ambig-cutoff',
+    a.add_argument(
+        '--is_type',
+        action='store_true',
+        help='filter for type straing records')
+    a.add_argument(
+        '--min-length',
+        metavar='',
+        type=int,
+        help='Minimum sequence length')
+    a.add_argument(
+        '--prop-ambig-cutoff',
+        metavar='',
         type=float,
         help=('Maximum proportion of characters in '
               'sequence which may be ambiguous'))
-    flt.add_argument(
-        '--min-length',
+    a.add_argument(
+        '--species-cap',
+        metavar='INT',
         type=int,
-        help='Minimum sequence length')
-    flt.add_argument(
-        '--tax-ids',
-        help='column tax_id')
-    keep = p.add_argument_group('keep group')
-    keep.add_argument(
-        '--versions',
-        help='column version')
+        help='group records by species taxid and accept ony top nth')
     return p
 
 
 def main():
     args = build_parser().parse_args()
 
-    keep = []
+    info = pandas.read_feather(args.feather)
+    info['keep'] = True
 
-    annotations = pandas.read_csv(args.annotations, dtype=str)
-    annotations = annotations.set_index('seqname')
-
-    if args.versions:
-        versions = (v.strip() for v in open(args.versions))
-        versions = set(v for v in versions if v)
-        keep.append(annotations[annotations['version'].isin(versions)])
-
-    # raw min_length filtering
-    if args.min_length:
-        annotations['length'] = annotations['length'].astype(int)
-        annotations = annotations[annotations['length'] > args.min_length]
-
-    # raw prop_ambig filtering
-    if args.prop_ambig_cutoff:
-        annotations['ambig_count'] = annotations['ambig_count'].astype(int)
-        annotations['length'] = annotations['length'].astype(int)
-        annotations['prop_ambig'] = (
-            annotations['ambig_count'] / annotations['length'])
-        annotations = (
-            annotations[annotations['prop_ambig'] < args.prop_ambig_cutoff])
-        annotations = annotations.drop('prop_ambig', axis=1)
+    if args.is_valid:
+        info.loc[~info['is_valid'], 'keep'] = False
 
     if args.tax_ids:
         tax_ids = (i.strip() for i in open(args.tax_ids))
         tax_ids = set(i for i in tax_ids if i)
-        annotations = annotations[annotations['tax_id'].isin(tax_ids)]
+        info.loc[info['tax_id'].isin(tax_ids), 'keep'] = True
+
+    # drop OR rows
+    info = info[info['keep']].drop('keep', axis='columns')
+
+    if args.min_length:
+        info = info[info['length'] >= args.min_length]
+
+    # raw prop_ambig filtering
+    if args.prop_ambig_cutoff:
+        info['prop_ambig'] = (
+            info['ambig_count'] / info['length'])
+        info = info[info['prop_ambig'] <= args.prop_ambig_cutoff]
+        info = info.drop('prop_ambig', axis='columns')
 
     if args.is_type:
-        annotations = annotations[annotations['is_type'] == 'True']
+        info = info[info['is_type']]
 
-    if args.species:
-        annotations = annotations[~annotations['species'].isna()]
+    if args.is_species:
+        info = info[~info['species'].isna()]
 
-    if keep:
-        annotations = annotations.append(pandas.concat(keep))
-        annotations = annotations[~annotations.index.duplicated()]
+    if args.drop_duplicate_sequences:
+        info = info[~info[['accession', 'seqhash']].duplicated(keep='first')]
 
-    for s in SeqIO.parse(args.fasta, 'fasta'):
-        if s.id in annotations.index:
-            args.out_fa.write('>{}\n{}\n'.format(s.description, s.seq))
+    if args.species_cap:
+        info = info.groupby(by='species', as_index=False)
+        info = info.nth(list(range(args.species_cap)))
 
-    if args.out_annotations:
-        annotations.to_csv(args.out_annotations)
+    seqs = {s.id: s.seq for s in SeqIO.parse(args.fasta, 'fasta')}
+
+    with open(args.out_fa, 'w') as out_fa:
+        for s in info['seqname'].values:
+            if s in seqs:
+                out_fa.write('>{}\n{}\n'.format(s, seqs[s]))
+
+    if args.out_info:
+        info.to_csv(args.out_info, index=False)
 
 
 if __name__ == '__main__':
