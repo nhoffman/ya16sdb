@@ -31,11 +31,11 @@ fi
 
 if [[ ! -f $venv/bin/vsearch ]]; then
   (cd src &&
-   wget https://github.com/torognes/vsearch/releases/download/v2.5.0/vsearch-2.5.0-linux-x86_64.tar.gz &&
-   tar tzf vsearch-2.5.0-linux-x86_64.tar.gz |
-   grep bin/vsearch | xargs tar xzf vsearch-2.5.0-linux-x86_64.tar.gz --strip-components 2 --directory $venv/bin)
+   wget https://github.com/torognes/vsearch/releases/download/v2.13.0/vsearch-2.13.0-linux-x86_64.tar.gz &&
+   tar tzf vsearch-2.13.0-linux-x86_64.tar.gz |
+   grep bin/vsearch | xargs tar xzf vsearch-2.13.0-linux-x86_64.tar.gz --strip-components 2 --directory $venv/bin)
 else
-  echo "vsearch already installed: v2.5.0"
+  echo "vsearch already installed: v2.13.0"
 fi
 
 rm -rf src
