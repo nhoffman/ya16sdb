@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Add confidence column to seq_info file
+Add confidence column to feather file
 
 Confidence values:
 
@@ -9,7 +9,8 @@ published - has pubmed_id and is_type is FALSE
 direct - is_type is FALSE and no pubmed_id (the rest)
 """
 import argparse
-import csv
+import hashlib
+import pandas
 import sys
 
 
@@ -17,25 +18,29 @@ def main():
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('seq_info', type=argparse.FileType('r'))
-    p.add_argument('pubmed_ids', type=argparse.FileType('r'))
-    p.add_argument('--out', type=argparse.FileType('w'), default=sys.stdout)
+    p.add_argument('feather')
+    p.add_argument(
+        '--out',
+        default=sys.stdout,
+        type=argparse.FileType('w'),
+        help='feather file md5sum [stdout]')
     args = p.parse_args()
-    pids = set(r['version'] for r in csv.DictReader(args.pubmed_ids))
-    info = csv.DictReader(args.seq_info)
-    writer = csv.DictWriter(
-        args.out, fieldnames=info.fieldnames + ['confidence'])
-    writer.writeheader()
-    for row in info:
-        if row['is_type'] == 'True':
-            row['confidence'] = 'type'
-        elif '_' in row['accession']:
-            row['confidence'] = 'refseq'
-        elif row['version'] in pids:
-            row['confidence'] = 'published'
+    info = pandas.read_feather(args.feather)
+
+    def confidence(s):
+        if s['is_type']:
+            s['confidence'] = 'type'
+        elif s['is_refseq']:
+            s['confidence'] = 'refseq'
+        elif s['is_published']:
+            s['confidence'] = 'published'
         else:
-            row['confidence'] = 'direct'
-        writer.writerow(row)
+            s['confidence'] = 'direct'
+        return s
+
+    info = info.apply(confidence, axis='columns')
+    info.to_feather(args.feather)
+    args.out.write(hashlib.md5(open(args.feather, 'rb').read()).hexdigest())
 
 
 if __name__ == '__main__':
