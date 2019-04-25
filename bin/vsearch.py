@@ -4,8 +4,6 @@ Filters and aligns fasta records based on vsearch alignment and
 presence of invalid sequence characters.
 """
 import argparse
-import sys
-
 from Bio import SeqIO, Alphabet
 
 
@@ -13,7 +11,6 @@ def main():
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-
     p.add_argument(
         'vsearch',
         help='vsearch alignments')
@@ -21,22 +18,18 @@ def main():
         'fasta',
         help='vsearch fasta file')
     p.add_argument(
-        '--unknowns',
-        required=True,  # mimics ``taxit update_taxids``
-        metavar='fasta',
+        'out',
+        help='fasta output of sequences in forward orientation')
+    p.add_argument(
+        'unknowns',
         help=('fasta format output of sequences not '
               'aligned or with invalid sequence characters'))
-    p.add_argument(
-        '--out',
-        default=sys.stdout,
-        metavar='fasta',
-        help='fasta output of sequences in forward orientation')
-
     args = p.parse_args()
-
-    vsearch = (row.split('\t') for row in open(args.vsearch))
-    vsearch = {row[0]: row[2] for row in vsearch if row[1] != '*'}
-
+    vsearch = (row.strip().split('\t') for row in open(args.vsearch))
+    vsearch = (row for row in vsearch if row[1] != '*')
+    vsearch = sorted(vsearch, key=lambda x: x[2], reverse=True)
+    # we want the plus (x[2]) aligns and they will be at the end
+    vsearch = {row[0]: row[2] for row in vsearch}
     with open(args.out, 'w') as out, open(args.unknowns, 'w') as unknowns:
         seqs = SeqIO.parse(args.fasta, 'fasta', Alphabet.IUPAC.ambiguous_dna)
         for s in seqs:
