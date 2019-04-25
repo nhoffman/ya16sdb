@@ -92,7 +92,7 @@ def main():
     references = []
 
     for i, g in enumerate(SeqIO.parse(args.genbank, 'genbank')):
-        sys.stderr.write('\rprocessing record ' + str(i))
+        sys.stderr.write('processing record ' + str(i) + '\r')
 
         try:
             record = parse_record(g)
