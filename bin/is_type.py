@@ -3,9 +3,7 @@
 Add is_type column based on presence in type strain file
 """
 import argparse
-import hashlib
 import pandas
-import sys
 
 
 def main():
@@ -18,11 +16,6 @@ def main():
         'types',
         type=argparse.FileType('r'),
         help='txt file of version numbers that are type strains')
-    p.add_argument(
-        '--out',
-        default=sys.stdout,
-        type=argparse.FileType('w'),
-        help='feather file md5sum [stdout]')
     args = p.parse_args()
     types = (t.strip() for t in args.types)
     types = set(t for t in types if t)
@@ -30,7 +23,6 @@ def main():
     info['is_type'] = False
     info.loc[info['version'].isin(types), 'is_type'] = True
     info.to_feather(args.feather)
-    args.out.write(hashlib.md5(open(args.feather, 'rb').read()).hexdigest())
 
 
 if __name__ == '__main__':

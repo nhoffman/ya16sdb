@@ -5,10 +5,8 @@ output all valid tax_ids in database
 
 import argparse
 import configparser
-import hashlib
 import pandas
 import sqlalchemy
-import sys
 
 
 def main():
@@ -20,11 +18,6 @@ def main():
     p.add_argument(
         'url',
         help='Database string URI or filename.')
-    p.add_argument(
-        '--out',
-        default=sys.stdout,
-        type=argparse.FileType('w'),
-        help='feather file md5sum [stdout')
     args = p.parse_args()
     info = pandas.read_feather(args.feather)
     conf = configparser.SafeConfigParser(allow_no_value=True)
@@ -40,7 +33,6 @@ def main():
     info['is_valid'] = False
     info.loc[info['tax_id'].isin(named), 'is_valid'] = True
     info.to_feather(args.feather)
-    args.out.write(hashlib.md5(open(args.feather, 'rb').read()).hexdigest())
 
 
 if __name__ == '__main__':
