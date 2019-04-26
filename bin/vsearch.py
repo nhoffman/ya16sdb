@@ -4,6 +4,7 @@ Filters and aligns fasta records based on vsearch alignment and
 presence of invalid sequence characters.
 """
 import argparse
+import pandas
 from Bio import SeqIO, Alphabet
 
 
@@ -18,7 +19,13 @@ def main():
         'fasta',
         help='vsearch fasta file')
     p.add_argument(
-        'out',
+        'seq_info',
+        help='seq_info file')
+    p.add_argument(
+        'out_fa',
+        help='fasta output of sequences in forward orientation')
+    p.add_argument(
+        'out_info',
         help='fasta output of sequences in forward orientation')
     p.add_argument(
         'unknowns',
@@ -30,15 +37,18 @@ def main():
     vsearch = sorted(vsearch, key=lambda x: x[2], reverse=True)
     # we want the plus (x[2]) aligns and they will be at the end
     vsearch = {row[0]: row[2] for row in vsearch}
-    with open(args.out, 'w') as out, open(args.unknowns, 'w') as unknowns:
-        seqs = SeqIO.parse(args.fasta, 'fasta', Alphabet.IUPAC.ambiguous_dna)
-        for s in seqs:
+    with open(args.out_fa, 'w') as out, open(args.unknowns, 'w') as unknowns:
+        parsed = SeqIO.parse(args.fasta, 'fasta', Alphabet.IUPAC.ambiguous_dna)
+        for s in parsed:
             if s.id in vsearch and Alphabet._verify_alphabet(s.seq):
                 if vsearch[s.id] == '-':
                     s.seq = s.seq.reverse_complement()
                 out.write('>{}\n{}\n'.format(s.description, s.seq))
             else:
                 unknowns.write('>{}\n{}\n'.format(s.description, s.seq))
+    info = pandas.read_csv(args.seq_info, dtype=str)
+    info = info[info['seqname'].isin(vsearch)]
+    info.to_csv(args.out_info, index=False)
 
 
 if __name__ == '__main__':
