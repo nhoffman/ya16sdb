@@ -119,7 +119,7 @@ env = Environment(
         '{eutils}'.format(**settings))
 )
 
-env.Decider('MD5-timestamp')
+env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
 
@@ -329,10 +329,11 @@ Fix record orientation.  Drop sequences with no alignments.
 These records are rare and we want to be able to re-download later
 them when the 16s training set updates.
 """
-fa, _ = env.Command(
+fa, seq_info, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
+            '$out/ncbi/vsearch/seq_info.csv',
             '$out/ncbi/vsearch/unknown.fasta'],
-    source=[vsearch, fa],
+    source=[vsearch, fa, seq_info],
     action='vsearch.py $SOURCES $TARGETS')
 
 """
@@ -387,7 +388,7 @@ env.Command(
 update tax_ids
 """
 seq_info = env.Command(
-    target='$out/ncbi/combined/taxit/seq_info.csv',
+    target='$out/ncbi/combined/update_taxids/seq_info.csv',
     source=seq_info,
     action='$taxit -v update_taxids --out $TARGET $SOURCE $tax_url')
 
@@ -414,7 +415,7 @@ feather = env.Command(
 species = env.Command(
     target='$out/.feather/species.md5',
     source=[feather, taxonomy],
-    action='species.py --out $TARGET $SOURCES')
+    action=['species.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 https://github.com/nhoffman/ya16sdb/issues/11
@@ -422,12 +423,12 @@ https://github.com/nhoffman/ya16sdb/issues/11
 is_type = env.Command(
     target='$out/.feather/is_type.md5',
     source=[feather, types],
-    action='is_type.py --out $TARGET $SOURCES')
+    action=['is_type.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 is_published = env.Command(
     target='$out/.feather/is_publshed.md5',
     source=[feather, pubmed_info],
-    action='is_published.py --out $TARGET $SOURCES')
+    action=['is_published.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 add is_refseq and original column with refseq accession
@@ -435,7 +436,7 @@ add is_refseq and original column with refseq accession
 is_refseq = env.Command(
     target='$out/.feather/is_refseq.md5',
     source=[feather, refseq_info],
-    action='is_refseq.py --out $TARGET $SOURCES')
+    action=['is_refseq.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 '''
 is_valid attribute from taxtastic
@@ -445,7 +446,7 @@ https://github.com/fhcrc/taxtastic/blob/master/taxtastic/ncbi.py#L172
 is_valid = env.Command(
     target='$out/.feather/is_valid.md5',
     source=feather,
-    action='is_valid.py --out $TARGET $SOURCE $tax_url')
+    action=['is_valid.py $SOURCE $tax_url', 'md5sum $SOURCE > $TARGET'])
 
 """
 https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40
@@ -453,7 +454,7 @@ https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40
 confidence = env.Command(
     target='$out/.feather/confidence.md5',
     source=feather,
-    action='confidence.py --out $TARGET $SOURCE')
+    action=['confidence.py $SOURCE', 'md5sum $SOURCE > $TARGET'])
 Depends(confidence, [is_type, is_refseq, is_published])
 
 """
@@ -462,14 +463,14 @@ calculate md5hash of sequences
 seqhash = env.Command(
     target='$out/.feather/seqhash.md5',
     source=[feather, fa],
-    action='seqhash.py --out $TARGET $SOURCES')
+    action=['seqhash.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """End feather columns"""
 
 sort_values = env.Command(
     target='$out/.feather/sorted.md5',
     source=feather,
-    action='sort_values.py --out $TARGET $SOURCE $sort_by')
+    action=['sort_values.py $SOURCE $sort_by', 'md5sum $SOURCE > $TARGET'])
 Depends(sort_values, [is_type, is_refseq, is_published, seqhash])
 
 fa, seq_info = env.Command(
@@ -603,7 +604,7 @@ of processes - otherwise deenurp will use all of them!
 """
 fa, taxid_map, details_out, deenurp_log = env.Command(
     source=[fa, taxid_map, taxonomy, details_in, trusted_taxids],
-    target=['$out/dedup/1200bp/named/filtered/seqs.fasta',
+    target=['$out/dedup/1200bp/named/filtered/unsorted.fasta',
             '$out/dedup/1200bp/named/filtered/tax_id_map.csv',
             '$out/dedup/1200bp/named/filtered/details_out.csv',
             '$out/dedup/1200bp/named/filtered/deenurp.log'],
@@ -630,10 +631,11 @@ fa, taxid_map, details_out, deenurp_log = env.Command(
 """
 Create a filtered seq_info.csv file
 """
-seq_info = env.Command(
-    target='$out/dedup/1200bp/named/filtered/seq_info.csv',
-    source=[taxid_map, seq_info],
-    action='merge.py --out $TARGET $SOURCES')
+fa, seq_info = env.Command(
+    target=['$out/dedup/1200bp/named/filtered/seqs.fasta',
+            '$out/dedup/1200bp/named/filtered/seq_info.csv'],
+    source=[fa, feather],
+    action='partition_refs.py $SOURCES $TARGETS')
 
 """
 Make general named taxtable with all ranks included for filter_outliers
