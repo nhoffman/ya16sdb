@@ -102,13 +102,15 @@ def main():
 
     seqs = {s.id: s.seq for s in SeqIO.parse(args.fasta, 'fasta')}
 
+    drop = []
     with open(args.out_fa, 'w') as out_fa:
         for s in info['seqname'].values:
             if s in seqs:
                 out_fa.write('>{}\n{}\n'.format(s, seqs[s]))
-
-    if args.out_info:
-        info.to_csv(args.out_info, index=False)
+            else:
+                drop.append(s)
+    drop = set(drop)
+    info[~info['seqname'].isin(drop)].to_csv(args.out_info, index=False)
 
 
 if __name__ == '__main__':
