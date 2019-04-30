@@ -126,7 +126,8 @@ Help(vrs.GenerateHelpText(env))
 rrna_16s = ('16s[All Fields] '
             'AND rRNA[Feature Key] '
             'AND Bacteria[Organism] '
-            'AND 500 : 99999999999[Sequence Length]')
+            'AND {min_seq_length} : '
+            '99999999999[Sequence Length]').format(**settings)
 
 mefetch_acc = ('mefetch -vv '
                '-api-key $api_key '
@@ -241,7 +242,10 @@ gbs = env.Command(
             '| '
             # extract 16s features
             'ftract -feature "rrna:product:16S ribosomal RNA" '
-            '-log $out/ncbi/log.txt -on-error continue | '
+            '-log $out/ncbi/log.txt '
+            '-on-error continue '
+            '-min-length ' + settings['min_seq_length'] + ' '
+            '| '
             'mefetch '  # download genbank records
             '-vv '
             '-api-key $api_key '
