@@ -764,34 +764,6 @@ named_type_hits = env.Command(
             '--maxaccepts 1 '
             '--strand plus'))
 
-'''
-TODO: add named_type_hits to feather file
-'''
-
-# '''
-# bokeh plot filtered sequences
-# hard coded: sort column 2 (records) desc
-# '''
-# env.Command(
-#     target=['$out/dedup/1200bp/named/filtered/index.html',
-#             '$out/dedup/1200bp/named/filtered/plots/map.csv'],
-#     source=[details_out,
-#             named_type_hits,
-#             seq_info,
-#             taxonomy,
-#             types,
-#             deenurp_log],
-#     action=('plot_details.py ${SOURCES[:5]} '
-#             '--param strategy:cluster '
-#             '--param cluster_type:single '
-#             '--param distance_percentile:90.0 '
-#             '--param min_distance:0.01 '
-#             '--param max_distance:0.02 '
-#             '--log-in ${SOURCES[5]} '
-#             '--plot-dir $out/dedup/1200bp/named/filtered/plots '
-#             '--plot-map ${TARGETS[1]} '
-#             '--plot-index ${TARGETS[0]}'))
-
 """
 copy taxdmp file into output dir so a ``taxit new_database``
 can be built again in the future if needed
