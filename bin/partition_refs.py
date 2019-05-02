@@ -127,9 +127,9 @@ def main():
             subset=['accession', 'seqhash'], keep='first')
 
     if args.trusted:
-        # place trusted sequences at the top
+        # place trusted sequences at the bottom
         trusted = trusted[~trusted.isin(info)]
-        info = trusted.append(info)
+        info = info.append(trusted)
 
     if args.species_cap:
         info = info.groupby(by='species', as_index=False)
