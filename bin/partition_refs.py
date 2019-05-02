@@ -28,11 +28,15 @@ def build_parser():
         '--is_valid',
         action='store_true',
         help='filter for named (is_valid=true) records')
-    o.add_argument(
-        '--tax-ids',
-        metavar='FILE',
-        help='if tax_id is in FILE')
+    o.add_argument('--trusted-taxids')
     a = p.add_argument_group('AND options')
+    a.add_argument(
+        '--do_not_trust',
+        help='drop these sequences or tax_ids')
+    a.add_argument(
+        '--inliers',
+        action='store_true',
+        help='is_out=False')
     a.add_argument(
         '--is_species',
         action='store_true',
@@ -57,6 +61,9 @@ def build_parser():
         metavar='INT',
         type=int,
         help='group records by species taxid and accept ony top nth')
+    a.add_argument(
+        '--trusted',
+        help='trusted record accessions and versions')
     return p
 
 
@@ -64,15 +71,25 @@ def main():
     args = build_parser().parse_args()
 
     info = pandas.read_feather(args.feather)
+
+    if args.trusted:
+        recs = (i.strip() for i in open(args.trusted) if not i.startswith('#'))
+        recs = set(i for i in recs if i)
+        trusted = info[
+            (info['version'].isin(recs)) |
+            (info['accession'].isin(recs)) |
+            (info['seqname'].isin(recs))]
+
     info['keep'] = True
 
     if args.is_valid:
         info.loc[~info['is_valid'], 'keep'] = False
 
-    if args.tax_ids:
-        tax_ids = (i.strip() for i in open(args.tax_ids))
-        tax_ids = set(i for i in tax_ids if i)
-        info.loc[info['tax_id'].isin(tax_ids), 'keep'] = True
+    if args.trusted_taxids:
+        ids = (i for i in open(args.trusted_taxids) if not i.startswith('#'))
+        ids = (i.strip() for i in ids)
+        ids = set(i for i in ids if i)
+        info.loc[info['tax_id'].isin(ids), 'keep'] = True
 
     # drop OR rows
     info = info[info['keep']].drop('keep', axis='columns')
@@ -93,8 +110,26 @@ def main():
     if args.is_species:
         info = info[~info['species'].isna()]
 
+    if args.inliers:
+        info = info[~info['is_out']]
+
+    if args.do_not_trust:
+        dnt = (i for i in open(args.do_not_trust) if not i.startswith('#'))
+        dnt = (i.strip() for i in dnt)
+        dnt = set(i for i in dnt if i)
+        info = info[~info['tax_id'].isin(dnt)]
+        info = info[~info['accession'].isin(dnt)]
+        info = info[~info['version'].isin(dnt)]
+        info = info[~info['seqname'].isin(dnt)]
+
     if args.drop_duplicate_sequences:
-        info = info[~info[['accession', 'seqhash']].duplicated(keep='first')]
+        info = info.drop_duplicates(
+            subset=['accession', 'seqhash'], keep='first')
+
+    if args.trusted:
+        # place trusted sequences at the top
+        trusted = trusted[~trusted.isin(info)]
+        info = trusted.append(info)
 
     if args.species_cap:
         info = info.groupby(by='species', as_index=False)
@@ -109,8 +144,10 @@ def main():
                 out_fa.write('>{}\n{}\n'.format(s, seqs[s]))
             else:
                 drop.append(s)
-    drop = set(drop)
-    info[~info['seqname'].isin(drop)].to_csv(args.out_info, index=False)
+
+    info = info[~info['seqname'].isin(set(drop))]
+
+    info.to_csv(args.out_info, index=False)
 
 
 if __name__ == '__main__':

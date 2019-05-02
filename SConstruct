@@ -103,7 +103,7 @@ env = Environment(
     taxit=(
         '{singularity} exec '
         '--bind {taxonomy} '
-        '--bind {trusted_taxids} '
+        '--bind {trust} '
         '--bind $$(readlink -f $$(pwd)) '
         '--pwd $$(readlink -f $$(pwd)) '
         '{taxtastic} taxit'.format(**settings)),
@@ -160,11 +160,6 @@ tm7 = env.Command(
     action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
             ' AND Candidatus Saccharibacteria[Organism]" | '
             '' + mefetch_acc))
-
-tm7_ids = env.Command(
-    source=None,
-    target='$out/ncbi/tm7/tax_ids.txt',
-    action='$taxit get_descendants --out $TARGET $tax_url 95818')
 
 if test:
     tax_ids = (i.strip() for i in open('testfiles/tax_ids.txt') if i)
@@ -483,13 +478,15 @@ fa, seq_info = env.Command(
     action='partition_refs.py $SOURCES $TARGETS')
 Depends([fa, seq_info], sort_values)
 
+raw = fa
+
 """
 pull type sequences
 """
 type_fa, type_info = env.Command(
     target=['$out/dedup/1200bp/types/seqs.fasta',
             '$out/dedup/1200bp/types/seq_info.csv'],
-    source=[fa, feather, tm7_ids],
+    source=[fa, feather],
     action=['partition_refs.py '
             '--drop-duplicate-sequences '
             '--is_species '
@@ -497,8 +494,7 @@ type_fa, type_info = env.Command(
             '--is_valid '
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
-            '--tax-ids ${SOURCES[2]} '
-            '${SOURCES[:2]} $TARGETS'])
+            '$SOURCES $TARGETS'])
 
 """
 Make sequence_from_type taxtable with all ranks included
@@ -531,10 +527,10 @@ blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 """
 filter for named and tm7 sequence records
 """
-fa, info = env.Command(
+named, info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
             '$out/dedup/1200bp/named/seq_info.csv'],
-    source=[fa, feather, tm7_ids],
+    source=[fa, feather],
     action=('partition_refs.py '
             '--drop-duplicate-sequences '
             '--is_species '
@@ -542,7 +538,6 @@ fa, info = env.Command(
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '--species-cap 5000 '
-            '--tax-ids ${SOURCES[2]} '
             '${SOURCES[:2]} $TARGETS'))
 Depends([fa, seq_info], [is_valid, species])
 
@@ -583,17 +578,9 @@ mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 """
-get all taxid descendants from trusted_taxids.txt file
-"""
-trusted_taxids = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted_taxids.txt',
-    source=settings['trusted_taxids'],
-    action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
-
-"""
 update tax_ids in details_in cache
 """
-details_in = env.Command(
+details_cache = env.Command(
     source='$outliers_cache',
     target='$out/dedup/1200bp/named/filtered/details_in.csv',
     action=['$taxit update_taxids '
@@ -606,31 +593,34 @@ details_in = env.Command(
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
-fa, taxid_map, details_out, deenurp_log = env.Command(
-    source=[fa, taxid_map, taxonomy, details_in, trusted_taxids],
+fa, details = env.Command(
+    source=[fa, taxid_map, taxonomy, details_cache],
     target=['$out/dedup/1200bp/named/filtered/unsorted.fasta',
-            '$out/dedup/1200bp/named/filtered/tax_id_map.csv',
-            '$out/dedup/1200bp/named/filtered/details_out.csv',
-            '$out/dedup/1200bp/named/filtered/deenurp.log'],
+            '$out/dedup/1200bp/named/filtered/outliers.csv'],
     action=['$deenurp -vvv filter_outliers '
             '--cluster-type single '
-            '--detailed-seqinfo ${TARGETS[2]} '
+            '--detailed-seqinfo ${TARGETS[1]} '
             '--distance-percentile 90.0 '
             '--filter-rank species '
-            '--filtered-seqinfo ${TARGETS[1]} '
             '--jobs 1 '
-            '--log ${TARGETS[3]} '
+            '--log $out/dedup/1200bp/named/filtered/deenurp.log '
             '--max-distance 0.02 '
             '--min-distance 0.01 '
             '--min-seqs-for-filtering 5 '
-            '--no-filter ${SOURCES[4]} '
             '--output-seqs ${TARGETS[0]}  '
             '--previous-details ${SOURCES[3]} '
             '--strategy cluster '
             '--threads-per-job 14 '
             '${SOURCES[:3]}',
-            # cache it
-            'cp ${TARGETS[2]} $outliers_cache'])
+            'cp ${TARGETS[1]} $outliers_cache'])
+
+"""
+add distance metrics to feather file
+"""
+is_out = env.Command(
+    target='$out/.feather/is_out.md5',
+    source=[feather, details],
+    action=['is_out.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 Create a filtered seq_info.csv file
@@ -668,16 +658,46 @@ mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 """
-labmed do-not-trust filtering
+get taxid descendants from any taxids in trust.txt
+"""
+trusted_taxids = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
+    source=settings['trust'],
+    action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
-FIXME:  This will process will eventually go in its own repo but consider
-doing a reverse grep into partition_refs.py
+dnt_ids = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/dnt_taxids.txt',
+    source=settings['do_not_trust'],
+    action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
+
+trusted = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',
+    source=[settings['trust'], trusted_taxids],
+    action='cat $SOURCES > $TARGET')
+
+dnt = env.Command(
+    target='$out/dedup/1200bp/named/filtered/trusted/dnt.txt',
+    source=[settings['do_not_trust'], dnt_ids],
+    action='cat $SOURCES > $TARGET')
+
+"""
+labmed trust/do_not_trust seqs
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
-    source=[settings['do_not_trust'], fa, seq_info],
-    action='do_not_trust.py $SOURCES $TARGETS')
+    source=[raw, feather, trusted, dnt],
+    action=['partition_refs.py '
+            '--do_not_trust ${SOURCES[3]} '
+            '--drop-duplicate-sequences '
+            '--inliers '  # column is_out = False
+            '--is_species '
+            '--is_valid '
+            '--min-length 1200 '
+            '--prop-ambig-cutoff 0.01 '
+            '--trusted ${SOURCES[2]} '
+            '--trusted-taxids ${SOURCES[2]} '
+            '${SOURCES[:2]} $TARGETS'])
 
 """
 Make filtered taxtable with ranked columns and no_rank rows
@@ -763,6 +783,10 @@ named_type_hits = env.Command(
             '--threads 12 '
             '--maxaccepts 1 '
             '--strand plus'))
+
+"""
+TODO: add named_type_hits match columns to feather file
+"""
 
 """
 copy taxdmp file into output dir so a ``taxit new_database``
