@@ -132,8 +132,8 @@ def main():
         info = info.append(trusted)
 
     if args.species_cap:
-        info = info.groupby(by='species', as_index=False)
-        info = info.nth(list(range(args.species_cap)))
+        # remember seqs are sorted in reverse preferred order
+        info = info.groupby(by='species').tail(args.species_cap)
 
     seqs = {s.id: s.seq for s in SeqIO.parse(args.fasta, 'fasta')}
 

@@ -527,7 +527,7 @@ blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 """
 filter for named and tm7 sequence records
 """
-named, info = env.Command(
+fa, info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
             '$out/dedup/1200bp/named/seq_info.csv'],
     source=[fa, feather],
@@ -666,7 +666,7 @@ trusted_taxids = env.Command(
     action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 dnt_ids = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/dnt_taxids.txt',
+    target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
     action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
@@ -697,6 +697,7 @@ fa, seq_info = env.Command(
             '--prop-ambig-cutoff 0.01 '
             '--trusted ${SOURCES[2]} '
             '--trusted-taxids ${SOURCES[2]} '
+            '--species-cap 5000 '
             '${SOURCES[:2]} $TARGETS'])
 
 """
