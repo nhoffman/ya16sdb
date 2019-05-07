@@ -36,7 +36,7 @@ def build_parser():
     a.add_argument(
         '--inliers',
         action='store_true',
-        help='is_out=False')
+        help='choose sequences that were filtered and designated inliers')
     a.add_argument(
         '--is_species',
         action='store_true',

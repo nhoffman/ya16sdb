@@ -85,6 +85,8 @@ vrs.Add(PathVariable(
     'references_cache', '', '$base/references.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
     'refseq_info_cache', '', '$base/refseq_info.csv', PathIsFileCreate))
+vrs.Add(PathVariable(
+    'unknown_cache', '', '$base/unknown.txt', PathIsFileCreate))
 
 environment_variables = dict(
     os.environ,
@@ -193,35 +195,25 @@ else:
         target='$out/ncbi/records.txt',
         action='cat $SOURCES > $TARGET')
 
-'''
-filter out ignored accessions
-'''
-esearch = env.Command(
-    source=[settings['ignore'], esearch],
-    target='$out/ncbi/esearch.txt',
-    action='grep --invert-match --file $SOURCES > $TARGET')
-
 """
-Do not download record accessions in the ignore list or
-that have been previously downloaded in the records_cache.
+Do not download record accessions in the ignore list or that have been
+previously downloaded in the records_cache or in unknown_cache.
 Exit script if no new records exist.
 """
-new = env.Command(
+esearch = env.Command(
     target='$out/ncbi/mefetch.txt',
-    source=[esearch, '$records_cache'],
-    action=['cat ${SOURCES[1]} | '
+    source=[esearch, settings['ignore'], '$records_cache', '$unknown_cache'],
+    action=['cat ${SOURCES[1:]} | '
             'grep '
             '--invert-match '
             '--fixed-strings '
             '--file /dev/stdin '
             '${SOURCES[0]} > $TARGET '
-            '|| (echo "No new records"'
-            ' && exit 1)'
-            ])
+            '|| (echo "No new records" && exit 1)'])
 
 gbs = env.Command(
     target='$out/ncbi/records.gb',
-    source=new,
+    source=esearch,
     action=['mefetch -vv '  # download feature tables
             '-api-key $api_key '
             '-db nucleotide '
@@ -273,7 +265,7 @@ Record versions returned from esearch that had no actual 16s features
 """
 no_features = env.Command(
     target='$out/ncbi/no_features.txt',
-    source=[seq_info, new],
+    source=[seq_info, esearch],
     action=('csvcut.py --columns version ${SOURCES[0]} | '
             'tail -n +2 | '
             'grep '
@@ -324,16 +316,20 @@ vsearch = env.Command(
             '--userout $TARGET'))
 
 """
-Fix record orientation.  Drop sequences with no alignments.
-These records are rare and we want to be able to re-download later
-them when the 16s training set updates.
+Fix record orientation and ignore sequences with no vsearch alignments.
+
+NOTE: unknown.txt will contain records (accession.version) ids with ANY
+16s coordinates so we can potentially re-download these
+coordinates later when data/rdp_16s_type_strains.fasta.bz2 is updated.
 """
-fa, seq_info, _ = env.Command(
+fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
             '$out/ncbi/vsearch/seq_info.csv',
-            '$out/ncbi/vsearch/unknown.fasta'],
+            '$out/ncbi/vsearch/unknown.fasta',
+            '$out/ncbi/vsearch/unknown.txt'],
     source=[vsearch, fa, seq_info],
-    action='vsearch.py $SOURCES $TARGETS')
+    action=['vsearch.py $SOURCES $TARGETS',
+            'cp ${TARGETS[3]} $unknown_cache'])
 
 """
 Append with older records
@@ -617,10 +613,10 @@ fa, details = env.Command(
 """
 add distance metrics to feather file
 """
-is_out = env.Command(
-    target='$out/.feather/is_out.md5',
+filter_outlies = env.Command(
+    target='$out/.feather/filter_outliers.md5',
     source=[feather, details],
-    action=['is_out.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
+    action=['filter_outliers.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 Create a filtered seq_info.csv file
