@@ -51,11 +51,11 @@ def main():
             else:
                 unknown.write('>{}\n{}\n'.format(s.description, s.seq))
     info = pandas.read_csv(args.seq_info, dtype=str)
+    unknown = info[~info['seqname'].isin(vsearch)]
+    unknown['version'].drop_duplicates().to_csv(
+        args.unknown_accessions, header=False, index=False)
     info = info[info['seqname'].isin(vsearch)]
     info.to_csv(args.out_info, index=False)
-    unknown = info[~info['seqname'].isin(vsearch)]
-    unknown['version'].to_csv(
-        args.unknown_accessions, header=False, index=False)
 
 
 if __name__ == '__main__':
