@@ -4,6 +4,7 @@ Download and curate the NCBI 16S rRNA sequences
 TODO: download records updated before last download
 """
 import configparser
+import csv
 import errno
 import os
 import sys
@@ -21,7 +22,7 @@ if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
 conf = configparser.SafeConfigParser()
 conf.read('settings.conf')
-settings = conf['settings']
+settings = conf['DEFAULT']
 
 
 def PathIsFileCreate(key, val, env):
@@ -57,16 +58,9 @@ true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
 vrs = Variables(None, ARGUMENTS)
-if test:
-    vrs.Add('base', help='Path to output directory', default='test_output')
-else:
-    vrs.Add('base', help='Path to output directory', default='output')
-vrs.Add('api_key', 'ncbi api_key for downloading data', settings['api_key'])
-vrs.Add('email', 'email address for ncbi', settings['email'])
-vrs.Add('nreq', ('Number of concurrent http requests to ncbi'), 8)
+out = 'test_output' if test else 'output'
+vrs.Add('base', help='Path to output directory', default=out)
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
-vrs.Add('retry', 'ncbi retry milliseconds', '60000')
-vrs.Add('sort_by', 'sequence sorting', settings['sort_by'])
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
@@ -102,45 +96,14 @@ env = Environment(
     ENV=environment_variables,
     variables=vrs,
     shell='bash',
-    taxit=(
-        '{singularity} exec '
-        '--bind {taxonomy} '
-        '--bind {trust} '
-        '--bind $$(readlink -f $$(pwd)) '
-        '--pwd $$(readlink -f $$(pwd)) '
-        '{taxtastic} taxit'.format(**settings)),
-    deenurp=(
-        '{singularity} exec '
-        '--bind $$(readlink -f $$(pwd)) '
-        '--pwd $$(readlink -f $$(pwd)) '
-        '{deenurp} deenurp'.format(**settings)),
-    eutils=(
-        '{singularity} exec '
-        '--bind $$(readlink -f $$(pwd)) '
-        '--pwd $$(readlink -f $$(pwd)) '
-        '{eutils}'.format(**settings))
+    eutils=settings['eutils'],
+    taxit=settings['taxit'],
+    deenurp=settings['deenurp'],
 )
 
 env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
-
-rrna_16s = ('16s[All Fields] '
-            'AND rRNA[Feature Key] '
-            'AND Bacteria[Organism] '
-            'AND {min_seq_length} : '
-            '99999999999[Sequence Length]').format(**settings)
-
-mefetch_acc = ('mefetch -vv '
-               '-api-key $api_key '
-               '-email $email '
-               '-format acc '
-               '-log $out/ncbi/log.txt '
-               '-max-retry -1 '  # continuous retries
-               '-mode text '
-               '-proc $nreq '
-               '-out $TARGET '
-               '-retry $retry')
 
 """
 get accessions (versions) of records considered type strains
@@ -150,46 +113,35 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 types = env.Command(
     source=None,
     target='$out/ncbi/types.txt',
-    action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
-            ' AND sequence_from_type[Filter]" | ' + mefetch_acc))
-
-"""
-Download TM7 accessions
-"""
-tm7 = env.Command(
-    source=None,
-    target='$out/ncbi/tm7/versions.txt',
-    action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
-            ' AND Candidatus Saccharibacteria[Organism]" | '
-            '' + mefetch_acc))
+    action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
 
 if test:
-    tax_ids = (i.strip() for i in open('testfiles/tax_ids.txt') if i)
-    tax_ids = ('txid' + i + '[Organism]' for i in tax_ids)
+    taxids = (i.strip() for i in open('testfiles/tax_ids.txt'))
+    taxids = ('txid' + i + '[Organism]' for i in taxids if i)
+    taxids = ' OR '.join(taxids)
     esearch = env.Command(
         target='$out/ncbi/records.txt',
         source='testfiles/tax_ids.txt',
-        action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
-                ' AND (' + ' OR '.join(tax_ids) + ')" | ' + mefetch_acc))
+        action=('$eutils %(esearch)s "%(16s)s AND (%(taxids)s)" | %(acc)s' %
+                {'taxids': taxids, **settings}))
 else:
     """
     Download accessions for bacteria with 16s rrna seq_info
     NOT environmental or unclassified
-
-    TODO: Limit to a recent date frame as initial search.  If latest records
-    are not found then run the whole thing in full.  This will save time in
-    execution of this step.
     """
+    """
+    Download TM7 accessions
+    """
+    tm7 = env.Command(
+        source=None,
+        target='$out/ncbi/tm7/versions.txt',
+        action='$eutils %(esearch)s "%(tm7)s" | %(acc)s' % settings)
+
     classified = env.Command(
         source=None,
         target='$out/ncbi/classified.txt',
-        action=('$eutils esearch -db nucleotide -query "' + rrna_16s +
-                'NOT(environmental samples[Organism] '
-                'OR unclassified Bacteria[Organism])" | ' + mefetch_acc))
+        action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
 
-    """
-    concat our download set
-    """
     esearch = env.Command(
         source=[classified, tm7],
         target='$out/ncbi/records.txt',
@@ -201,7 +153,7 @@ previously downloaded in the records_cache or in unknown_cache.
 Exit script if no new records exist.
 """
 esearch = env.Command(
-    target='$out/ncbi/mefetch.txt',
+    target='$out/ncbi/all.txt',
     source=[esearch, settings['ignore'], '$records_cache', '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
             'grep '
@@ -211,41 +163,36 @@ esearch = env.Command(
             '${SOURCES[0]} > $TARGET '
             '|| (echo "No new records" && exit 1)'])
 
+"""
+Check the cache for last download_date and download list of modified records
+in order to redownload modified records that we have previously downloaded.
+"""
+seq_info = csv.DictReader(open(env.subst('$seq_info_cache')))
+seq_info = [time.strptime(r['download_date'], '%d-%b-%Y') for r in seq_info]
+if seq_info:
+    download_date = time.strftime('%Y/%m/%d', sorted(seq_info)[-1])
+else:
+    download_date = time.strftime('%Y/%m/%d')
+modified = env.Command(
+    source=None,
+    target='$out/ncbi/modified.txt',
+    action=['$eutils %(esearch)s "%(classified)s '
+            'AND %(download_date)s[Modification Date] : '
+            '3000[Modification Date]" | %(acc)s' %
+            {'download_date': download_date, **settings}])
+
+"""
+sort --unique so we are not downloading records twice
+"""
+esearch = env.Command(
+    target='$out/ncbi/mefetch.txt',
+    source=[esearch, modified],
+    action='cat $SOURCES | sort --unique > $TARGET')
+
 gbs = env.Command(
     target='$out/ncbi/records.gb',
     source=esearch,
-    action=['mefetch -vv '  # download feature tables
-            '-api-key $api_key '
-            '-db nucleotide '
-            '-email $email '
-            '-format ft '
-            '-id $SOURCE '
-            '-log $out/ncbi/log.txt '
-            '-max-retry -1 '  # continuous retry
-            '-mode text '
-            '-proc $nreq '
-            '-retmax 1 '
-            '-retry $retry '
-            '| '
-            # extract 16s features
-            'ftract -feature "rrna:product:16S ribosomal RNA" '
-            '-log $out/ncbi/log.txt '
-            '-on-error continue '
-            '-min-length ' + settings['min_seq_length'] + ' '
-            '| '
-            'mefetch '  # download genbank records
-            '-vv '
-            '-api-key $api_key '
-            '-csv '
-            '-db nucleotide '
-            '-email $email '
-            '-format gbwithparts '
-            '-log $out/ncbi/log.txt '
-            '-max-retry -1 '  # continuous retry
-            '-mode text '
-            '-proc $nreq '
-            '-retmax 1 '
-            '-retry $retry > $TARGET'])
+    action='%(fts)s | %(ftract)s | %(gbs)s' % settings)
 
 """
 extract
@@ -465,7 +412,8 @@ seqhash = env.Command(
 sort_values = env.Command(
     target='$out/.feather/sorted.md5',
     source=feather,
-    action=['sort_values.py $SOURCE $sort_by', 'md5sum $SOURCE > $TARGET'])
+    action=['sort_values.py $SOURCE %(sort_by)s' % settings,
+            'md5sum $SOURCE > $TARGET'])
 Depends(sort_values, [is_type, is_refseq, is_published, seqhash])
 
 fa, seq_info = env.Command(
@@ -521,7 +469,7 @@ types_mothur = env.Command(
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
 """
-filter for named and tm7 sequence records
+filter using various criteria
 """
 fa, info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
