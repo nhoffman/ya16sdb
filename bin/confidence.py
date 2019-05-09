@@ -19,19 +19,13 @@ def main():
     p.add_argument('feather')
     args = p.parse_args()
     info = pandas.read_feather(args.feather)
-
-    def confidence(s):
-        if s['is_type']:
-            s['confidence'] = 'type'
-        elif s['is_refseq']:
-            s['confidence'] = 'refseq'
-        elif s['is_published']:
-            s['confidence'] = 'published'
-        else:
-            s['confidence'] = 'direct'
-        return s
-
-    info = info.apply(confidence, axis='columns')
+    if 'confidence' in info.columns:
+        info = info.drop('confidence', axis='columns')
+    info.loc[info['is_type'], 'confidence'] = 'type'
+    is_refseq = info['confidence'].isna() & info['is_refseq']
+    info.loc[is_refseq, 'confidence'] = 'refseq'
+    is_published = info['confidence'].isna() & info['is_published']
+    info.loc[is_published, 'confidence'] = 'published'
     info.to_feather(args.feather)
 
 
