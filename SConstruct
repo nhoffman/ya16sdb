@@ -119,16 +119,12 @@ if test:
     taxids = (i.strip() for i in open('testfiles/tax_ids.txt'))
     taxids = ('txid' + i + '[Organism]' for i in taxids if i)
     taxids = ' OR '.join(taxids)
-    esearch = env.Command(
+    ncbi = env.Command(
         target='$out/ncbi/records.txt',
         source='testfiles/tax_ids.txt',
         action=('$eutils %(esearch)s "%(16s)s AND (%(taxids)s)" | %(acc)s' %
                 {'taxids': taxids, **settings}))
 else:
-    """
-    Download accessions for bacteria with 16s rrna seq_info
-    NOT environmental or unclassified
-    """
     """
     Download TM7 accessions
     """
@@ -142,7 +138,11 @@ else:
         target='$out/ncbi/classified.txt',
         action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
 
-    esearch = env.Command(
+    '''
+    We will use this records.txt list to remove any records that we had
+    downloaded previously
+    '''
+    ncbi = env.Command(
         source=[classified, tm7],
         target='$out/ncbi/records.txt',
         action='cat $SOURCES > $TARGET')
@@ -152,9 +152,9 @@ Do not download record accessions in the ignore list or that have been
 previously downloaded in the records_cache or in unknown_cache.
 Exit script if no new records exist.
 """
-esearch = env.Command(
-    target='$out/ncbi/all.txt',
-    source=[esearch, settings['ignore'], '$records_cache', '$unknown_cache'],
+new = env.Command(
+    target='$out/ncbi/new.txt',
+    source=[ncbi, settings['ignore'], '$records_cache', '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
             'grep '
             '--invert-match '
@@ -184,14 +184,14 @@ modified = env.Command(
 """
 sort --unique so we are not downloading records twice
 """
-esearch = env.Command(
-    target='$out/ncbi/mefetch.txt',
-    source=[esearch, modified],
+download = env.Command(
+    target='$out/ncbi/download.txt',
+    source=[new, modified],
     action='cat $SOURCES | sort --unique > $TARGET')
 
 gbs = env.Command(
     target='$out/ncbi/records.gb',
-    source=esearch,
+    source=download,
     action='%(fts)s | %(ftract)s | %(gbs)s' % settings)
 
 """
@@ -212,7 +212,7 @@ Record versions returned from esearch that had no actual 16s features
 """
 no_features = env.Command(
     target='$out/ncbi/no_features.txt',
-    source=[seq_info, esearch],
+    source=[seq_info, download],
     action=('csvcut.py --columns version ${SOURCES[0]} | '
             'tail -n +2 | '
             'grep '
@@ -300,7 +300,7 @@ fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
             '$out/references.csv',
             '$out/refseq_info.csv',
             '$out/records.txt'],
-    source=[esearch,
+    source=[ncbi,
             fa, '$seqs_cache',
             seq_info, '$seq_info_cache',
             pubmed_info, '$pubmed_info_cache',
