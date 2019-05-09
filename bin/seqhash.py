@@ -16,6 +16,8 @@ def main():
     p.add_argument('fasta')
     args = p.parse_args()
     info = pandas.read_feather(args.feather)
+    if 'seqhash' in info.columns:
+        info = info.drop('seqhash', axis='columns')
     hashes = {}
     with open(args.fasta) as fasta:
         for s in SeqIO.parse(fasta, 'fasta'):
