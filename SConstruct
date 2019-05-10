@@ -1,17 +1,14 @@
 """
 Download and curate the NCBI 16S rRNA sequences
-
-TODO: download records updated before last download
 """
 import configparser
 import csv
 import errno
 import os
 import sys
+import SCons
 import time
 
-# requirements installed in the virtualenv
-import SCons
 from SCons.Script import (
         ARGUMENTS, Depends, Environment, Help, PathVariable, Variables)
 
@@ -26,7 +23,7 @@ settings = conf['DEFAULT']
 
 
 def PathIsFileCreate(key, val, env):
-    """namedator to check if Path is a cache file,
+    """check if Path is a cache file and
     creating it if it does not exist."""
     if os.path.isdir(val):
         m = 'Path for option %s is a directory, not a file: %s'
@@ -125,9 +122,6 @@ if test:
         action=('$eutils %(esearch)s "%(16s)s AND (%(taxids)s)" | %(acc)s' %
                 {'taxids': taxids, **settings}))
 else:
-    """
-    Download TM7 accessions
-    """
     tm7 = env.Command(
         source=None,
         target='$out/ncbi/tm7/versions.txt',
@@ -151,6 +145,8 @@ else:
 Do not download record accessions in the ignore list or that have been
 previously downloaded in the records_cache or in unknown_cache.
 Exit script if no new records exist.
+
+TODO: Do not exit, just continue
 """
 new = env.Command(
     target='$out/ncbi/new.txt',
@@ -182,13 +178,16 @@ modified = env.Command(
             {'download_date': download_date, **settings}])
 
 """
-sort --unique so we are not downloading records twice
+`sort --unique` so we are not downloading records twice
 """
 download = env.Command(
     target='$out/ncbi/download.txt',
     source=[new, modified],
     action='cat $SOURCES | sort --unique > $TARGET')
 
+"""
+download genbank records
+"""
 gbs = env.Command(
     target='$out/ncbi/records.gb',
     source=download,
@@ -220,14 +219,16 @@ no_features = env.Command(
             '--fixed-strings '
             '--file /dev/stdin '
             '${SOURCES[1]} > $TARGET '
-            # avoid the grep no match exit code 1 that scons hates
+            # force continue if grep finds no matches
             '|| true'))
 
 """
-filter innamed tax_ids
+filter unnamed tax_ids
 
-Do nothing with the unknown records for now because it might simply mean
+Do nothing with the unknown records because it might simply mean
 the ncbi taxonomy pipeline is out of sync with the latest 16s records
+
+TODO: replace this with new accession2taxid script
 """
 seq_info, _ = env.Command(
     target=['$out/ncbi/taxit/seq_info.csv',
@@ -268,13 +269,15 @@ Fix record orientation and ignore sequences with no vsearch alignments.
 NOTE: unknown.txt will contain records (accession.version) ids with ANY
 16s coordinates so we can potentially re-download these
 coordinates later when data/rdp_16s_type_strains.fasta.bz2 is updated.
+
+TODO: concat previous $unknown_cache file
 """
 fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
             '$out/ncbi/vsearch/seq_info.csv',
             '$out/ncbi/vsearch/unknown.fasta',
             '$out/ncbi/vsearch/unknown.txt'],
-    source=[vsearch, fa, seq_info],
+    source=[vsearch, fa, seq_info, '$unknown_cache'],
     action=['vsearch.py $SOURCES $TARGETS',
             'cp ${TARGETS[3]} $unknown_cache'])
 
@@ -561,7 +564,7 @@ fa, details = env.Command(
 """
 add distance metrics to feather file
 """
-filter_outlies = env.Command(
+filter_outliers = env.Command(
     target='$out/.feather/filter_outliers.md5',
     source=[feather, details],
     action=['filter_outliers.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
@@ -643,6 +646,7 @@ fa, seq_info = env.Command(
             '--trusted-taxids ${SOURCES[2]} '
             '--species-cap 5000 '
             '${SOURCES[:2]} $TARGETS'])
+Depends([fa, seq_info], filter_outliers)
 
 """
 Make filtered taxtable with ranked columns and no_rank rows
@@ -730,8 +734,12 @@ named_type_hits = env.Command(
             '--strand plus'))
 
 """
-TODO: add named_type_hits match columns to feather file
+add named_type_hits match columns to feather file
 """
+match_hits = env.Command(
+    target='$out/.feather/match_hits.md5',
+    source=[feather, named_type_hits],
+    action=['match_hits.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 copy taxdmp file into output dir so a ``taxit new_database``
