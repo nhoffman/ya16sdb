@@ -10,5 +10,3 @@ __pycache__
 taxonomy.conf
 ncbi_taxonomy.db
 taxdmp.zip
-nucl_gb.accession2taxid.gz
-nucl_wgs.accession2taxid.gz
