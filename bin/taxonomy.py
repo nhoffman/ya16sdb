@@ -13,9 +13,19 @@ def main():
     p.add_argument('taxonomy')
     args = p.parse_args()
     taxonomy = pandas.read_csv(
-        args.taxonomy, dtype=str, usecols=['tax_id', 'species'])
+        args.taxonomy,
+        dtype=str,
+        usecols=['tax_id', 'tax_name', 'species', 'genus'])
+    taxonomy = taxonomy.set_index('tax_id')
     info = pandas.read_feather(args.feather)
-    info = info.merge(taxonomy, how='left')
+    for c in ['species', 'genus', 'species_name', 'genus_name']:
+        if c in info.columns:
+            info = info.drop(c, axis='columns')
+    info = info.join(taxonomy[['species', 'genus']], on='tax_id')
+    info = info.join(taxonomy['tax_name'], on='species')
+    info = info.rename(columns={'tax_name': 'species_name'})
+    info = info.join(taxonomy['tax_name'], on='genus')
+    info = info.rename(columns={'tax_name': 'genus_name'})
     info.to_feather(args.feather)
 
 
