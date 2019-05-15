@@ -102,17 +102,8 @@ env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
 
-"""
-get accessions (versions) of records considered type strains
-NCBI web blast uses `sequence_from_type[Filter]` so we will use that
-http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
-"""
-types = env.Command(
-    source=None,
-    target='$out/ncbi/types.txt',
-    action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
-
 if test:
+    types = 'testfiles/types.txt'
     taxids = (i.strip() for i in open('testfiles/tax_ids.txt'))
     taxids = ('txid' + i + '[Organism]' for i in taxids if i)
     taxids = ' OR '.join(taxids)
@@ -122,6 +113,16 @@ if test:
         action=('$eutils %(esearch)s "%(16s)s AND (%(taxids)s)" | %(acc)s' %
                 {'taxids': taxids, **settings}))
 else:
+    """
+    get accessions (versions) of records considered type strains
+    NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+    http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+    """
+    types = env.Command(
+        source=None,
+        target='$out/ncbi/types.txt',
+        action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
+
     tm7 = env.Command(
         source=None,
         target='$out/ncbi/tm7/versions.txt',
@@ -145,8 +146,6 @@ else:
 Do not download record accessions in the ignore list or that have been
 previously downloaded in the records_cache or in unknown_cache.
 Exit script if no new records exist.
-
-TODO: Do not exit, just continue
 """
 new = env.Command(
     target='$out/ncbi/new.txt',
@@ -157,7 +156,7 @@ new = env.Command(
             '--fixed-strings '
             '--file /dev/stdin '
             '${SOURCES[0]} > $TARGET '
-            '|| (echo "No new records" && exit 1)'])
+            '|| true'])
 
 """
 Check the cache for last download_date and download list of modified records
@@ -222,23 +221,21 @@ no_features = env.Command(
             # force continue if grep finds no matches
             '|| true'))
 
+accession2taxid = env.Command(
+    target='$out/ncbi/accession2taxid.csv',
+    source=[settings['accession2taxid'], ncbi],
+    action='accession2taxid.py $SOURCES $TARGET')
+
 """
 filter unnamed tax_ids
 
 Do nothing with the unknown records because it might simply mean
 the ncbi taxonomy pipeline is out of sync with the latest 16s records
-
-TODO: replace this with new accession2taxid script
 """
 seq_info, _ = env.Command(
-    target=['$out/ncbi/taxit/seq_info.csv',
-            '$out/ncbi/taxit/unknown.csv'],
-    source=seq_info,
-    action=['$taxit update_taxids '
-            '--unknown-action drop '
-            '--unknowns ${TARGETS[1]} '
-            '--outfile ${TARGETS[0]} '
-            '$SOURCE $tax_url'])
+    target=['$out/ncbi/taxit/seq_info.csv', '$out/ncbi/taxit/unknowns.csv'],
+    source=[seq_info, accession2taxid],
+    action='update_taxids.py $SOURCES $TARGETS')
 
 """
 vsearch new sequences with training set to test sequence orientation
@@ -261,7 +258,8 @@ vsearch = env.Command(
             '--top_hits_only '
             '--usearch_global ${SOURCES[0]} '
             '--userfields query+target+qstrand+id+tilo+tihi '
-            '--userout $TARGET'))
+            '--userout $TARGET'
+            ' || true'))
 
 """
 Fix record orientation and ignore sequences with no vsearch alignments.
@@ -269,8 +267,6 @@ Fix record orientation and ignore sequences with no vsearch alignments.
 NOTE: unknown.txt will contain records (accession.version) ids with ANY
 16s coordinates so we can potentially re-download these
 coordinates later when data/rdp_16s_type_strains.fasta.bz2 is updated.
-
-TODO: concat previous $unknown_cache file
 """
 fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
@@ -334,8 +330,8 @@ update tax_ids
 """
 seq_info = env.Command(
     target='$out/ncbi/combined/update_taxids/seq_info.csv',
-    source=seq_info,
-    action='$taxit -v update_taxids --out $TARGET $SOURCE $tax_url')
+    source=[seq_info, accession2taxid],
+    action='update_taxids.py $SOURCES $TARGET')
 
 """
 taxonomy
@@ -355,12 +351,12 @@ feather = env.Command(
 
 """Start feather file columns"""
 """
-'species' taxonomy id column
+Add 'species' taxonomy id, species_name, genus taxid and genus name
 """
-species = env.Command(
-    target='$out/.feather/species.md5',
+tax_cols = env.Command(
+    target='$out/.feather/taxonomy.md5',
     source=[feather, taxonomy],
-    action=['species.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
+    action=['taxonomy.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 https://github.com/nhoffman/ya16sdb/issues/11
@@ -486,7 +482,7 @@ fa, info = env.Command(
             '--prop-ambig-cutoff 0.01 '
             '--species-cap 5000 '
             '${SOURCES[:2]} $TARGETS'))
-Depends([fa, seq_info], [is_valid, species])
+Depends([fa, seq_info], [is_valid, tax_cols])
 
 named = fa
 
@@ -528,13 +524,9 @@ mothur = env.Command(
 update tax_ids in details_in cache
 """
 details_cache = env.Command(
-    source='$outliers_cache',
     target='$out/dedup/1200bp/named/filtered/details_in.csv',
-    action=['$taxit update_taxids '
-            '--outfile $TARGET '
-            '$SOURCE $tax_url'
-            # continue if filter_outliers cache is empty
-            ' || echo "Continuing without filter_outliers cache"'])
+    source=['$outliers_cache', accession2taxid],
+    action='update_taxids.py $SOURCES $TARGET')
 
 """
 Filter sequences. Use --threads if you need to to limit the number
