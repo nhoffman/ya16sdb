@@ -22,8 +22,9 @@ def main():
         if args.unknowns:
             unknowns = info[~info['version'].isin(a2t['version'])]
             unknowns.to_csv(args.unknowns, index=False)
+        info = info[info['version'].isin(a2t['version'])]
         info = info.drop('tax_id', axis='columns')
-        info = info.merge(a2t, how='left')
+        info = info.merge(a2t)
         info.to_csv(args.out, columns=columns, index=False)
     else:
         print('seq_info file is empty')
