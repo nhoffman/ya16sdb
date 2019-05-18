@@ -22,46 +22,43 @@ def build_parser():
         '--drop-duplicate-sequences',
         action='store_true',
         help='group by accession and drop rows with duplicate seqhashes')
-    # filtering switches
-    o = p.add_argument_group('OR options')
-    o.add_argument(
+    f = p.add_argument_group('filtering options')
+    f.add_argument(
         '--is_valid',
         action='store_true',
         help='filter for named (is_valid=true) records')
-    o.add_argument('--trusted-taxids')
-    a = p.add_argument_group('AND options')
-    a.add_argument(
+    f.add_argument(
         '--do_not_trust',
         help='drop these sequences or tax_ids')
-    a.add_argument(
+    f.add_argument(
         '--inliers',
         action='store_true',
         help='choose sequences that were filtered and designated inliers')
-    a.add_argument(
+    f.add_argument(
         '--is_species',
         action='store_true',
         help='filter for records with tax id in species column')
-    a.add_argument(
+    f.add_argument(
         '--is_type',
         action='store_true',
         help='filter for type straing records')
-    a.add_argument(
+    f.add_argument(
         '--min-length',
         metavar='',
         type=int,
         help='Minimum sequence length')
-    a.add_argument(
+    f.add_argument(
         '--prop-ambig-cutoff',
         metavar='',
         type=float,
         help=('Maximum proportion of characters in '
               'sequence which may be ambiguous'))
-    a.add_argument(
+    f.add_argument(
         '--species-cap',
         metavar='INT',
         type=int,
         help='group records by species taxid and accept ony top nth')
-    a.add_argument(
+    f.add_argument(
         '--trusted',
         help='trusted record accessions and versions')
     return p
@@ -78,21 +75,11 @@ def main():
         trusted = info[
             (info['version'].isin(recs)) |
             (info['accession'].isin(recs)) |
+            (info['tax_id'].isin(recs)) |
             (info['seqname'].isin(recs))]
 
-    info['keep'] = True
-
     if args.is_valid:
-        info.loc[~info['is_valid'], 'keep'] = False
-
-    if args.trusted_taxids:
-        ids = (i for i in open(args.trusted_taxids) if not i.startswith('#'))
-        ids = (i.strip() for i in ids)
-        ids = set(i for i in ids if i)
-        info.loc[info['tax_id'].isin(ids), 'keep'] = True
-
-    # drop OR rows
-    info = info[info['keep']].drop('keep', axis='columns')
+        info = info[info['is_valid']]
 
     if args.min_length:
         info = info[info['length'] >= args.min_length]
@@ -111,7 +98,7 @@ def main():
         info = info[~info['species'].isna()]
 
     if args.inliers:
-        info = info[~info['is_out']]
+        info = info[info['filter_outliers'] & ~info['is_out']]
 
     if args.do_not_trust:
         dnt = (i for i in open(args.do_not_trust) if not i.startswith('#'))
