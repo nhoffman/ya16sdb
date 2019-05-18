@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-Add is_type column based on presence in type strain file
 """
 import argparse
 import pandas
@@ -15,6 +14,10 @@ def main():
     p.add_argument('details')
     args = p.parse_args()
     info = pandas.read_feather(args.feather)
+    for c in ['centroid', 'cluster', 'dist', 'is_out',
+              'x', 'y', 'filter_outliers']:
+        if c in info.columns:
+            info = info.drop(c, axis='columns')
     details = pandas.read_csv(
         args.details,
         dtype={
@@ -29,7 +32,9 @@ def main():
             'y': float
             }
         )
+    details['filter_outliers'] = True
     info = info.merge(details, how='left')
+    info.loc[info['filter_outliers'].isna(), 'filter_outliers'] = False
     info.loc[info['is_out'].isna(), 'is_out'] = False
     info.to_feather(args.feather)
 
