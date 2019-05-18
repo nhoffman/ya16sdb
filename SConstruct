@@ -133,10 +133,9 @@ else:
         target='$out/ncbi/classified.txt',
         action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
 
-    '''
-    We will use this records.txt list to remove any records that we had
-    downloaded previously
-    '''
+    """
+    We will use records.txt list to remove old records previously downloaded
+    """
     ncbi = env.Command(
         source=[classified, tm7],
         target='$out/ncbi/records.txt',
@@ -149,7 +148,11 @@ Exit script if no new records exist.
 """
 new = env.Command(
     target='$out/ncbi/new.txt',
-    source=[ncbi, settings['ignore'], '$records_cache', '$unknown_cache'],
+    source=[
+        ncbi,
+        settings['do_not_download'],
+        '$records_cache',
+        '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
             'grep '
             '--invert-match '
@@ -158,9 +161,27 @@ new = env.Command(
             '${SOURCES[0]} > $TARGET '
             '|| true'])
 
+accession2taxid = env.Command(
+    target='$out/ncbi/accession2taxid.csv',
+    source=[settings['accession2taxid'], ncbi],
+    action=['accession2taxid.py $SOURCES | '
+            '$taxit update_taxids '
+            '--outfile $TARGET '
+            '--unknown-action drop '
+            '- $tax_url'])
+
+"""
+Remove esearch records not present in accession2taxid and setup
+records that had their tax_ids changed or merged to be re-downloaded.
+"""
+updated = env.Command(
+    target='$out/ncbi/updated.txt',
+    source=[accession2taxid, new, '$seq_info_cache'],
+    action='updated.py $SOURCES $TARGET')
+
 """
 Check the cache for last download_date and download list of modified records
-in order to redownload modified records that we have previously downloaded.
+in order to re-download modified records that we have previously downloaded.
 """
 seq_info = csv.DictReader(open(env.subst('$seq_info_cache')))
 seq_info = [time.strptime(r['download_date'], '%d-%b-%Y') for r in seq_info]
@@ -176,12 +197,9 @@ modified = env.Command(
             '3000[Modification Date]" | %(acc)s' %
             {'download_date': download_date, **settings}])
 
-"""
-`sort --unique` so we are not downloading records twice
-"""
 download = env.Command(
     target='$out/ncbi/download.txt',
-    source=[new, modified],
+    source=[updated, modified],
     action='cat $SOURCES | sort --unique > $TARGET')
 
 """
@@ -220,22 +238,6 @@ no_features = env.Command(
             '${SOURCES[1]} > $TARGET '
             # force continue if grep finds no matches
             '|| true'))
-
-accession2taxid = env.Command(
-    target='$out/ncbi/accession2taxid.csv',
-    source=[settings['accession2taxid'], ncbi],
-    action='accession2taxid.py $SOURCES $TARGET')
-
-"""
-filter unnamed tax_ids
-
-Do nothing with the unknown records because it might simply mean
-the ncbi taxonomy pipeline is out of sync with the latest 16s records
-"""
-seq_info, _ = env.Command(
-    target=['$out/ncbi/taxit/seq_info.csv', '$out/ncbi/taxit/unknowns.csv'],
-    source=[seq_info, accession2taxid],
-    action='update_taxids.py $SOURCES $TARGETS')
 
 """
 vsearch new sequences with training set to test sequence orientation
@@ -287,10 +289,6 @@ Append with older records
 4. Drop sequences that have a refseq equivalent
 5. Deduplicate pubmeds and references
 6. Copy and cache full dataset
-
-NOTE: seqs that failed either the vsearch or taxit update_taxids will
-not be appended to the records.txt file and will therefore be re-downloaded
-the next time this pipeline is run
 """
 fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
     target=['$out/ncbi/combined/seqs.fasta',
@@ -324,14 +322,6 @@ env.Command(
     target=None,
     source=gbs,
     action='cat $SOURCE >> $genbank_cache')
-
-"""
-update tax_ids
-"""
-seq_info = env.Command(
-    target='$out/ncbi/combined/update_taxids/seq_info.csv',
-    source=[seq_info, accession2taxid],
-    action='update_taxids.py $SOURCES $TARGET')
 
 """
 taxonomy
@@ -521,19 +511,11 @@ mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 """
-update tax_ids in details_in cache
-"""
-details_cache = env.Command(
-    target='$out/dedup/1200bp/named/filtered/details_in.csv',
-    source=['$outliers_cache', accession2taxid],
-    action='update_taxids.py $SOURCES $TARGET')
-
-"""
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
 fa, details = env.Command(
-    source=[fa, taxid_map, taxonomy, details_cache],
+    source=[fa, taxid_map, taxonomy, '$outliers_cache'],
     target=['$out/dedup/1200bp/named/filtered/unsorted.fasta',
             '$out/dedup/1200bp/named/filtered/outliers.csv'],
     action=['$deenurp -vvv filter_outliers '
@@ -629,14 +611,13 @@ fa, seq_info = env.Command(
     action=['partition_refs.py '
             '--do_not_trust ${SOURCES[3]} '
             '--drop-duplicate-sequences '
-            '--inliers '  # column is_out = False
+            '--inliers '  # centroid & is_out = False
             '--is_species '
             '--is_valid '
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
-            '--trusted ${SOURCES[2]} '
-            '--trusted-taxids ${SOURCES[2]} '
             '--species-cap 5000 '
+            '--trusted ${SOURCES[2]} '
             '${SOURCES[:2]} $TARGETS'])
 Depends([fa, seq_info], filter_outliers)
 
@@ -732,6 +713,7 @@ match_hits = env.Command(
     target='$out/.feather/match_hits.md5',
     source=[feather, named_type_hits],
     action=['match_hits.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
+Depends([match_hits], tax_cols)
 
 """
 copy taxdmp file into output dir so a ``taxit new_database``
