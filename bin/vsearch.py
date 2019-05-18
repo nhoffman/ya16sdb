@@ -50,9 +50,9 @@ def main():
             else:
                 unknowns.write('>{}\n{}\n'.format(s.description, s.seq))
     info = pandas.read_csv(args.seq_info, dtype=str)
+    unknowns = info[~info['seqname'].isin(vsearch)]['version'].tolist()
     info = info[info['seqname'].isin(vsearch)]
     info.to_csv(args.out_info, index=False)
-    unknowns = info[~info['seqname'].isin(vsearch)]['version'].tolist()
     with open(args.prev_unknowns, 'r') as unknowns_in:
         unknowns_in = (u.strip() for u in unknowns_in)
         unknowns_in = (u for u in unknowns_in if u)
