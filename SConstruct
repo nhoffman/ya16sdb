@@ -161,6 +161,9 @@ new = env.Command(
             '${SOURCES[0]} > $TARGET '
             '|| true'])
 
+"""
+Looking for any NCBI record with a new or merged tax_id
+"""
 accession2taxid = env.Command(
     target='$out/ncbi/accession2taxid.csv',
     source=[settings['accession2taxid'], ncbi],
@@ -172,7 +175,7 @@ accession2taxid = env.Command(
 
 """
 Remove esearch records not present in accession2taxid and setup
-records that had their tax_ids changed or merged to be re-downloaded.
+records that have changed or merged tax_ids to be re-downloaded.
 """
 updated = env.Command(
     target='$out/ncbi/updated.txt',
@@ -460,7 +463,7 @@ blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 """
 filter using various criteria
 """
-fa, info = env.Command(
+fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
             '$out/dedup/1200bp/named/seq_info.csv'],
     source=[fa, feather],
