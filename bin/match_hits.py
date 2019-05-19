@@ -26,7 +26,7 @@ def main():
     vsearch = vsearch.merge(info[['seqname', 'version', 'species_name']])
     vsearch = vsearch.rename(
         columns={'version': 'match_version', 'species_name': 'match_species'})
-    info = info.merge(vsearch)
+    info = info.merge(vsearch, how='left')
     info.to_feather(args.feather)
 
 
