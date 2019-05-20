@@ -26,6 +26,7 @@ def main():
     info.loc[is_refseq, 'confidence'] = 'refseq'
     is_published = info['confidence'].isna() & info['is_published']
     info.loc[is_published, 'confidence'] = 'published'
+    info.loc[info['confidence'].isna(), 'confidence'] = 'direct'
     info.to_feather(args.feather)
 
 
