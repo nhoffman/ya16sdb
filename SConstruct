@@ -1,12 +1,12 @@
 """
-Download and curate the NCBI 16S rRNA sequences
+Download and curate the 16S rRNA sequences from NCBI
 """
 import configparser
 import csv
 import errno
 import os
-import sys
 import SCons
+import sys
 import time
 
 from SCons.Script import (
@@ -123,6 +123,10 @@ else:
         target='$out/ncbi/types.txt',
         action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
 
+    """
+    Candidatus Saccharibacteria
+    https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
+    """
     tm7 = env.Command(
         source=None,
         target='$out/ncbi/tm7/versions.txt',
@@ -134,7 +138,8 @@ else:
         action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
 
     """
-    We will use records.txt list to remove old records previously downloaded
+    Concat everything.  records.txt will be used to remove old records
+    previously downloaded.
     """
     ncbi = env.Command(
         source=[classified, tm7],
@@ -142,9 +147,8 @@ else:
         action='cat $SOURCES > $TARGET')
 
 """
-Do not download record accessions in the ignore list or that have been
+Do not download record accessions in the do_not_download list or that have been
 previously downloaded in the records_cache or in unknown_cache.
-Exit script if no new records exist.
 """
 new = env.Command(
     target='$out/ncbi/new.txt',
@@ -162,7 +166,8 @@ new = env.Command(
             '|| true'])
 
 """
-Looking for any NCBI record with a new or merged tax_id
+Filter accession2taxid into a much smaller list of 16s records and
+update taxids.
 """
 accession2taxid = env.Command(
     target='$out/ncbi/accession2taxid.csv',
@@ -213,9 +218,6 @@ gbs = env.Command(
     source=download,
     action='%(fts)s | %(ftract)s | %(gbs)s' % settings)
 
-"""
-extract
-"""
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
     target=['$out/ncbi/seqs.fasta',
@@ -227,7 +229,8 @@ fa, seq_info, pubmed_info, references, refseq_info = env.Command(
     action='extract_genbank.py $SOURCE ' + today + ' $TARGETS')
 
 """
-Record versions returned from esearch that had no actual 16s features
+Record versions returned from esearch that had no actual 16s features or were
+below `ftract -min-length`
 """
 no_features = env.Command(
     target='$out/ncbi/no_features.txt',
@@ -239,7 +242,6 @@ no_features = env.Command(
             '--fixed-strings '
             '--file /dev/stdin '
             '${SOURCES[1]} > $TARGET '
-            # force continue if grep finds no matches
             '|| true'))
 
 """
@@ -342,7 +344,7 @@ feather = env.Command(
     source=seq_info,
     action='to_feather.py $SOURCE $TARGET')
 
-"""Start feather file columns"""
+"""Add feather file columns"""
 """
 Add 'species' taxonomy id, species_name, genus taxid and genus name
 """
@@ -461,7 +463,7 @@ types_mothur = env.Command(
 blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
 
 """
-filter using various criteria
+filter into named set and other criteria
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
@@ -475,12 +477,12 @@ fa, seq_info = env.Command(
             '--prop-ambig-cutoff 0.01 '
             '--species-cap 5000 '
             '${SOURCES[:2]} $TARGETS'))
-Depends([fa, seq_info], [is_valid, tax_cols])
+Depends([fa, seq_info], [is_valid, tax_cols, seqhash])
 
 named = fa
 
 """
-Make general named taxtable with all ranks included for filter_outliers
+Make named taxtable for filter_outliers
 """
 taxonomy = env.Command(
     target='$out/dedup/1200bp/named/taxonomy.csv',
@@ -582,13 +584,16 @@ mothur = env.Command(
     action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
 """
-get taxid descendants from any taxids in trust.txt
+expand taxids into descendants
 """
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
     source=settings['trust'],
     action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
+"""
+expand taxids into descendants
+"""
 dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
@@ -605,7 +610,7 @@ dnt = env.Command(
     action='cat $SOURCES > $TARGET')
 
 """
-labmed trust/do_not_trust seqs
+Same as named set with inliers and trust/no_trust records
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
@@ -614,7 +619,7 @@ fa, seq_info = env.Command(
     action=['partition_refs.py '
             '--do_not_trust ${SOURCES[3]} '
             '--drop-duplicate-sequences '
-            '--inliers '  # centroid & is_out = False
+            '--inliers '  # filter_outliers = True & is_out = False
             '--is_species '
             '--is_valid '
             '--min-length 1200 '
