@@ -1,6 +1,6 @@
 pandas>=0.20.0
 #scons>=3.0.1
-medirect>=0.13.0
+medirect>=0.14.0
 sqlalchemy
 psycopg2
 feather-format
