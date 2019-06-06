@@ -8,5 +8,3 @@ settings.conf
 vault_pass.txt
 __pycache__
 taxonomy.conf
-ncbi_taxonomy.db
-taxdmp.zip
