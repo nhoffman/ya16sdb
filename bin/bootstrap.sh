@@ -13,8 +13,6 @@ fi
 # install python envs
 python3 -m venv $venv
 source $venv/bin/activate
-pip install -U "pip==9.0.1"  # need --egg switch for scons install
-$venv/bin/pip3 install --egg "scons>=3.0.1"
 $venv/bin/pip3 install --requirement requirements.txt
 
 mkdir src
