@@ -102,6 +102,7 @@ env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
 
+# FIXME: Create a "test" section in settings.conf to replace this if/else
 if test:
     types = 'testfiles/types.txt'
     taxids = (i.strip() for i in open('testfiles/tax_ids.txt'))
@@ -112,6 +113,7 @@ if test:
         source='testfiles/tax_ids.txt',
         action=('$eutils %(esearch)s "%(16s)s AND (%(taxids)s)" | %(acc)s' %
                 {'taxids': taxids, **settings}))
+    modified = 'testfiles/modified.txt'
 else:
     """
     get accessions (versions) of records considered type strains
@@ -146,6 +148,25 @@ else:
         target='$out/ncbi/records.txt',
         action='cat $SOURCES > $TARGET')
 
+    """
+    Check the cache for last download_date and download list of modified
+    records in order to re-download modified records that we have previously
+    downloaded.
+    """
+    si = csv.DictReader(open(env.subst('$seq_info_cache')))
+    si = [time.strptime(r['download_date'], '%d-%b-%Y') for r in si]
+    if si:
+        download_date = time.strftime('%Y/%m/%d', sorted(si)[-1])
+    else:
+        download_date = time.strftime('%Y/%m/%d')
+    modified = env.Command(
+        source=None,
+        target='$out/ncbi/modified.txt',
+        action=['$eutils %(esearch)s "%(classified)s '
+                'AND %(download_date)s[Modification Date] : '
+                '3000[Modification Date]" | %(acc)s' %
+                {'download_date': download_date, **settings}])
+
 """
 Do not download record accessions in the do_not_download list or that have been
 previously downloaded in the records_cache or in unknown_cache.
@@ -154,7 +175,6 @@ new = env.Command(
     target='$out/ncbi/new.txt',
     source=[
         ncbi,
-        settings['do_not_download'],
         '$records_cache',
         '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
@@ -163,6 +183,21 @@ new = env.Command(
             '--fixed-strings '
             '--file /dev/stdin '
             '${SOURCES[0]} > $TARGET '
+            '|| true'])
+
+'''
+combine new and modified and remove do_not_download.txt records
+'''
+combined = env.Command(
+    target='$out/ncbi/combined.txt',
+    source=[new, modified, settings['do_not_download']],
+    action=['cat ${SOURCES[:2]} | '
+            'grep '
+            '--invert-match '
+            '--fixed-strings '
+            '--file ${SOURCES[2]} '
+            '/dev/stdin | '
+            'sort --unique > $TARGET '
             '|| true'])
 
 """
@@ -182,33 +217,10 @@ accession2taxid = env.Command(
 Remove esearch records not present in accession2taxid and setup
 records that have changed or merged tax_ids to be re-downloaded.
 """
-updated = env.Command(
-    target='$out/ncbi/updated.txt',
-    source=[accession2taxid, new, '$seq_info_cache'],
-    action='updated.py $SOURCES $TARGET')
-
-"""
-Check the cache for last download_date and download list of modified records
-in order to re-download modified records that we have previously downloaded.
-"""
-seq_info = csv.DictReader(open(env.subst('$seq_info_cache')))
-seq_info = [time.strptime(r['download_date'], '%d-%b-%Y') for r in seq_info]
-if seq_info:
-    download_date = time.strftime('%Y/%m/%d', sorted(seq_info)[-1])
-else:
-    download_date = time.strftime('%Y/%m/%d')
-modified = env.Command(
-    source=None,
-    target='$out/ncbi/modified.txt',
-    action=['$eutils %(esearch)s "%(classified)s '
-            'AND %(download_date)s[Modification Date] : '
-            '3000[Modification Date]" | %(acc)s' %
-            {'download_date': download_date, **settings}])
-
 download = env.Command(
     target='$out/ncbi/download.txt',
-    source=[updated, modified],
-    action='cat $SOURCES | sort --unique > $TARGET')
+    source=[accession2taxid, combined, '$seq_info_cache'],
+    action='updated.py $SOURCES $TARGET')
 
 """
 download genbank records
@@ -475,8 +487,8 @@ fa, seq_info = env.Command(
             '--is_valid '
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
-            '--species-cap 5000 '
-            '${SOURCES[:2]} $TARGETS'))
+            '--species-cap %(species_cap)s '
+            '${SOURCES[:2]} $TARGETS' % settings))
 Depends([fa, seq_info], [is_valid, tax_cols, seqhash])
 
 named = fa
@@ -624,9 +636,9 @@ fa, seq_info = env.Command(
             '--is_valid '
             '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
-            '--species-cap 5000 '
+            '--species-cap %(species_cap)s '
             '--trusted ${SOURCES[2]} '
-            '${SOURCES[:2]} $TARGETS'])
+            '${SOURCES[:2]} $TARGETS' % settings])
 Depends([fa, seq_info], filter_outliers)
 
 """
