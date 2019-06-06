@@ -155,8 +155,8 @@ modified = env.Command(
             {'download_date': download_date, **settings}])
 
 """
-Do not download record accessions in the do_not_download list or that have been
-previously downloaded in the records_cache or in unknown_cache.
+New records are records not previously downloaded
+in the records_cache or in unknown_cache
 """
 new = env.Command(
     target='$out/ncbi/new.txt',
@@ -271,8 +271,7 @@ vsearch = env.Command(
 Fix record orientation and ignore sequences with no vsearch alignments.
 
 NOTE: unknown.txt will contain records (accession.version) ids with ANY
-16s coordinates so we can potentially re-download these
-coordinates later when data/rdp_16s_type_strains.fasta.bz2 is updated.
+filtered 16s allele allele.
 """
 fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
@@ -286,10 +285,9 @@ fa, seq_info, _, _ = env.Command(
 """
 Append with older records
 
-1. Drop seqnames missing either a sequence or row in seq_info, sequences
-   filtered out of the vsearch 16s alignment or sequences with unknown tax_ids
+1. Drop seqnames missing either a sequence or row in seq_info
 2. Append seqs, seq_info, pubmed_info and references to previous data set
-3. Drop records not in records.txt file
+3. Drop records not in the ncbi records.txt file
 4. Drop sequences that have a refseq equivalent
 5. Deduplicate pubmeds and references
 6. Copy and cache full dataset
