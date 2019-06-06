@@ -17,9 +17,6 @@ if not venv:
     sys.exit('--> an active virtualenv is required'.format(venv))
 if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
-conf = configparser.SafeConfigParser()
-conf.read('settings.conf')
-settings = conf['DEFAULT']
 
 
 def PathIsFileCreate(key, val, env):
@@ -54,6 +51,9 @@ def blast_db(env, sequence_file, output_base):
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
+conf = configparser.SafeConfigParser()
+conf.read('settings.conf')
+settings = conf['TEST'] if test else conf['DEFAULT']
 vrs = Variables(None, ARGUMENTS)
 out = 'test_output' if test else 'output'
 vrs.Add('base', help='Path to output directory', default=out)
@@ -102,70 +102,57 @@ env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
 
-# FIXME: Create a "test" section in settings.conf to replace this if/else
-if test:
-    types = 'testfiles/types.txt'
-    taxids = (i.strip() for i in open('testfiles/tax_ids.txt'))
-    taxids = ('txid' + i + '[Organism]' for i in taxids if i)
-    taxids = ' OR '.join(taxids)
-    ncbi = env.Command(
-        target='$out/ncbi/records.txt',
-        source='testfiles/tax_ids.txt',
-        action=('$eutils %(esearch)s "%(16s)s AND (%(taxids)s)" | %(acc)s' %
-                {'taxids': taxids, **settings}))
-    modified = 'testfiles/modified.txt'
+"""
+get accessions (versions) of records considered type strains
+NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+"""
+types = env.Command(
+    source=None,
+    target='$out/ncbi/types.txt',
+    action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
+
+"""
+Candidatus Saccharibacteria
+https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
+"""
+tm7 = env.Command(
+    source=None,
+    target='$out/ncbi/tm7/versions.txt',
+    action='$eutils %(esearch)s "%(tm7)s" | %(acc)s' % settings)
+
+classified = env.Command(
+    source=None,
+    target='$out/ncbi/classified.txt',
+    action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
+
+"""
+Concat everything.  records.txt will be used to remove old records
+previously downloaded.
+"""
+ncbi = env.Command(
+    source=[classified, tm7],
+    target='$out/ncbi/records.txt',
+    action='cat $SOURCES > $TARGET')
+
+"""
+Check the cache for last download_date and download list of modified
+records in order to re-download modified records that we have previously
+downloaded.
+"""
+si = csv.DictReader(open(env.subst('$seq_info_cache')))
+si = [time.strptime(r['download_date'], '%d-%b-%Y') for r in si]
+if si:
+    download_date = time.strftime('%Y/%m/%d', sorted(si)[-1])
 else:
-    """
-    get accessions (versions) of records considered type strains
-    NCBI web blast uses `sequence_from_type[Filter]` so we will use that
-    http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
-    """
-    types = env.Command(
-        source=None,
-        target='$out/ncbi/types.txt',
-        action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
-
-    """
-    Candidatus Saccharibacteria
-    https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
-    """
-    tm7 = env.Command(
-        source=None,
-        target='$out/ncbi/tm7/versions.txt',
-        action='$eutils %(esearch)s "%(tm7)s" | %(acc)s' % settings)
-
-    classified = env.Command(
-        source=None,
-        target='$out/ncbi/classified.txt',
-        action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
-
-    """
-    Concat everything.  records.txt will be used to remove old records
-    previously downloaded.
-    """
-    ncbi = env.Command(
-        source=[classified, tm7],
-        target='$out/ncbi/records.txt',
-        action='cat $SOURCES > $TARGET')
-
-    """
-    Check the cache for last download_date and download list of modified
-    records in order to re-download modified records that we have previously
-    downloaded.
-    """
-    si = csv.DictReader(open(env.subst('$seq_info_cache')))
-    si = [time.strptime(r['download_date'], '%d-%b-%Y') for r in si]
-    if si:
-        download_date = time.strftime('%Y/%m/%d', sorted(si)[-1])
-    else:
-        download_date = time.strftime('%Y/%m/%d')
-    modified = env.Command(
-        source=None,
-        target='$out/ncbi/modified.txt',
-        action=['$eutils %(esearch)s "%(classified)s '
-                'AND %(download_date)s[Modification Date] : '
-                '3000[Modification Date]" | %(acc)s' %
-                {'download_date': download_date, **settings}])
+    download_date = time.strftime('%Y/%m/%d')
+modified = env.Command(
+    source=None,
+    target='$out/ncbi/modified.txt',
+    action=['$eutils %(esearch)s "%(classified)s '
+            'AND %(download_date)s[Modification Date] : '
+            '3000[Modification Date]" | %(acc)s' %
+            {'download_date': download_date, **settings}])
 
 """
 Do not download record accessions in the do_not_download list or that have been
