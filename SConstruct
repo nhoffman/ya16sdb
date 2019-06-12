@@ -110,7 +110,7 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 types = env.Command(
     source=None,
     target='$out/ncbi/types.txt',
-    action='$eutils %(esearch)s "%(types)s" | %(acc)s' % settings)
+    action='$eutils %(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings)
 
 """
 Candidatus Saccharibacteria
@@ -119,12 +119,13 @@ https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
 tm7 = env.Command(
     source=None,
     target='$out/ncbi/tm7/versions.txt',
-    action='$eutils %(esearch)s "%(tm7)s" | %(acc)s' % settings)
+    action='$eutils %(esearch)s "%(tm7)s" | %(acc)s -out $TARGET' % settings)
 
 classified = env.Command(
     source=None,
     target='$out/ncbi/classified.txt',
-    action='$eutils %(esearch)s "%(classified)s" | %(acc)s' % settings)
+    action=['$eutils %(esearch)s "%(classified)s" | '
+            '%(acc)s -out $TARGET' % settings])
 
 """
 Concat everything.  records.txt will be used to remove old records
@@ -151,7 +152,7 @@ modified = env.Command(
     target='$out/ncbi/modified.txt',
     action=['$eutils %(esearch)s "%(classified)s '
             'AND %(download_date)s[Modification Date] : '
-            '3000[Modification Date]" | %(acc)s' %
+            '3000[Modification Date]" | %(acc)s -out $TARGET' %
             {'download_date': download_date, **settings}])
 
 """
@@ -166,9 +167,9 @@ new = env.Command(
         '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
             'grep '
-            '--invert-match '
-            '--fixed-strings '
             '--file /dev/stdin '
+            '--fixed-strings '
+            '--invert-match '
             '${SOURCES[0]} > $TARGET '
             '|| true'])
 
@@ -180,9 +181,9 @@ combined = env.Command(
     source=[new, modified, settings['do_not_download']],
     action=['cat ${SOURCES[:2]} | '
             'grep '
-            '--invert-match '
-            '--fixed-strings '
             '--file ${SOURCES[2]} '
+            '--fixed-strings '
+            '--invert-match '
             '/dev/stdin | '
             'sort --unique > $TARGET '
             '|| true'])
@@ -201,8 +202,8 @@ accession2taxid = env.Command(
             '- $tax_url'])
 
 """
-Remove esearch records not present in accession2taxid and setup
-records that have changed or merged tax_ids to be re-downloaded.
+Remove esearch records not present in accession2taxid and identify
+cached records that changed or merged tax_ids to be re-downloaded
 """
 download = env.Command(
     target='$out/ncbi/download.txt',
@@ -215,7 +216,9 @@ download genbank records
 gbs = env.Command(
     target='$out/ncbi/records.gb',
     source=download,
-    action='%(fts)s | %(ftract)s | %(gbs)s' % settings)
+    action=['%(fts)s -id $SOURCE | '
+            '%(ftract)s | '
+            '%(gbs)s -out $TARGET' % settings])
 
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
@@ -237,9 +240,9 @@ no_features = env.Command(
     action=('csvcut.py --columns version ${SOURCES[0]} | '
             'tail -n +2 | '
             'grep '
-            '--invert-match '
-            '--fixed-strings '
             '--file /dev/stdin '
+            '--fixed-strings '
+            '--invert-match '
             '${SOURCES[1]} > $TARGET '
             '|| true'))
 
@@ -270,8 +273,8 @@ vsearch = env.Command(
 """
 Fix record orientation and ignore sequences with no vsearch alignments.
 
-NOTE: unknown.txt will contain records (accession.version) ids with ANY
-filtered 16s allele allele.
+NOTE: unknown.txt will contain records (accession.version) with ANY
+filtered 16s allele.
 """
 fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
@@ -283,14 +286,14 @@ fa, seq_info, _, _ = env.Command(
             'cp ${TARGETS[3]} $unknown_cache'])
 
 """
-Append with older records
+Refresh/append with older records
 
 1. Drop seqnames missing either a sequence or row in seq_info
 2. Append seqs, seq_info, pubmed_info and references to previous data set
 3. Drop records not in the ncbi records.txt file
 4. Drop sequences that have a refseq equivalent
 5. Deduplicate pubmeds and references
-6. Copy and cache full dataset
+6. Copy and cache
 """
 fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
     target=['$out/ncbi/combined/seqs.fasta',
