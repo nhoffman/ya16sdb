@@ -102,15 +102,11 @@ env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
 
-"""
-get accessions (versions) of records considered type strains
-NCBI web blast uses `sequence_from_type[Filter]` so we will use that
-http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
-"""
-types = env.Command(
+classified = env.Command(
     source=None,
-    target='$out/ncbi/types.txt',
-    action='$eutils %(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings)
+    target='$out/ncbi/classified.txt',
+    action=['$eutils %(esearch)s "%(classified)s" | '
+            '%(acc)s -out $TARGET' % settings])
 
 """
 Candidatus Saccharibacteria
@@ -121,12 +117,6 @@ tm7 = env.Command(
     target='$out/ncbi/tm7/versions.txt',
     action='$eutils %(esearch)s "%(tm7)s" | %(acc)s -out $TARGET' % settings)
 
-classified = env.Command(
-    source=None,
-    target='$out/ncbi/classified.txt',
-    action=['$eutils %(esearch)s "%(classified)s" | '
-            '%(acc)s -out $TARGET' % settings])
-
 """
 Concat everything.  records.txt will be used to remove old records
 previously downloaded.
@@ -135,6 +125,16 @@ ncbi = env.Command(
     source=[classified, tm7],
     target='$out/ncbi/records.txt',
     action='cat $SOURCES > $TARGET')
+
+"""
+get accessions (versions) of records considered type strains
+NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+"""
+types = env.Command(
+    source=None,
+    target='$out/ncbi/types.txt',
+    action='$eutils %(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings)
 
 """
 Check the cache for last download_date and download list of modified
