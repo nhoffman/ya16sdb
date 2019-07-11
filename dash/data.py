@@ -1,13 +1,9 @@
-import os
-import gzip
-from datetime import datetime
-from io import BytesIO
-
 import boto3
-
-import numpy as np
-import pandas as pd
+from io import BytesIO
+from datetime import datetime
 import feather
+import gzip
+import os
 
 
 def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
@@ -38,8 +34,11 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
         last_modified = datetime.fromtimestamp(
             os.path.getmtime(pathspec)).isoformat()
         if get_data:
-            with gzip.open(pathspec) as f:
-                df = feather.read_dataframe(f)
+            if pathspec.endswith('.gz'):
+                with gzip.open(pathspec) as f:
+                    df = feather.read_dataframe(f)
+            else:
+                df = feather.read_dataframe(pathspec)
         else:
             df = None
 
