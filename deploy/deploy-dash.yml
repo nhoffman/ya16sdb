@@ -46,7 +46,7 @@
   become_user: dokku
 
   vars:
-    - DATA_FILE: s3://{{ S3_BUCKET }}/filter_details.feather.gz
+    - DATA_FILE: s3://{{ S3_BUCKET }}/seq_info.feather
 
   vars_files:
     - secrets.yml
