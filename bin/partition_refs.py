@@ -115,7 +115,7 @@ def main():
 
     if args.trusted:
         # place trusted sequences at the bottom
-        trusted = trusted[~trusted.isin(info)]
+        trusted = trusted[~trusted['seqname'].isin(info['seqname'])]
         info = info.append(trusted)
 
     if args.species_cap:
