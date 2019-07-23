@@ -286,6 +286,17 @@ fa, seq_info, _, _ = env.Command(
             'cp ${TARGETS[3]} $unknown_cache'])
 
 """
+Remove new records with unknown tax_ids
+"""
+seq_info = env.Command(
+    target='$out/ncbi/update_taxids/seq_info.csv',
+    source=seq_info,
+    action=['$taxit update_taxids '
+            '--outfile $TARGET '
+            '--unknown-action drop '
+            '$SOURCE $tax_url'])
+
+"""
 Refresh/append with older records
 
 1. Drop seqnames missing either a sequence or row in seq_info
