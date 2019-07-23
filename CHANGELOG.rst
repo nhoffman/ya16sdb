@@ -2,6 +2,16 @@
 Changes for ya16sdb
 ===================
 
+0.6
+===
+* Sort and cap reference sequences by confidence (and other seq_info attributes) in blast db(s) (GL: 38)
+* Redownload records that have an updated modified_date to pick up changes in pubmed_id (GL: 17)
+* Do not re-download vsearch filtered sequences if training set has not been updated (GL: 44)
+* Move data/ignore.txt to /molmicro/lists dir and settings.conf and change file name to do_not_download.txt (GL: 47)
+* Include copy of /molmicro/common/uw/taxonomy/taxdmp.zip in dated output dir (GL: 48)
+* Update record tax_ids using accession2taxid from ncbi ftp site (GL: 54)
+* Create a "Trusted" list to compliment "Do Not Trust List" (GL: 57)
+
 0.5
 ===
 * New dash based filter outlier plots (GL: 37)
