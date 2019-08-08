@@ -23,9 +23,13 @@ REFERENCE_COLS = ['pubmed_id', 'title', 'authors',
 
 REFSEQ_INFO_COLS = ['seqname', 'accession', 'gi', 'seq_start', 'seq_stop']
 
+# https://www.ncbi.nlm.nih.gov/Sequin/acc.html
+REFSEQ = '[A-Z]{2}_\w+'
+ACCESSION = '[A-Z]+\d+'
+COORDINATES = ':(?P<seq_start>\d+)-(?P<seq_stop>\d+)'
 REFSEQ_SOURCE = re.compile(
-    'REFSEQ.*?(?P<accession>[A-Z]{1,4}_?\d{5,8})'
-    ':?(?P<seq_start>\d+)?-?(?P<seq_stop>\d+)?',
+    'REFSEQ.*?(?P<accession>{REFSEQ}|{ACCESSION})({COORDINATES})?'.format(
+        REFSEQ=REFSEQ, ACCESSION=ACCESSION, COORDINATES=COORDINATES),
     re.DOTALL)
 
 GI_SOURCE = re.compile('gi:(?P<gi>\d+)')
