@@ -167,9 +167,10 @@ new = env.Command(
         '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
             'grep '
-            '--file /dev/stdin '
+            '--file - '
             '--fixed-strings '
             '--invert-match '
+            '--line-regexp '
             '${SOURCES[0]} > $TARGET '
             '|| true'])
 
@@ -184,7 +185,8 @@ combined = env.Command(
             '--file ${SOURCES[2]} '
             '--fixed-strings '
             '--invert-match '
-            '/dev/stdin | '
+            '--line-regexp '
+            '- | '
             'sort --unique > $TARGET '
             '|| true'])
 
@@ -240,9 +242,10 @@ no_features = env.Command(
     action=('csvcut.py --columns version ${SOURCES[0]} | '
             'tail -n +2 | '
             'grep '
-            '--file /dev/stdin '
+            '--file - '
             '--fixed-strings '
             '--invert-match '
+            '--line-regexp '
             '${SOURCES[1]} > $TARGET '
             '|| true'))
 
