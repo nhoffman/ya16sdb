@@ -26,7 +26,9 @@ def main():
         seq_info = pandas.read_csv(
             args.seq_info, dtype=str, usecols=['version', 'tax_id'])
         same = seq_info.merge(a2t)
-        seq_info = seq_info[~seq_info['version'].isin(same['version'])]
+        # only add back sequences with updated taxids
+        seq_info = seq_info[(~seq_info['version'].isin(same['version'])) &
+                            (seq_info['version'].isin(a2t['version']))]
         accessions = accessions.append(seq_info[['version']])
     accessions.drop_duplicates().to_csv(args.out, header=None, index=False)
 
