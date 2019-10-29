@@ -2,6 +2,10 @@
 Changes for ya16sdb
 ===================
 
+0.6.1
+=====
+* Bug fix to include only records with updated taxids to be re-downloaded (GL: 72)
+
 0.6
 ===
 * Sort and cap reference sequences by confidence (and other seq_info attributes) in blast db(s) (GL: 38)
