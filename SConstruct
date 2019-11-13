@@ -10,7 +10,13 @@ import sys
 import time
 
 from SCons.Script import (
-        ARGUMENTS, Depends, Environment, Help, PathVariable, Variables)
+        ARGUMENTS,
+        Depends,
+        Environment,
+        Help,
+        PathVariable,
+        Variables,
+        )
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
@@ -55,8 +61,7 @@ conf = configparser.SafeConfigParser()
 conf.read('settings.conf')
 settings = conf['TEST'] if test else conf['DEFAULT']
 vrs = Variables(None, ARGUMENTS)
-out = 'test_output' if test else 'output'
-vrs.Add('base', help='Path to output directory', default=out)
+vrs.Add('base', help='Path to output directory', default=settings['outdir'])
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
@@ -98,6 +103,7 @@ env = Environment(
     deenurp=settings['deenurp'],
 )
 
+env.EnsureSConsVersion(3, 0, 5)
 env.Decider('MD5')
 
 Help(vrs.GenerateHelpText(env))
@@ -161,10 +167,7 @@ in the records_cache or in unknown_cache
 """
 new = env.Command(
     target='$out/ncbi/new.txt',
-    source=[
-        ncbi,
-        '$records_cache',
-        '$unknown_cache'],
+    source=[ncbi, '$records_cache', '$unknown_cache'],
     action=['cat ${SOURCES[1:]} | '
             'grep '
             '--file - '
@@ -736,6 +739,24 @@ match_hits = env.Command(
     source=[feather, named_type_hits],
     action=['match_hits.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 Depends([match_hits], tax_cols)
+
+"""
+add named_type_hits match columns to feather file
+"""
+match_hits = env.Command(
+    target='$out/.feather/match_hits.md5',
+    source=[feather, named_type_hits],
+    action=['match_hits.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
+Depends([match_hits], tax_cols)
+
+"""
+gzip feather file as last step
+"""
+gzip = env.Command(
+    target='${SOURCE}.gz',
+    source=feather,
+    action='gzip --to-stdout $SOURCE > $TARGET')
+Depends([gzip], match_hits)
 
 """
 copy taxdmp file into output dir so a ``taxit new_database``
