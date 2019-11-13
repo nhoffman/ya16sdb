@@ -1,5 +1,5 @@
-awscli==1.16.101
-boto3==1.9.86
+awscli==1.16.281
+boto3==1.10.17
 dash==0.28.5
 dash-core-components==0.30.1
 dash-html-components==0.13.2
