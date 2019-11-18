@@ -55,11 +55,12 @@ At a high level, this pipeline does the following:
   "direct" (direct submissions).
 * Discards records likely to be mis-annotated using ``deenurp filter-outliers``.
 * Provides various subsets of annotated sequences. For example:
-  - taxonomic name consistent with species-level classifications
-  - type strains only
-  - outliers removed
-  - downsampled to a subset of sequences for each species, prioritizing
-    type strains and "published" records.
+
+  * taxonomic name consistent with species-level classifications
+  * type strains only
+  * outliers removed
+  * downsampled to a subset of sequences for each species,
+     prioritizing type strains and "published" records.
+
 * Each record subset provides sequence metadata, sequences, taxonomic
   lineages, and a blast database.
-
