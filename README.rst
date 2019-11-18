@@ -1,79 +1,65 @@
-========================
- NCBI curation pipeline
-========================
+===============================
+ Yet Another 16S rRNA database
+===============================
 
-https://bitbucket.org/uwlabmed/mkrefpkg
+ya16sdb is a pipeline for downloading, curating, and annotating a
+database of bacterial 16S rRNA sequences. This repository also
+implements a web application (https://ya16sdb.labmed.uw.edu/) that can
+be used to visualize the distance-based relationships among sequences
+for a given species.
 
-Pipeline executed using ``scons -f SConstruct-ncbi``
+The purpose of the project is to provide a high quality source of
+bacterial 16S rRNA sequences that is up to date with NCBI, in a format
+that is useful as an input for various bioinformatics pipleines such
+as blast searching, phylogenetic reference set creation,
+sequence-based taxonomic assignment, etc.
 
-output directories
-==================
+Project information
+===================
 
-``output-ncbi`` contains the pipleine output, with intermediate files
-in the top level, and a dated subdirectory for each run of the
-pipeline. The most recent output is typically symlinked to
-``output-ncbi/LATEST``. The layout of each of these subdirectories is
-as follows::
+This project is a product of ongoing research interests of Noah
+Hoffman (https://faculty.washington.edu/ngh2/home/pages/software.html)
+at the University of Washington in the Department of Laboratory
+Medicine.
 
-  % ls -1 output-ncbi/LATEST/
-  1200bp/
-  appended_info.csv
-  git_version.txt
-  is_type_info.csv
-  ncbi.log
-  ncbi.txt
-  new/
-  pubmed_ids.csv
-  references.csv
-  requirements.txt
-  seq_info.csv
-  seqs.fasta
-  types.txt
-  versions.txt
+Christopher Rosenthal is the primary author of the pipeline.
 
-* in the top level, seq_info.csv and seqs.fasta contain the entire
-  corpus of downloaded 16 sequences.
-* ``new/`` - new records downloaded relative to the last run
-  (typically not used for any downstream applications)
-* ``1200bp/`` - records limited to those >= 1200bp
-* ``1200bp/valid/`` - records in ``1200bp/`` with species-level names
-  not matching the regular expression defined here:
-  https://github.com/fhcrc/taxtastic/blob/master/taxtastic/ncbi.py#L79
-* ``1200bp/valid/dedup`` - "valid" records deduplicated by first
-  grouping by accession, then choosing a representative of each set of
-  identical sequences (ie, same md5 hash),
-* ``1200bp/valid/filtered`` - deduplicated sequences from which
-  outliers have been discarded (using ``deenurp filter_outliers``).
-* ``1200bp/valid/types`` - type strains, as identified by NCBI
-  (correspond to accessions downloaded with the genbank query filter
-  ``sequence_from_type[Filter]``)
+The pipeline heavily relies on *taxtastic*
+(https://github.com/fhcrc/taxtastic) and *deenurp*
+(https://github.com/fhcrc/deenurp), both of which began as
+collaborations with Erick Matsen at The Fred Hutchinson Cancer
+Research Center in Seattle, WA.
 
-As an (extreme) example of the incremental filtering process::
+Please cite this project as
 
-  LATEST % find . -name seq_info.csv | xargs grep -c 'Streptococcus pneumoniae' seq_info.csv
-  seq_info.csv:12446
-  ./new/seq_info.csv:0
-  ./new/valid/seq_info.csv:0
-  ./new/invalid/seq_info.csv:0
-  ./seq_info.csv:12446
-  ./1200bp/seq_info.csv:11393
-  ./1200bp/valid/seq_info.csv:11393
-  ./1200bp/valid/dedup/seq_info.csv:11208
-  ./1200bp/valid/filtered/seq_info.csv:11045
-  ./1200bp/valid/types/seq_info.csv:58
+Rosenthal C and Hoffman NG. 2019. ya16sdb: a pipeline for creating a
+collection of high-quality bacterial 16S rRNA sequences from
+NCBI. Version 0.6.1. University of Washington. https://github.com/nhoffman/ya16sdb
 
+Overview
+========
 
-interactive visualizations
-==========================
+At a high level, this pipeline does the following:
 
-Interactive visualizations of the filtered reference sequences are
-implemented using Bokeh. In an activated virtualenv with the contents
-of ``requirements.txt`` installed::
-
-  bokeh serve --show view_outliers
-
-This will start a local Bokeh server and open the visualization in a
-web browser.
-
-
+* Downloads annotation for all available sequence records from the
+  NCBI matching search terms for 16S rRNA.
+* Retrieves sequence records for corresponding full length (or near
+  full-length) 16S rRNA genes; this involves extracting subsequences
+  from genome sequences or contigs.
+* Ensures that all records are actually encode 16S rRNA, and provides
+  sequences in a consistent orientation.
+* Identifies the taxonomic lineage of each record.
+* Annotates records as a "type strain" (according to NCBI's definition
+  of type strain), "published" (annotation has an accompanying PubMed
+  ID), "refseq" (belonging to the Genbank refseq collection), or
+  "direct" (direct submissions).
+* Discards records likely to be mis-annotated using ``deenurp filter-outliers``.
+* Provides various subsets of annotated sequences. For example:
+  * taxonomic name consistent with species-level classifications
+  * type strains only
+  * outliers removed
+  * downsampled to a subset of sequences for each species, prioritizing
+    type strains and "published" records.
+* Each record subset provides sequence metadata, sequences, taxonomic
+  lineages, and a blast database.
 
