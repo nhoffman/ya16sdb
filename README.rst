@@ -46,8 +46,8 @@ At a high level, this pipeline does the following:
 * Retrieves sequence records for corresponding full length (or near
   full-length) 16S rRNA genes; this involves extracting subsequences
   from genome sequences or contigs.
-* Ensures that all records are actually encode 16S rRNA, and provides
-  sequences in a consistent orientation.
+* Ensures that all records are 16S rRNA genes
+* Ensures that sequences are in a consistent orientation.
 * Identifies the taxonomic lineage of each record.
 * Annotates records as a "type strain" (according to NCBI's definition
   of type strain), "published" (annotation has an accompanying PubMed
