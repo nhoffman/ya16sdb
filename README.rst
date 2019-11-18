@@ -54,13 +54,11 @@ At a high level, this pipeline does the following:
   ID), "refseq" (belonging to the Genbank refseq collection), or
   "direct" (direct submissions).
 * Discards records likely to be mis-annotated using ``deenurp filter-outliers``.
-* Provides various subsets of annotated sequences. For example:
+* Provides various subsets of annotated sequences. Each record subset
+  provides sequence metadata, sequences, taxonomic lineages, and a
+  blast database. For example:
 
-  * taxonomic name consistent with species-level classifications
+  * only records with taxonomic name consistent with species-level classifications
   * type strains only
   * outliers removed
-  * downsampled to a subset of sequences for each species,
-     prioritizing type strains and "published" records.
-
-* Each record subset provides sequence metadata, sequences, taxonomic
-  lineages, and a blast database.
+  * downsampled to a subset of sequences for each species, prioritizing type strains and "published" records.
