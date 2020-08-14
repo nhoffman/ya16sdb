@@ -23,7 +23,12 @@ def main():
         sep='\t',
         usecols=['seqname', 'match_seqname', 'match_pct'])
     info = pandas.read_feather(args.feather)
-    vsearch = vsearch.merge(info[['seqname', 'version', 'species_name']])
+    vsearch = vsearch.merge(
+        info[['seqname', 'version', 'species_name']],
+        left_on='match_seqname',
+        right_on='seqname',
+        suffixes=['', '_'])
+    vsearch = vsearch.drop('seqname_', axis='columns')
     vsearch = vsearch.rename(
         columns={'version': 'match_version', 'species_name': 'match_species'})
     info = info.merge(vsearch, how='left')
