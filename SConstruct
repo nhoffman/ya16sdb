@@ -20,7 +20,7 @@ from SCons.Script import (
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
-    sys.exit('--> an active virtualenv is required'.format(venv))
+    sys.exit('--> an active virtualenv is required')
 if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
 
@@ -566,7 +566,7 @@ filter_outliers = env.Command(
     action=['filter_outliers.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
-Create a filtered seq_info.csv file
+Create a filtered seq_info.csv file of filter_outliers fasta
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/seqs.fasta',

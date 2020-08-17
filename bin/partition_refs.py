@@ -70,13 +70,17 @@ def main():
     info = pandas.read_feather(args.feather)
 
     if args.trusted:
+        # all type strains are trusted - GL #79
+        trusted = info[info['is_type']]
         recs = (i.strip() for i in open(args.trusted) if not i.startswith('#'))
         recs = set(i for i in recs if i)
-        trusted = info[
+        # add special trusted recs after type strains
+        # because they are preferred
+        trusted = trusted.append(info[
             (info['version'].isin(recs)) |
             (info['accession'].isin(recs)) |
             (info['tax_id'].isin(recs)) |
-            (info['seqname'].isin(recs))]
+            (info['seqname'].isin(recs))])
 
     if args.is_valid:
         info = info[info['is_valid']]
@@ -114,7 +118,8 @@ def main():
             subset=['accession', 'seqhash'], keep='first')
 
     if args.trusted:
-        # place trusted sequences at the bottom
+        # trusted sequences are preferred and appended
+        # last to ensure they pass species_cap
         trusted = trusted[~trusted['seqname'].isin(info['seqname'])]
         info = info.append(trusted)
 
