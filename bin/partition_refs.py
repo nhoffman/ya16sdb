@@ -104,15 +104,6 @@ def main():
     if args.inliers:
         info = info[info['filter_outliers'] & ~info['is_out']]
 
-    if args.do_not_trust:
-        dnt = (i for i in open(args.do_not_trust) if not i.startswith('#'))
-        dnt = (i.strip() for i in dnt)
-        dnt = set(i for i in dnt if i)
-        info = info[~info['tax_id'].isin(dnt)]
-        info = info[~info['accession'].isin(dnt)]
-        info = info[~info['version'].isin(dnt)]
-        info = info[~info['seqname'].isin(dnt)]
-
     if args.drop_duplicate_sequences:
         info = info.drop_duplicates(
             subset=['accession', 'seqhash'], keep='first')
@@ -122,6 +113,17 @@ def main():
         # last to ensure they pass species_cap
         trusted = trusted[~trusted['seqname'].isin(info['seqname'])]
         info = info.append(trusted)
+
+    # apply args.do_not_trust after adding args.trusted in case a
+    # type strain needs to be removed
+    if args.do_not_trust:
+        dnt = (i for i in open(args.do_not_trust) if not i.startswith('#'))
+        dnt = (i.strip() for i in dnt)
+        dnt = set(i for i in dnt if i)
+        info = info[~info['tax_id'].isin(dnt)]
+        info = info[~info['accession'].isin(dnt)]
+        info = info[~info['version'].isin(dnt)]
+        info = info[~info['seqname'].isin(dnt)]
 
     if args.species_cap:
         # remember seqs are sorted in reverse preferred order
