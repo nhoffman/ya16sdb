@@ -741,15 +741,6 @@ match_hits = env.Command(
 Depends([match_hits], tax_cols)
 
 """
-add named_type_hits match columns to feather file
-"""
-match_hits = env.Command(
-    target='$out/.feather/match_hits.md5',
-    source=[feather, named_type_hits],
-    action=['match_hits.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-Depends([match_hits], tax_cols)
-
-"""
 gzip feather file as last step
 """
 gzip = env.Command(
