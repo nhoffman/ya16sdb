@@ -2,6 +2,11 @@
 Changes for ya16sdb
 ===================
 
+0.7
+===
+* All type strains are considered trusted unless part of do_not_trust list GL: 79
+* Bug fix to correct merge with vsearch nearest type strain GH: 39
+
 0.6.1
 =====
 * Bug fix to include only records with updated taxids to be re-downloaded (GL: 72)
