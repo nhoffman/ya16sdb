@@ -1,6 +1,5 @@
-[dokku-hosts]
+[prod]
 
-dokku-stack-dev
-dokku-stack-prod
+dokku-stack-apps-public-prod
 
 

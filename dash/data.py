@@ -18,10 +18,16 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
     print('reading data from {}'.format(pathspec))
     if pathspec.startswith('s3://'):
         s3_bucket, s3_key = pathspec.replace('s3://', '').split('/', 1)
-        s3client = boto3.client(
-            's3',
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key)
+        if aws_access_key_id:
+            print('using provided access keys')
+            s3client = boto3.client(
+                's3',
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key)
+        else:
+            # assume credentials are available in default credential chain
+            print('assuming existing aws credentials')
+            s3client = boto3.Session(region_name='us-west-2').client('s3')
         s3obj = s3client.get_object(Bucket=s3_bucket, Key=s3_key)
         last_modified = s3obj['LastModified']
         if get_data:
