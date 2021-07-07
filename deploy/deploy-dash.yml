@@ -37,24 +37,14 @@
         register: stack
 
 
-- hosts: "{{ TARGET }}"
+- hosts: "{{ ENV }}"
   become: yes
   become_user: dokku
 
-  vars:
-    - DATA_FILE: s3://{{ S3_BUCKET }}/seq_info.feather
-
   vars_files:
-    - secrets.yml
     - dash-vars.yml
 
   tasks:
-
-    - fail: msg="specify stack to deploy to using -e TARGET=<stack name>"
-      when: TARGET is undefined or TARGET not in TARGETS
-      tags:
-        - always
-        - set-target
 
     - name: "check if {{ APPNAME }} exists"
       shell: "dokku apps:exists {{ APPNAME }}"
@@ -62,7 +52,10 @@
       ignore_errors: True
 
     - name: "create {{ APPNAME }}"
-      shell: "dokku apps:create {{ APPNAME }}"
+      shell: "dokku {{ item }}"
+      with_items:
+        - "apps:create {{ APPNAME }}"
+        - "git:initialize {{ APPNAME }}"
       when: app_exists.rc == 1
 
     - name: configure the application
@@ -78,11 +71,11 @@
       shell: "dokku config:set --encoded --no-restart {{ APPNAME }} {{ item }}"
       with_items:
         - "DATA_FILE={{ DATA_FILE | b64encode }}"
-        - "BUCKET_ACCESS_KEY='{{ BUCKET_ACCESS_KEY | b64encode }}'"
-        - "BUCKET_SECRET_KEY='{{ BUCKET_SECRET_KEY | b64encode }}'"
       no_log: true
       tags:
         - env-vars
 
     - name: restart dokku app
       shell: "dokku ps:restart {{ APPNAME }}"
+  tags:
+    - deploy-app
