@@ -9,8 +9,6 @@
   vars:
     CLOUDFORMATION_PARAMS:
       DataBucketName: "{{ S3_BUCKET }}"
-    TARGETS:
-      - dokku-stack-apps
 
   tasks:
     - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.7"
