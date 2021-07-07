@@ -35,6 +35,8 @@
           template: "./{{ STACK_NAME }}.generated.json"
           template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
         register: stack
+  tags:
+    - deploy-stack
 
 
 - hosts: "{{ ENV }}"

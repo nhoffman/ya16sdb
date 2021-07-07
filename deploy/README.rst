@@ -57,24 +57,25 @@ NOTE: mitogen will be installed to the virtualenv and so the path to the ansible
 Deployment
 ----------
 
-Create the S3 bucket and IAM role, and install and configure the
+This deployment depends on the labmed dokku-stack, in order to provide application
+routing as well as an IAM instance profile that has the Ya16sdb policy attached to it.
+Please see the dokku-stack documentation for deployment information there.
+
+Create the S3 bucket and IAM Policy, and install and configure the
 application (only needs to be done once, or to update dokku
 configuration)::
 
-  deploy/deploy-dash.yml -i deploy/hosts --vault-password-file vault_pass.txt -e TARGET=dokku-stack-prod
+  deploy/deploy-dash.yml -e ENV=prod -t deploy-stack
 
-After the IAM role is created, create credentials and add them to
-``secrets.yml``::
-
-  aws iam create-access-key --user-name Ya16sdbUser > Ya16sdbUser.json
+  deploy/deploy-dash.yml -e ENV=prod -t deploy-app -i deploy/hosts
 
 Add a git remote (once for each newly-cloned repo)::
 
-  git remote add dokku-stack-prod dokku@dokku-stack-prod:ya16sdb
+  git remote add dokku-stack-apps-public-prod dokku@dokku-stack-apps-public-prod:ya16sdb
 
 Push the application to the Dokku instance::
 
-  git subtree push --prefix dash dokku-stack-prod master
+  git subtree push --prefix dash dokku-stack-apps-public-prod master
 
 Updating the data file
 ----------------------
