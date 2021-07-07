@@ -7,3 +7,4 @@ test_output
 settings.conf
 vault_pass.txt
 __pycache__
+deploy/ya16sdb-data-stack.generated.json
