@@ -7,14 +7,10 @@
     - dash-vars.yml
 
   vars:
-    BASENAME: "{{ APPNAME.split('-') | map('title') | join('') }}"
     CLOUDFORMATION_PARAMS:
-      BucketName: "{{ APPNAME }}-data"
-      PolicyName: "{{ BASENAME }}Policy"
-      UserName: "{{ BASENAME }}User"
+      DataBucketName: "{{ S3_BUCKET }}"
     TARGETS:
-      - dokku-stack-dev
-      - dokku-stack-prod
+      - dokku-stack-apps
 
   tasks:
     - fail: msg="ansible version is {{ ansible_version['full'] }}, requires >= 2.7"
@@ -23,23 +19,23 @@
         - always
         - ansible-version
 
-    - fail: msg="specify stack to deploy to using -e TARGET=<stack name>"
-      when: TARGET is undefined or TARGET not in TARGETS
-      tags:
-        - always
-        - set-target
+    - name: deploy AWS stack
+      block:
+      - name: generate cloudformation json from troposphere file
+        shell: "python {{ STACK_NAME }}.template.py > ./{{ STACK_NAME }}.generated.json"
+        tags: generate-json
 
-    # "Outputs" are stored in stack_vars['stack_outputs']
-    - name: create s3 bucket and role for application data
-      cloudformation:
-        stack_name: "{{ STACK_NAME }}"
-        state: "present"
-        region: "us-west-2"
-        template: "s3-bucket-and-role.json"
-        template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
-      register: stack_vars
-      tags:
-        - s3
+      - name: deploy the cloudformation template for this stack
+        cloudformation:
+          profile: "{{ AWS_PROFILE }}"
+          stack_name: "{{ STACK_NAME }}"
+          state: "present"
+          region: "us-west-2"
+          create_changeset: true
+          template: "./{{ STACK_NAME }}.generated.json"
+          template_parameters: "{{ CLOUDFORMATION_PARAMS }}"
+        register: stack
+
 
 - hosts: "{{ TARGET }}"
   become: yes
@@ -53,6 +49,13 @@
     - dash-vars.yml
 
   tasks:
+
+    - fail: msg="specify stack to deploy to using -e TARGET=<stack name>"
+      when: TARGET is undefined or TARGET not in TARGETS
+      tags:
+        - always
+        - set-target
+
     - name: "check if {{ APPNAME }} exists"
       shell: "dokku apps:exists {{ APPNAME }}"
       register: app_exists

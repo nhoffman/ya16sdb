@@ -1,5 +1,6 @@
 ---
 
+AWS_PROFILE: saml
 APPNAME: ya16sdb
 HOSTNAME: ya16sdb.labmed.uw.edu
 STACK_NAME: "{{ APPNAME }}-data-stack"
