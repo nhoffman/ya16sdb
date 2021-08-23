@@ -83,18 +83,17 @@ def write_layout():
     return html.Div(
         style={'width': 1175},
         children=[
-            html.Div(id='state'),
+            dcc.Store(id='state'),
             dcc.Location(id='url', refresh=False),
             dcc.Markdown(
                 children=[
                     str(df['download_date'].max().strftime('%A, %B %d, %Y'))
                 ],
-                containerProps={
-                    'style': {
-                        'text-align': 'right',
-                        'font-style': 'italic',
-                        'height': 0,
-                        'width': '100%'}}),
+                style={
+                    'text-align': 'right',
+                    'font-style': 'italic',
+                    'height': 0,
+                    'width': '100%'}),
             html.Div(
                 children=[
                     dcc.Input(type='text', id='text-input'),
@@ -104,12 +103,11 @@ def write_layout():
                         children='Search')]),
             dcc.Markdown(
                 children=['**Genus**'],
-                containerProps={
-                    'style': {
-                        'display': 'inline-block',
-                        'text-align': 'center',
-                        'vertical-align': 'middle',
-                        'width': '5%'}}),
+                style={
+                    'display': 'inline-block',
+                    'text-align': 'center',
+                    'vertical-align': 'middle',
+                    'width': '5%'}),
             html.Div(
                 children=[
                     dcc.Dropdown(
@@ -122,12 +120,11 @@ def write_layout():
                     'width': '40%'}),
             dcc.Markdown(
                 children=['**Species**'],
-                containerProps={
-                    'style': {
-                        'display': 'inline-block',
-                        'text-align': 'center',
-                        'vertical-align': 'middle',
-                        'width': '6%'}}),
+                style={
+                    'display': 'inline-block',
+                    'text-align': 'center',
+                    'vertical-align': 'middle',
+                    'width': '6%'}),
             html.Div(
                 children=[dcc.Dropdown(id='species-column', clearable=False)],
                 style={
@@ -140,28 +137,24 @@ def write_layout():
                         style={'width': '11%', 'display': 'inline-block'}),
                     dcc.Markdown(
                         children=['**Color**'],
-                        containerProps={
-                            'style': {
-                                'width': '5%',
-                                'display': 'inline-block'}}),
+                        style={
+                            'width': '5%',
+                            'display': 'inline-block'}),
                     dcc.Markdown(
                         children=['**Shape**'],
-                        containerProps={
-                            'style': {
-                                'width': '10%',
-                                'display': 'inline-block'}}),
+                        style={
+                            'width': '10%',
+                            'display': 'inline-block'}),
                     dcc.Markdown(
-                         children=['**Selection**'],
-                         containerProps={
-                             'style': {
-                                 'width': '39%',
-                                 'display': 'inline-block'}}),
+                        children=['**Selection**'],
+                        style={
+                             'width': '39%',
+                             'display': 'inline-block'}),
                     dcc.Markdown(
                         children=['**Visibility**'],
-                        containerProps={
-                            'style': {
+                        style={
                                 'width': '35%',
-                                'display': 'inline-block'}}),
+                                'display': 'inline-block'}),
                     html.Div(
                         children=[
                             dcc.Markdown(children=['**Outliers**']),
@@ -177,10 +170,10 @@ def write_layout():
                     dcc.RadioItems(
                         id='color-items',
                         options=[
-                            {'value': 'is_out'},
-                            {'value': 'confidence'},
-                            {'value': 'match_species'},
-                            {'value': 'isolation_source'}],
+                            {'label': '', 'value': 'is_out'},
+                            {'label': '', 'value': 'confidence'},
+                            {'label': '', 'value': 'match_species'},
+                            {'label': '', 'value': 'isolation_source'}],
                         inputStyle={'height': 15, 'width': 15, 'margin': 11},
                         style={
                             'vertical-align': 'middle',
@@ -189,10 +182,10 @@ def write_layout():
                     dcc.RadioItems(
                         id='shape-items',
                         options=[
-                            {'value': 'is_out'},
-                            {'value': 'confidence'},
-                            {'value': 'match_species'},
-                            {'value': 'isolation_source'}],
+                            {'label': '', 'value': 'is_out'},
+                            {'label': '', 'value': 'confidence'},
+                            {'label': '', 'value': 'match_species'},
+                            {'label': '', 'value': 'isolation_source'}],
                         inputStyle={'height': 15, 'width': 15, 'margin': 11},
                         style={
                             'vertical-align': 'middle',
@@ -245,12 +238,11 @@ def write_layout():
                 style={'margin': 15, 'width': '95%'}),
             dcc.Markdown(
                 children=['**Axes**'],
-                containerProps={
-                    'style': {
-                        'display': 'inline-block',
-                        'text-align': 'center',
-                        'vertical-align': 'middle',
-                        'width': '4%'}}),
+                style={
+                    'display': 'inline-block',
+                    'text-align': 'center',
+                    'vertical-align': 'middle',
+                    'width': '4%'}),
             html.Div(
                 children=[
                     dcc.Dropdown(
@@ -353,7 +345,7 @@ def update_xaxis_value(search):
     [Input('url', 'search'),
      Input('submit-button', 'n_clicks')],
     [State('text-input', 'value'),
-     State('state', 'hidden')])
+     State('state', 'data')])
 def update_genus_value(search, n_clicks, text, state):
     request, data = parse_search_input(df, state, search, n_clicks, text)
     if request is None:
@@ -380,7 +372,7 @@ def update_species_options(tax_id):
      Input('url', 'search'),
      Input('submit-button', 'n_clicks')],
     [State('text-input', 'value'),
-     State('state', 'hidden'),
+     State('state', 'data'),
      State('genus-column', 'value')])
 def update_species_value(options, search, n_clicks, text, state, tax_id):
     dff = df[df['genus'] == tax_id]
@@ -575,7 +567,7 @@ def parse_multi(state, search, option):
 @app.callback(
     Output('isolation-source-selection', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_isolation_source_selection_value(_, state, search):
     return parse_multi(state, search, 'selection_isolation_source')
@@ -584,7 +576,7 @@ def update_isolation_source_selection_value(_, state, search):
 @app.callback(
     Output('isolation-source-visibility', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_isolation_source_visiblity_value(_, state, search):
     return parse_multi(state, search, 'visibility_isolation_source')
@@ -593,7 +585,7 @@ def update_isolation_source_visiblity_value(_, state, search):
 @app.callback(
     Output('match-species-selection', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_match_species_selection_value(_, state, search):
     return parse_multi(state, search, 'selection_match_species')
@@ -602,7 +594,7 @@ def update_match_species_selection_value(_, state, search):
 @app.callback(
     Output('match-species-visibility', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_match_species_visibility_value(_, state, search):
     return parse_multi(state, search, 'visibility_match_species')
@@ -611,7 +603,7 @@ def update_match_species_visibility_value(_, state, search):
 @app.callback(
     Output('outliers-selection', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_outliers_selection_value(_, state, search):
     return parse_multi(state, search, 'selection_is_out')
@@ -620,7 +612,7 @@ def update_outliers_selection_value(_, state, search):
 @app.callback(
     Output('outliers-visibility', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_outliers_visibility_value(_, state, search):
     return parse_multi(state, search, 'visibility_is_out')
@@ -629,7 +621,7 @@ def update_outliers_visibility_value(_, state, search):
 @app.callback(
     Output('confidence-selection', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_confidence_selection_value(_, state, search):
     return parse_multi(state, search, 'selection_confidence')
@@ -638,7 +630,7 @@ def update_confidence_selection_value(_, state, search):
 @app.callback(
     Output('confidence-visibility', 'value'),
     [Input('species-column', 'value')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('url', 'search')])
 def update_confidence_visibility_value(_, state, search):
     return parse_multi(state, search, 'visibility_confidence')
@@ -677,7 +669,7 @@ def update_symbol_items(search):
      Input('color-items', 'value'),
      Input('shape-items', 'value'),
      Input('submit-button', 'n_clicks')],
-    [State('state', 'hidden'),
+    [State('state', 'data'),
      State('text-input', 'value'),
      State('url', 'search')])
 def update_graph(tax_id, xaxis, yaxis, year_value,
@@ -818,7 +810,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
 
 
 @app.callback(
-    Output('state', 'hidden'),
+    Output('state', 'data'),
     [Input('submit-button', 'n_clicks'),
      Input('species-column', 'value'),
      Input('plot', 'figure'),
@@ -849,7 +841,7 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
      State('species-column', 'value'),
      State('text-input', 'value'),
      State('url', 'search'),
-     State('state', 'hidden')])
+     State('state', 'data')])
 def update_table(selected, iso, match, outliers, confidence,
                  n_clicks, tax_id, text, search, state):
     dff = df[df['species'] == tax_id]
