@@ -3,5 +3,5 @@ scons>=3.0.5
 medirect>=0.14.0
 sqlalchemy
 psycopg2-binary
-feather-format==0.4.0
-pyarrow==0.16.0
+feather-format
+pyarrow
