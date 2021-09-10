@@ -3,6 +3,7 @@
 Create a seq_info.csv feather file optionally gzipped
 """
 import argparse
+import datetime
 import pandas
 import sys
 
@@ -41,7 +42,7 @@ def main(arguments):
         args.seq_info,
         dtype=DTYPES,
         parse_dates=['download_date', 'modified_date'],
-        date_parser=lambda x: pandas.datetime.strptime(x, '%d-%b-%Y'))
+        date_parser=lambda x: datetime.datetime.strptime(x, '%d-%b-%Y'))
     seq_info.to_feather(args.out)
 
 
