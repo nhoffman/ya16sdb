@@ -5,7 +5,7 @@ presence of invalid sequence characters.
 """
 import argparse
 import pandas
-from Bio import SeqIO, Alphabet
+from Bio import SeqIO
 
 
 def main():
@@ -41,9 +41,9 @@ def main():
     # we want the plus aligns at the end of x[2]
     vsearch = {row[0]: row[2] for row in vsearch}
     with open(args.out_fa, 'w') as out, open(args.unknowns, 'w') as unknowns:
-        parsed = SeqIO.parse(args.fasta, 'fasta', Alphabet.IUPAC.ambiguous_dna)
+        parsed = SeqIO.parse(args.fasta, 'fasta')
         for s in parsed:
-            if s.id in vsearch and Alphabet._verify_alphabet(s.seq):
+            if s.id in vsearch:
                 if vsearch[s.id] == '-':
                     s.seq = s.seq.reverse_complement()
                 out.write('>{}\n{}\n'.format(s.description, s.seq))
