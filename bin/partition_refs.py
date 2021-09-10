@@ -141,7 +141,7 @@ def main():
 
     info = info[~info['seqname'].isin(set(drop))]
 
-    info.to_csv(args.out_info, index=False)
+    info.to_csv(args.out_info, index=False, date_format='%d-%b-%Y')
 
 
 if __name__ == '__main__':
