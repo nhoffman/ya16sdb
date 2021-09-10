@@ -11,11 +11,20 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('a2t')
+    p.add_argument('ncbi')
     p.add_argument('accessions')
     p.add_argument('seq_info')
-    p.add_argument('out')
+    p.add_argument('out_ncbi')
+    p.add_argument('out_download')
     args = p.parse_args()
     a2t = pandas.read_csv(args.a2t, dtype=str)
+    ncbi = pandas.read_csv(
+        args.ncbi,
+        dtype=str,
+        header=None,
+        names=['version'])
+    ncbi = ncbi[ncbi['version'].isin(a2t['version'])]
+    ncbi.to_csv(args.out_ncbi, header=None, index=False)
     accessions = pandas.read_csv(
         args.accessions,
         dtype=str,
@@ -30,7 +39,8 @@ def main():
         seq_info = seq_info[(~seq_info['version'].isin(same['version'])) &
                             (seq_info['version'].isin(a2t['version']))]
         accessions = accessions.append(seq_info[['version']])
-    accessions.drop_duplicates().to_csv(args.out, header=None, index=False)
+    accessions = accessions.drop_duplicates()
+    accessions.to_csv(args.out_download, header=None, index=False)
 
 
 if __name__ == '__main__':

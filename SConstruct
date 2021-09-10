@@ -46,7 +46,8 @@ def blast_db(env, sequence_file, output_base):
     blast_out = env.Command(
         target=[output_base + ext for ext in extensions],
         source=sequence_file,
-        action='makeblastdb -dbtype nucl -in $SOURCE -out ' + output_base)
+        action=('$blast makeblastdb -dbtype nucl '
+                '-in $SOURCE -out ' + output_base))
     env.Command(
         target=output_base,
         source=blast_out,
@@ -65,6 +66,7 @@ vrs.Add('base', help='Path to output directory', default=settings['outdir'])
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
+# FIXME: put these into a cache folder
 vrs.Add(PathVariable(
     'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
 vrs.Add(PathVariable(
@@ -98,6 +100,7 @@ env = Environment(
     ENV=environment_variables,
     variables=vrs,
     shell='bash',
+    blast=settings['blast'],
     eutils=settings['eutils'],
     taxit=settings['taxit'],
     deenurp=settings['deenurp'],
@@ -207,13 +210,16 @@ accession2taxid = env.Command(
             '- $tax_url'])
 
 """
-Remove esearch records not present in accession2taxid and identify
+Remove esearch records not present in accession2taxid and append
 cached records that changed or merged tax_ids to be re-downloaded
+
+TODO: Create a script that can be run individually on
+ncbi, combined and seq_info_cache
 """
-download = env.Command(
-    target='$out/ncbi/download.txt',
-    source=[accession2taxid, combined, '$seq_info_cache'],
-    action='updated.py $SOURCES $TARGET')
+ncbi, download = env.Command(
+    target=['$out/ncbi/clean.txt', '$out/ncbi/download.txt'],
+    source=[accession2taxid, ncbi, combined, '$seq_info_cache'],
+    action='updated.py $SOURCES $TARGETS')
 
 """
 download genbank records
@@ -255,6 +261,9 @@ no_features = env.Command(
 """
 vsearch new sequences with training set to test sequence orientation
 and 16s region
+
+FIXME: consider using cmsearch or generating a
+single sequence from the rfam covariance model
 """
 vsearch = env.Command(
     target='$out/ncbi/vsearch/vsearch.tsv',
@@ -281,6 +290,8 @@ Fix record orientation and ignore sequences with no vsearch alignments.
 
 NOTE: unknown.txt will contain records (accession.version) with ANY
 filtered 16s allele.
+
+FIXME: This unknown_cache should be appended not copied
 """
 fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
