@@ -26,7 +26,8 @@ def main():
     url = conf.get('sqlalchemy', 'url')
     engine = sqlalchemy.create_engine(url)
     conn = engine.connect()
-    meta = sqlalchemy.MetaData(engine, reflect=True)
+    meta = sqlalchemy.MetaData()
+    meta.reflect(bind=engine)
     nodes = meta.tables['nodes']
     s = sqlalchemy.select([nodes.c.tax_id]).where(nodes.c.is_valid)
     named = set(i[0] for i in conn.execute(s))
