@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+import ya16sdb
 import sys
-
-
-def open_clean(fl):
-    if isinstance(fl, str):
-        fl = [fl]
-    for f in fl:
-        f = (row.strip() for row in open(f))
-        f = (row for row in f if row)
-        for row in f:
-            yield row
 
 
 def main():
@@ -31,8 +22,8 @@ def main():
     seqinfo = csv.DictReader(open(args.seq_info))
     seqinfo = (row for row in seqinfo if row['tax_id'] not in taxids)
     removed = set(row['version'] for row in seqinfo)
-    modified = set(open_clean(args.modified))
-    cache = set(open_clean(args.cache))
+    modified = set(ya16sdb.open_clean(args.modified))
+    cache = set(ya16sdb.open_clean(args.cache))
     cache -= removed - modified
     args.out.write('\n'.join(cache))
 

@@ -5,9 +5,9 @@ filters by length and percent ambiguity.
 import argparse
 import pandas
 import sys
+import ya16sdb
 
 from Bio import SeqIO
-from to_feather import DTYPES
 
 
 def build_parser():
@@ -70,9 +70,9 @@ def main():
     args = build_parser().parse_args()
 
     if args.info == '-':
-        info = pandas.read_csv(sys.stdin, dtype=DTYPES)
+        info = pandas.read_csv(sys.stdin, dtype=ya16sdb.DTYPES)
     elif args.info.endswith('.csv'):
-        info = pandas.read_csv(args.info, dtype=DTYPES)
+        info = pandas.read_csv(args.info, dtype=ya16sdb.DTYPES)
     elif args.info.endswith('.feather'):
         info = pandas.read_feather(args.info)
     else:

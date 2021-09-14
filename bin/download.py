@@ -2,12 +2,7 @@
 import argparse
 import csv
 import sys
-
-
-def open_clean(fl):
-    fl = (row.strip() for row in open(fl))
-    fl = (row for row in fl if row)
-    return fl
+import ya16sdb
 
 
 def main():
@@ -20,8 +15,8 @@ def main():
     p.add_argument('--out', type=argparse.FileType('w'), default=sys.stdout)
     args = p.parse_args()
     download = set(row['version'] for row in csv.DictReader(open(args.a2t)))
-    cache = set(open_clean(args.cache))
-    do_not_download = set(open_clean(args.do_not_download))
+    cache = set(ya16sdb.open_clean(args.cache))
+    do_not_download = set(ya16sdb.open_clean(args.do_not_download))
     download -= cache - do_not_download
     args.out.write('\n'.join(download))
 

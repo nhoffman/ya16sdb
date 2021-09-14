@@ -6,14 +6,7 @@ import argparse
 import csv
 import gzip
 import sys
-
-
-def open_clean(fl):
-    for f in list(fl):
-        f = (row.strip() for row in open(f))
-        f = (row for row in f if row)
-        for row in f:
-            yield row
+import ya16sdb
 
 
 def main():
@@ -27,7 +20,7 @@ def main():
         default=sys.stdout,
         type=argparse.FileType('w'))
     args = p.parse_args()
-    accessions = set(open_clean(args.accessions))
+    accessions = set(ya16sdb.open_clean(args.accessions))
     a2t = csv.reader(gzip.open(args.accession2taxid, 'rt'), delimiter='\t')
     next(a2t)  # header
     acc, tax_id = 1, 2
