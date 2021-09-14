@@ -63,28 +63,28 @@ conf.read('settings.conf')
 settings = conf['TEST'] if test else conf['DEFAULT']
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('base', help='Path to output directory', default=settings['outdir'])
+vrs.Add('cache', default=os.path.join('$base', 'cache'))
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
-# FIXME: put these into a cache folder
 vrs.Add(PathVariable(
-    'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
+    'genbank_cache', '', '$cache/records.gb', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'outliers_cache', '', '$base/filter_outliers.csv', PathIsFileCreate))
+    'outliers_cache', '', '$cache/filter_outliers.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'pubmed_info_cache', '', '$base/pubmed_info.csv', PathIsFileCreate))
+    'pubmed_info_cache', '', '$cache/pubmed_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'seqs_cache', '', '$base/seqs.fasta', PathIsFileCreate))
+    'seqs_cache', '', '$cache/seqs.fasta', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'seq_info_cache', '', '$base/seq_info.csv', PathIsFileCreate))
+    'seq_info_cache', '', '$cache/seq_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'records_cache', '', '$base/records.txt', PathIsFileCreate))
+    'records_cache', '', '$cache/records.txt', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'references_cache', '', '$base/references.csv', PathIsFileCreate))
+    'references_cache', '', '$cache/references.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'refseq_info_cache', '', '$base/refseq_info.csv', PathIsFileCreate))
+    'refseq_info_cache', '', '$cache/refseq_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'unknown_cache', '', '$base/unknown.txt', PathIsFileCreate))
+    'unknown_cache', '', '$cache/unknown.txt', PathIsFileCreate))
 
 environment_variables = dict(
     os.environ,
