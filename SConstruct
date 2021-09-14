@@ -203,18 +203,6 @@ fa, seq_info, pubmed_info, references, refseq_info = env.Command(
     action='extract_genbank.py $SOURCE ' + today + ' $TARGETS')
 
 """
-Remove new records with tax_ids not in our taxonomy database
-"""
-fa, seq_info = env.Command(
-    target=['$out/ncbi/extract_genbank/update_taxids/seqs.fasta',
-            '$out/ncbi/extract_genbank/update_taxids/seq_info.csv'],
-    source=[fa, seq_info],
-    action=['$taxit update_taxids '
-            '--unknown-action drop '
-            '${SOURCES[1]} $tax_url | '
-            'partition_refs.py ${SOURCES[0]} - $TARGETS'])
-
-"""
 Record versions returned from esearch that had no actual 16s features or were
 below `ftract -min-length`
 
@@ -232,6 +220,18 @@ no_features = env.Command(
             '--line-regexp '
             '${SOURCES[1]} > $TARGET '
             '|| true'))
+
+"""
+Remove new records with tax_ids not in our taxonomy database
+"""
+fa, seq_info = env.Command(
+    target=['$out/ncbi/extract_genbank/update_taxids/seqs.fasta',
+            '$out/ncbi/extract_genbank/update_taxids/seq_info.csv'],
+    source=[fa, seq_info],
+    action=['$taxit update_taxids '
+            '--unknown-action drop '
+            '${SOURCES[1]} $tax_url | '
+            'partition_refs.py ${SOURCES[0]} - $TARGETS'])
 
 """
 vsearch new sequences with training set to test sequence orientation
