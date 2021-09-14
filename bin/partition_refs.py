@@ -4,8 +4,10 @@ filters by length and percent ambiguity.
 """
 import argparse
 import pandas
+import sys
 
 from Bio import SeqIO
+from to_feather import DTYPES
 
 
 def build_parser():
@@ -14,7 +16,7 @@ def build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # inputs
     p.add_argument('fasta')
-    p.add_argument('feather')
+    p.add_argument('info')
     # outputs
     p.add_argument('out_fa')
     p.add_argument('out_info')
@@ -67,7 +69,14 @@ def build_parser():
 def main():
     args = build_parser().parse_args()
 
-    info = pandas.read_feather(args.feather)
+    if args.info == '-':
+        info = pandas.read_csv(sys.stdin, dtype=DTYPES)
+    elif args.info.endswith('.csv'):
+        info = pandas.read_csv(args.info, dtype=DTYPES)
+    elif args.info.endswith('.feather'):
+        info = pandas.read_feather(args.info)
+    else:
+        raise TypeError('file extension not yet supported ' + args.info)
 
     if args.trusted:
         # all type strains are trusted - GL #79

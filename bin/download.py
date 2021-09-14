@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""
-"""
 import argparse
-import os
-import pandas
+import csv
+import sys
+
+
+def open_clean(fl):
+    fl = (row.strip() for row in open(fl))
+    fl = (row for row in fl if row)
+    return fl
 
 
 def main():
@@ -11,36 +15,15 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('a2t')
-    p.add_argument('ncbi')
-    p.add_argument('accessions')
-    p.add_argument('seq_info')
-    p.add_argument('out_ncbi')
-    p.add_argument('out_download')
+    p.add_argument('cache')
+    p.add_argument('do_not_download')
+    p.add_argument('--out', type=argparse.FileType('w'), default=sys.stdout)
     args = p.parse_args()
-    a2t = pandas.read_csv(args.a2t, dtype=str)
-    ncbi = pandas.read_csv(
-        args.ncbi,
-        dtype=str,
-        header=None,
-        names=['version'])
-    ncbi = ncbi[ncbi['version'].isin(a2t['version'])]
-    ncbi.to_csv(args.out_ncbi, header=None, index=False)
-    accessions = pandas.read_csv(
-        args.accessions,
-        dtype=str,
-        header=None,
-        names=['version'])
-    accessions = accessions[accessions['version'].isin(a2t['version'])]
-    if os.stat(args.seq_info).st_size > 0:
-        seq_info = pandas.read_csv(
-            args.seq_info, dtype=str, usecols=['version', 'tax_id'])
-        same = seq_info.merge(a2t)
-        # only add back sequences with updated taxids
-        seq_info = seq_info[(~seq_info['version'].isin(same['version'])) &
-                            (seq_info['version'].isin(a2t['version']))]
-        accessions = accessions.append(seq_info[['version']])
-    accessions = accessions.drop_duplicates()
-    accessions.to_csv(args.out_download, header=None, index=False)
+    download = set(row['version'] for row in csv.DictReader(open(args.a2t)))
+    cache = set(open_clean(args.cache))
+    do_not_download = set(open_clean(args.do_not_download))
+    download -= cache - do_not_download
+    args.out.write('\n'.join(download))
 
 
 if __name__ == '__main__':
