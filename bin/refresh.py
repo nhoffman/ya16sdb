@@ -120,7 +120,8 @@ def main():
     seq_info = prev_seq_info.append(new_seq_info)[columns]
 
     # remove anything dropped from ncbi
-    ncbi = set(v.strip() for v in open(args.ncbi))
+    ncbi = pandas.read_csv(
+        args.ncbi, dtype=str, squeeze=True, usecols=['version'])
     seq_info = seq_info[seq_info['version'].isin(ncbi)]
 
     # include with records_out
