@@ -24,7 +24,7 @@ def main():
     removed = set(row['version'] for row in seqinfo)
     modified = set(ya16sdb.open_clean(args.modified))
     cache = set(ya16sdb.open_clean(args.cache))
-    cache -= removed - modified
+    cache = cache - removed - modified
     args.out.write('\n'.join(cache))
 
 
