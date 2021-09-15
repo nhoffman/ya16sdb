@@ -63,7 +63,7 @@ conf.read('settings.conf')
 settings = conf['TEST'] if test else conf['DEFAULT']
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('base', help='Path to output directory', default=settings['outdir'])
-vrs.Add('cache', default=os.path.join('$base', 'cache'))
+vrs.Add('cache', default=os.path.join('$base', '.cache'))
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars

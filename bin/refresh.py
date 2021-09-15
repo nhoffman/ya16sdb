@@ -17,6 +17,7 @@ import argparse
 import itertools
 import pandas
 import os
+import ya16sdb
 
 from Bio import SeqIO
 
@@ -101,23 +102,27 @@ def main():
 
     args = p.parse_args()
 
-    new_seq_info = pandas.read_csv(args.new_seq_info, dtype=str)
+    new_seq_info = pandas.read_csv(
+        args.new_seq_info,
+        dtype=ya16sdb.DTYPES,
+        usecols=ya16sdb.SEQ_INFO_COLS)
 
     if os.path.getsize(args.previous_seq_info) == 0:
-        prev_seq_info = pandas.DataFrame(columns=new_seq_info.columns)
+        prev_seq_info = pandas.DataFrame(
+            columns=ya16sdb.SEQ_INFO_COLS,
+            dtype=str)
     else:
-        prev_seq_info = pandas.read_csv(args.previous_seq_info, dtype=str)
+        prev_seq_info = pandas.read_csv(
+            args.previous_seq_info,
+            dtype=ya16sdb.DTYPES,
+            usecols=ya16sdb.SEQ_INFO_COLS)
 
     # remove previous seq_info in new seq_info with same accessions
     prev_seq_info = prev_seq_info[
         ~prev_seq_info['accession'].isin(new_seq_info['accession'])]
 
-    # combine seq_info files and retain column order
-    columns = prev_seq_info.columns.tolist()
-    for c in new_seq_info.columns:
-        if c not in columns:
-            columns.append(c)
-    seq_info = prev_seq_info.append(new_seq_info)[columns]
+    # combine seq_info files
+    seq_info = prev_seq_info.append(new_seq_info)
 
     # remove anything dropped from ncbi
     ncbi = pandas.read_csv(

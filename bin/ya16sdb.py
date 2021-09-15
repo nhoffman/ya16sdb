@@ -1,3 +1,26 @@
+SEQ_INFO_COLS = [
+    'seqname',
+    'version',
+    'accession',
+    'name',
+    'description',
+    'tax_id',
+    'modified_date',
+    'download_date',
+    'version_num',
+    'source',
+    'keywords',
+    'organism',
+    'length',
+    'ambig_count',
+    'strain',
+    'mol_type',
+    'isolate',
+    'isolation_source',
+    'seq_start',
+    'seq_stop'
+]
+
 DTYPES = {
     'accession': str,
     'ambig_count': int,

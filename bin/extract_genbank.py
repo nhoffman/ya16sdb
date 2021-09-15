@@ -6,16 +6,11 @@ import argparse
 import csv
 import re
 import sys
+import ya16sdb
 
 from Bio import SeqIO
 
 # columns of output files
-ANNOTATION_COLS = ['seqname', 'version', 'accession', 'name',
-                   'description', 'tax_id', 'modified_date', 'download_date',
-                   'version_num', 'source', 'keywords', 'organism', 'length',
-                   'ambig_count', 'strain', 'mol_type', 'isolate',
-                   'isolation_source', 'seq_start', 'seq_stop']
-
 PUBMED_COLS = ['pubmed_id', 'version', 'accession']
 
 REFERENCE_COLS = ['pubmed_id', 'title', 'authors',
@@ -61,8 +56,8 @@ def build_parser():
         help='sequences')
     parser.add_argument(
         'annotations',
-        type=dictwriter(ANNOTATION_COLS),
-        help=str(ANNOTATION_COLS))
+        type=dictwriter(ya16sdb.SEQ_INFO_COLS),
+        help=str(ya16sdb.SEQ_INFO_COLS))
     parser.add_argument(
         'pubmed_info',
         type=dictwriter(PUBMED_COLS),
