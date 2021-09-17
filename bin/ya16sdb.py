@@ -18,7 +18,8 @@ SEQ_INFO_COLS = [
     'isolate',
     'isolation_source',
     'seq_start',
-    'seq_stop'
+    'seq_stop',
+    'assembly_refseq'
 ]
 
 DTYPES = {

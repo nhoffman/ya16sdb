@@ -1,5 +1,7 @@
 """
 Download and curate the 16S rRNA sequences from NCBI
+
+NOTE: run with `scons -j 1` only
 """
 import configparser
 import csv
@@ -384,6 +386,35 @@ confidence = env.Command(
     source=feather,
     action=['confidence.py $SOURCE', 'md5sum $SOURCE > $TARGET'])
 Depends(confidence, [is_type, is_refseq, is_published])
+
+"""
+Download and add ANI tax-check-status annotations
+
+https://www.ncbi.nlm.nih.gov/assembly
+"""
+
+"""
+Map for WGS records without a refseq assembly accession
+"""
+asm = env.Command(
+    target='$out/ani/assembly_summary_genbank.txt',
+    source=None,
+    action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
+            'genomes/genbank/assembly_summary_genbank.txt'))
+
+"""
+The ANI tax check report
+"""
+ani_report = env.Command(
+    target='$out/ani/ANI_report_prokaryotes.txt',
+    source=None,
+    action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
+            'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
+
+ani = env.Command(
+    target='$out/.feather/ani.md5',
+    source=[feather, ani_report, asm],
+    action=['ani.py $SOURCES', 'md5sum $SOURCE > $TARGET'])
 
 """
 calculate md5hash of sequences

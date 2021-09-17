@@ -55,7 +55,7 @@ def build_parser():
         type=argparse.FileType('w'),
         help='sequences')
     parser.add_argument(
-        'annotations',
+        'seq_info',
         type=dictwriter(ya16sdb.SEQ_INFO_COLS),
         help=str(ya16sdb.SEQ_INFO_COLS))
     parser.add_argument(
@@ -104,7 +104,7 @@ def main():
                     'accession': record['accession']})
             references.extend(refs)
 
-            args.annotations.writerow(record)
+            args.seq_info.writerow(record)
 
             # refseqs
             if '_' in record['accession']:
@@ -156,31 +156,38 @@ def parse_record(record):
     else:
         tax_id = ''
 
+    assembly_refseq = None
+    for d in record.dbxrefs:
+        if d.startswith('Assembly:'):
+            assembly_refseq = d.split(':')[1]
+
     seq_start, seq_stop = parse_coordinates(record)
     if all([seq_start, seq_stop]):
         seq_id = '{}_{}_{}'.format(accession, seq_start, seq_stop)
     else:
         seq_id = record.id
 
-    info = dict(accession=accession,
-                ambig_count=sum(1 for b in record.seq if b not in ACGT),
-                modified_date=record.annotations['date'],
-                description=record.description,
-                keywords=';'.join(record.annotations.get('keywords', [])),
-                length=len(record),
-                name=record.name,
-                organism=record.annotations['organism'],
-                seq_start=seq_start,
-                seq_stop=seq_stop,
-                seqname=seq_id,
-                source=record.annotations['source'],
-                mol_type=';'.join(quals.get('mol_type', '')),
-                strain=';'.join(quals.get('strain', '')),
-                isolate=';'.join(quals.get('isolate', '')),
-                isolation_source=';'.join(quals.get('isolation_source', '')),
-                tax_id=tax_id,
-                version=version,
-                version_num=version_num)
+    info = {'accession': accession,
+            'ambig_count': sum(1 for b in record.seq if b not in ACGT),
+            'assembly_refseq': assembly_refseq,
+            'modified_date': record.annotations['date'],
+            'description': record.description,
+            'keywords': ';'.join(record.annotations.get('keywords', [])),
+            'length': len(record),
+            'mol_type': ';'.join(quals.get('mol_type', '')),
+            'name': record.name,
+            'organism': record.annotations['organism'],
+            'seq_start': seq_start,
+            'seq_stop': seq_stop,
+            'seqname': seq_id,
+            'source': record.annotations['source'],
+            'strain': ';'.join(quals.get('strain', '')),
+            'isolate': ';'.join(quals.get('isolate', '')),
+            'isolation_source': ';'.join(quals.get('isolation_source', '')),
+            'tax_id': tax_id,
+            'version': version,
+            'version_num': version_num,
+            }
 
     return info
 
