@@ -82,10 +82,16 @@ def main():
             'assembly_refseq',
             'best-match-species-name',
             'best-match-species-taxid',
-            'taxonomy-check-status']
-            )
+            'taxonomy-check-status',
+            'best-match-type-category',
+            'best-match-type-ANI',
+            'best-match-type-qcoverage',
+            'declared-type-ANI',
+            'declared-type-qcoverage'
+            ])
+    # create our two map files, one from the assembly_refseq
     ani_map = ani[~ani['assembly_refseq'].isna()]
-    ani_map = ani_map[['assembly_genbank', 'assembly_refseq']]
+    ani_map = ani_map[['assembly_refseq', 'assembly_genbank']]
     asm_map = pandas.read_csv(
         args.asm,
         dtype=str,
@@ -93,17 +99,22 @@ def main():
         names=asm_header,
         sep='\t',
         skiprows=[0, 1],  # comment and header rows
-        usecols=['assembly_genbank', 'wgs_master'])
+        usecols=['wgs_master', 'assembly_genbank'])
     asm_map = asm_map[~asm_map['wgs_master'].isna()]
     asm_map['wgs_prefix'] = asm_map['wgs_master'].apply(lambda x: x[:7])
     info['wgs_prefix'] = info['accession'].apply(lambda x: x[:7])
-    info = info.merge(ani_map, how='left')
+    # creates the assembly_genbank column
+    info = info.merge(ani_map, how='left', on='assembly_refseq')
+    # creates a assembly_genbank_ column
     info = info.merge(asm_map, how='left', on='wgs_prefix', suffixes=['', '_'])
+    # fill in the additional assembly_genbank accessions from asm_map
     info['assembly_genbank'] = info['assembly_genbank'].fillna(
         info['assembly_genbank_'])
     drop = ['assembly_genbank_', 'assembly_refseq', 'wgs_prefix', 'wgs_master']
     info = info.drop(drop, axis='columns')
-    info = info.merge(ani, how='left')
+    # Now that we have our assembly_genbank column ready we
+    # can merge in the rest of the ANI columns
+    info = info.merge(ani, how='left', on='assembly_genbank')
     info.to_feather(args.feather)
 
 
