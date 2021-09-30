@@ -4,60 +4,30 @@ Add ANI_report_prokaryotes.tsv tax check data
 """
 import argparse
 import pandas
+import re
 
-ani_header = [
-    'assembly_genbank',  # genbank-accession
-    'assembly_refseq',  # refseq-accession
-    'taxid',
-    'species-taxid',
-    'organism-name',
-    'species-name',
-    'assembly-name',
-    'assembly-type-category',
-    'excluded-from-refseq',
-    'declared-type-assembly',
-    'declared-type-organism-name',
-    'declared-type-category',
-    'declared-type-ANI',
-    'declared-type-qcoverage',
-    'declared-type-scoverage',
-    'best-match-type-assembly',
-    'best-match-species-taxid',
-    'best-match-species-name',
-    'best-match-type-category',
-    'best-match-type-ANI',
-    'best-match-type-qcoverage',
-    'best-match-type-scoverage',
-    'best-match-status',
-    'comment',
-    'taxonomy-check-status'
-    ]
 
-asm_header = [
-    'assembly_genbank',  # assembly_accession
-    'bioproject',
-    'biosample',
-    'wgs_master',
-    'refseq_category',
-    'taxid',
-    'species_taxid',
-    'organism_name',
-    'infraspecific_name',
-    'isolate',
-    'version_status',
-    'assembly_level',
-    'release_type',
-    'genome_rep',
-    'seq_rel_date',
-    'asm_name',
-    'submitter',
-    'assembly_refseq',  # gbrs_paired_asm
-    'paired_asm_comp',
-    'ftp_path',
-    'excluded_from_refseq',
-    'relation_to_type_material',
-    'asm_not_live_date'
-    ]
+# assumes 4 or 6 A-Z prefix WGS record prefix
+WGS_PREFIX = re.compile(r"^([A-Z]{6}|[A-Z]{4})")
+
+
+def extract_wgs_master_prefix(accession):
+    """
+    Adapted from https://gitlab.labmed.uw.edu/molmicro/reference-packages/
+    plotting/-/blob/master/plotting/subcommands/get_ref_info.py#L153
+
+    given an ncbi identifier, use a regex to
+    return the 4 or 6 alphabetical code corresponding to
+    NCBI convention.
+    See https://www.ncbi.nlm.nih.gov/genbank/acc_prefix/
+    """
+
+    # remove 'N[Z,R]_' etc. refseq prefixes from accessions
+    # see https://www.ncbi.nlm.nih.gov/books/NBK21091/table/
+    # ch18.T.refseq_accession_numbers_and_mole/?report=objectonly
+    accession = accession.split("_", 1)[-1]
+    match = WGS_PREFIX.search(accession)
+    return match.group() if match else pandas.NA
 
 
 def main():
@@ -72,14 +42,11 @@ def main():
     ani = pandas.read_csv(
         args.ani,
         dtype=str,
-        header=None,
         na_values='na',
-        names=ani_header,
         sep='\t',
-        skiprows=[0],  # header row
         usecols=[
-            'assembly_genbank',
-            'assembly_refseq',
+            '# genbank-accession',
+            'refseq-accession',
             'best-match-species-name',
             'best-match-species-taxid',
             'taxonomy-check-status',
@@ -89,27 +56,37 @@ def main():
             'declared-type-ANI',
             'declared-type-qcoverage'
             ])
+    ani = ani.rename(
+        columns={
+            '# genbank-accession': 'assembly_genbank',
+            'refseq-accession': 'assembly_refseq'})
     # create our two map files, one from the assembly_refseq
     ani_map = ani[~ani['assembly_refseq'].isna()]
     ani_map = ani_map[['assembly_refseq', 'assembly_genbank']]
     asm_map = pandas.read_csv(
         args.asm,
         dtype=str,
-        header=None,
-        names=asm_header,
+        header=1,
         sep='\t',
-        skiprows=[0, 1],  # comment and header rows
-        usecols=['wgs_master', 'assembly_genbank'])
+        usecols=['wgs_master', '# assembly_accession'])
+    asm_map = asm_map.rename(
+        columns={'# assembly_accession': 'assembly_genbank'})
     asm_map = asm_map[~asm_map['wgs_master'].isna()]
-    asm_map['wgs_prefix'] = asm_map['wgs_master'].apply(lambda x: x[:7])
-    info['wgs_prefix'] = info['accession'].apply(lambda x: x[:7])
-    # creates the assembly_genbank column
-    info = info.merge(ani_map, how='left', on='assembly_refseq')
-    # creates a assembly_genbank_ column
-    info = info.merge(asm_map, how='left', on='wgs_prefix', suffixes=['', '_'])
-    # fill in the additional assembly_genbank accessions from asm_map
+    asm_map['wgs_prefix'] = asm_map['wgs_master'].apply(
+        lambda x: extract_wgs_master_prefix(x))
+    info['wgs_prefix'] = info['accession'].apply(
+        lambda x: extract_wgs_master_prefix(x))
+    # create two assembly_genbank columns prioritizing
+    # assembly_genbank accessions from records with a wgs_prefix
+    # that can be cross-referenced with the assembly_summary_genbank.txt file
+    info = info.merge(asm_map, how='left', on='wgs_prefix')
+    info = info.merge(
+        ani_map, how='left', on='assembly_refseq', suffixes=['', '_'])
+    # if a record can not be cross-referenced with assembly_summary_genbank.txt
+    # then just use the assembly_refseq accession found in the genbank file
     info['assembly_genbank'] = info['assembly_genbank'].fillna(
         info['assembly_genbank_'])
+    # cleanup
     drop = ['assembly_genbank_', 'assembly_refseq', 'wgs_prefix', 'wgs_master']
     info = info.drop(drop, axis='columns')
     # Now that we have our assembly_genbank column ready we
