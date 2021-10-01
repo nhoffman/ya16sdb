@@ -1,5 +1,7 @@
 """
 Download and curate the 16S rRNA sequences from NCBI
+
+NOTE: run with `scons -j 1` only
 """
 import configparser
 import csv
@@ -63,28 +65,28 @@ conf.read('settings.conf')
 settings = conf['TEST'] if test else conf['DEFAULT']
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('base', help='Path to output directory', default=settings['outdir'])
+vrs.Add('cache', default=os.path.join('$base', '.cache'))
 vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
-# FIXME: put these into a cache folder
 vrs.Add(PathVariable(
-    'genbank_cache', '', '$base/records.gb', PathIsFileCreate))
+    'genbank_cache', '', '$cache/records.gb', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'outliers_cache', '', '$base/filter_outliers.csv', PathIsFileCreate))
+    'outliers_cache', '', '$cache/filter_outliers.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'pubmed_info_cache', '', '$base/pubmed_info.csv', PathIsFileCreate))
+    'pubmed_info_cache', '', '$cache/pubmed_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'seqs_cache', '', '$base/seqs.fasta', PathIsFileCreate))
+    'seqs_cache', '', '$cache/seqs.fasta', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'seq_info_cache', '', '$base/seq_info.csv', PathIsFileCreate))
+    'seq_info_cache', '', '$cache/seq_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'records_cache', '', '$base/records.txt', PathIsFileCreate))
+    'records_cache', '', '$cache/records.txt', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'references_cache', '', '$base/references.csv', PathIsFileCreate))
+    'references_cache', '', '$cache/references.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'refseq_info_cache', '', '$base/refseq_info.csv', PathIsFileCreate))
+    'refseq_info_cache', '', '$cache/refseq_info.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
-    'unknown_cache', '', '$base/unknown.txt', PathIsFileCreate))
+    'unknown_cache', '', '$cache/unknown.txt', PathIsFileCreate))
 
 environment_variables = dict(
     os.environ,
@@ -123,27 +125,8 @@ https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
 """
 tm7 = env.Command(
     source=None,
-    target='$out/ncbi/tm7/versions.txt',
+    target='$out/ncbi/tm7.txt',
     action='$eutils %(esearch)s "%(tm7)s" | %(acc)s -out $TARGET' % settings)
-
-"""
-Concat everything.  records.txt will be used to remove old records
-previously downloaded.
-"""
-ncbi = env.Command(
-    source=[classified, tm7],
-    target='$out/ncbi/records.txt',
-    action='cat $SOURCES > $TARGET')
-
-"""
-get accessions (versions) of records considered type strains
-NCBI web blast uses `sequence_from_type[Filter]` so we will use that
-http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
-"""
-types = env.Command(
-    source=None,
-    target='$out/ncbi/types.txt',
-    action='$eutils %(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings)
 
 """
 Check the cache for last download_date and download list of modified
@@ -159,73 +142,53 @@ else:
 modified = env.Command(
     source=None,
     target='$out/ncbi/modified.txt',
-    action=['$eutils %(esearch)s "%(classified)s '
+    action=['$eutils %(esearch)s "(%(classified)s OR %(tm7)s) '
             'AND %(download_date)s[Modification Date] : '
             '3000[Modification Date]" | %(acc)s -out $TARGET' %
             {'download_date': download_date, **settings}])
 
 """
-New records are records not previously downloaded
-in the records_cache or in unknown_cache
+type strains records
+NCBI web blast uses `sequence_from_type[Filter]` so we will use that
+http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 """
-new = env.Command(
-    target='$out/ncbi/new.txt',
-    source=[ncbi, '$records_cache', '$unknown_cache'],
-    action=['cat ${SOURCES[1:]} | '
-            'grep '
-            '--file - '
-            '--fixed-strings '
-            '--invert-match '
-            '--line-regexp '
-            '${SOURCES[0]} > $TARGET '
-            '|| true'])
-
-'''
-combine new and modified and remove do_not_download.txt records
-'''
-combined = env.Command(
-    target='$out/ncbi/combined.txt',
-    source=[new, modified, settings['do_not_download']],
-    action=['cat ${SOURCES[:2]} | '
-            'grep '
-            '--file ${SOURCES[2]} '
-            '--fixed-strings '
-            '--invert-match '
-            '--line-regexp '
-            '- | '
-            'sort --unique > $TARGET '
-            '|| true'])
+types = env.Command(
+    source=None,
+    target='$out/ncbi/types.txt',
+    action='$eutils %(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings)
 
 """
-Filter accession2taxid into a much smaller list of 16s records and
-update taxids.
+Trim accession2taxid with 16s records and update taxids
 """
 accession2taxid = env.Command(
     target='$out/ncbi/accession2taxid.csv',
-    source=[settings['accession2taxid'], ncbi],
+    source=[settings['accession2taxid'], classified, tm7],
     action=['accession2taxid.py $SOURCES | '
             '$taxit update_taxids '
             '--outfile $TARGET '
             '--unknown-action drop '
             '- $tax_url'])
 
-"""
-Remove esearch records not present in accession2taxid and append
-cached records that changed or merged tax_ids to be re-downloaded
+cache = env.Command(
+    target='$out/ncbi/cache.txt',
+    source=[accession2taxid, '$seq_info_cache', modified,
+            '$records_cache', '$unknown_cache'],
+    action='cache.py --out $TARGET $SOURCES')
 
-TODO: Create a script that can be run individually on
-ncbi, combined and seq_info_cache
 """
-ncbi, download = env.Command(
-    target=['$out/ncbi/clean.txt', '$out/ncbi/download.txt'],
-    source=[accession2taxid, ncbi, combined, '$seq_info_cache'],
-    action='updated.py $SOURCES $TARGETS')
+Find records to download and filter ncbi master list
+with tax_ids that exist in our taxonomy
+"""
+download = env.Command(
+    target='$out/ncbi/download.txt',
+    source=[accession2taxid, cache, settings['do_not_download']],
+    action='download.py --out $TARGET $SOURCES')
 
 """
 download genbank records
 """
 gbs = env.Command(
-    target='$out/ncbi/records.gb',
+    target='$out/ncbi/download.gb',
     source=download,
     action=['%(fts)s -id $SOURCE | '
             '%(ftract)s | '
@@ -233,17 +196,19 @@ gbs = env.Command(
 
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
-    target=['$out/ncbi/seqs.fasta',
-            '$out/ncbi/seq_info.csv',
-            '$out/ncbi/pubmed_info.csv',
-            '$out/ncbi/references.csv',
-            '$out/ncbi/refseq_info.csv'],
+    target=['$out/ncbi/extract_genbank/seqs.fasta',
+            '$out/ncbi/extract_genbank/seq_info.csv',
+            '$out/ncbi/extract_genbank/pubmed_info.csv',
+            '$out/ncbi/extract_genbank/references.csv',
+            '$out/ncbi/extract_genbank/refseq_info.csv'],
     source=gbs,
     action='extract_genbank.py $SOURCE ' + today + ' $TARGETS')
 
 """
 Record versions returned from esearch that had no actual 16s features or were
 below `ftract -min-length`
+
+FIXME: get rid of the ugly grep
 """
 no_features = env.Command(
     target='$out/ncbi/no_features.txt',
@@ -257,6 +222,18 @@ no_features = env.Command(
             '--line-regexp '
             '${SOURCES[1]} > $TARGET '
             '|| true'))
+
+"""
+Remove new records with tax_ids not in our taxonomy database
+"""
+fa, seq_info = env.Command(
+    target=['$out/ncbi/extract_genbank/update_taxids/seqs.fasta',
+            '$out/ncbi/extract_genbank/update_taxids/seq_info.csv'],
+    source=[fa, seq_info],
+    action=['$taxit update_taxids '
+            '--unknown-action drop '
+            '${SOURCES[1]} $tax_url | '
+            'partition_refs.py ${SOURCES[0]} - $TARGETS'])
 
 """
 vsearch new sequences with training set to test sequence orientation
@@ -291,7 +268,7 @@ Fix record orientation and ignore sequences with no vsearch alignments.
 NOTE: unknown.txt will contain records (accession.version) with ANY
 filtered 16s allele.
 
-FIXME: This unknown_cache should be appended not copied
+FIXME: I think this unknown_cache should be appended not copied
 """
 fa, seq_info, _, _ = env.Command(
     target=['$out/ncbi/vsearch/seqs.fasta',
@@ -301,17 +278,6 @@ fa, seq_info, _, _ = env.Command(
     source=[vsearch, fa, seq_info, '$unknown_cache'],
     action=['vsearch.py $SOURCES $TARGETS',
             'cp ${TARGETS[3]} $unknown_cache'])
-
-"""
-Remove new records with unknown tax_ids
-"""
-seq_info = env.Command(
-    target='$out/ncbi/update_taxids/seq_info.csv',
-    source=seq_info,
-    action=['$taxit update_taxids '
-            '--outfile $TARGET '
-            '--unknown-action drop '
-            '$SOURCE $tax_url'])
 
 """
 Refresh/append with older records
@@ -324,13 +290,13 @@ Refresh/append with older records
 6. Copy and cache
 """
 fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
-    target=['$out/ncbi/combined/seqs.fasta',
-            '$out/ncbi/combined/seq_info.csv',
+    target=['$out/ncbi/seqs.fasta',
+            '$out/ncbi/seq_info.csv',
             '$out/pubmed_info.csv',
             '$out/references.csv',
             '$out/refseq_info.csv',
             '$out/records.txt'],
-    source=[ncbi,
+    source=[accession2taxid,
             fa, '$seqs_cache',
             seq_info, '$seq_info_cache',
             pubmed_info, '$pubmed_info_cache',
@@ -420,6 +386,35 @@ confidence = env.Command(
     source=feather,
     action=['confidence.py $SOURCE', 'md5sum $SOURCE > $TARGET'])
 Depends(confidence, [is_type, is_refseq, is_published])
+
+"""
+Download and add ANI tax-check-status annotations
+
+https://www.ncbi.nlm.nih.gov/assembly
+"""
+
+"""
+Map for WGS records without a refseq assembly accession
+"""
+asm = env.Command(
+    target='$out/ani/assembly_summary_genbank.txt',
+    source=None,
+    action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
+            'genomes/genbank/assembly_summary_genbank.txt'))
+
+"""
+The ANI tax check report
+"""
+ani_report = env.Command(
+    target='$out/ani/ANI_report_prokaryotes.txt',
+    source=None,
+    action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
+            'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
+
+ani = env.Command(
+    target='$out/.feather/ani.md5',
+    source=[feather, ani_report, asm],
+    action=['ani.py $SOURCES', 'md5sum $SOURCE > $TARGET'])
 
 """
 calculate md5hash of sequences

@@ -4,6 +4,10 @@ Changes for ya16sdb
 
 0.7
 ===
+* Added ANI tax check annotations
+* Dependency updates
+* Cleaner pipeline
+* Cache files are consolidated into a hidden directory
 * All type strains are considered trusted unless part of do_not_trust list GL: 79
 * Bug fix to correct merge with vsearch nearest type strain GH: 39
 

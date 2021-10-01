@@ -17,6 +17,7 @@ import argparse
 import itertools
 import pandas
 import os
+import ya16sdb
 
 from Bio import SeqIO
 
@@ -71,16 +72,13 @@ def main():
 
     p.add_argument(
         'no_features',
-        type=argparse.FileType('r'),
         help='list of versions downloaded with no 16s regions')
     p.add_argument(
         'previous_records',
-        type=argparse.FileType('r'),
         help='list of previously downloaded record versions')
 
     p.add_argument(
         'fasta_out',
-        type=argparse.FileType('w'),
         help='records file in same Bio.SeqIO format as input')
     p.add_argument(
         'seq_info_out',
@@ -96,31 +94,35 @@ def main():
         help='refseqs output')
     p.add_argument(
         'records_out',
-        type=argparse.FileType('w'),
         help='list of all version downloaded')
 
     args = p.parse_args()
 
-    new_seq_info = pandas.read_csv(args.new_seq_info, dtype=str)
+    new_seq_info = pandas.read_csv(
+        args.new_seq_info,
+        dtype=ya16sdb.DTYPES,
+        usecols=ya16sdb.SEQ_INFO_COLS)
 
     if os.path.getsize(args.previous_seq_info) == 0:
-        prev_seq_info = pandas.DataFrame(columns=new_seq_info.columns)
+        prev_seq_info = pandas.DataFrame(
+            columns=ya16sdb.SEQ_INFO_COLS,
+            dtype=str)
     else:
-        prev_seq_info = pandas.read_csv(args.previous_seq_info, dtype=str)
+        prev_seq_info = pandas.read_csv(
+            args.previous_seq_info,
+            dtype=ya16sdb.DTYPES,
+            usecols=ya16sdb.SEQ_INFO_COLS)
 
     # remove previous seq_info in new seq_info with same accessions
     prev_seq_info = prev_seq_info[
         ~prev_seq_info['accession'].isin(new_seq_info['accession'])]
 
-    # combine seq_info files and retain column order
-    columns = prev_seq_info.columns.tolist()
-    for c in new_seq_info.columns:
-        if c not in columns:
-            columns.append(c)
-    seq_info = prev_seq_info.append(new_seq_info)[columns]
+    # combine seq_info files
+    seq_info = prev_seq_info.append(new_seq_info)
 
     # remove anything dropped from ncbi
-    ncbi = set(v.strip() for v in open(args.ncbi))
+    ncbi = pandas.read_csv(
+        args.ncbi, dtype=str, squeeze=True, usecols=['version'])
     seq_info = seq_info[seq_info['version'].isin(ncbi)]
 
     # include with records_out
@@ -156,10 +158,11 @@ def main():
     to_write = set(seq_info['seqname'].values)
     new_fa = SeqIO.parse(args.new_fasta, 'fasta')
     prev_fa = SeqIO.parse(args.previous_fasta, 'fasta')
-    for r in itertools.chain(new_fa, prev_fa):
-        if r.id in to_write:
-            args.fasta_out.write('>{}\n{}\n'.format(r.description, r.seq))
-            to_write.remove(r.id)
+    with open(args.fasta_out, 'w') as fasta_out:
+        for r in itertools.chain(new_fa, prev_fa):
+            if r.id in to_write:
+                fasta_out.write('>{}\n{}\n'.format(r.description, r.seq))
+                to_write.remove(r.id)
 
     # write seq_info
     seq_info.to_csv(args.seq_info_out, index=False, date_format='%d-%b-%Y')
@@ -198,8 +201,8 @@ def main():
     if any previous records appear again in a future esearch
     we can re-download.
     '''
-    previous_records = set(v.strip() for v in args.previous_records)
-    previous_records = set(v for v in previous_records if v in ncbi)
+    previous_records = set(ya16sdb.open_clean(args.previous_records))
+    previous_records &= set(ncbi.values.tolist())
 
     '''
     output downloaded versions we do not want to download again. This
@@ -207,13 +210,12 @@ def main():
     up to this point
     '''
     versions = set(seq_info['version'].tolist())
-    versions |= set(n.strip() for n in args.no_features)
+    versions |= set(ya16sdb.open_clean(args.no_features))
     versions |= current_records
     versions |= previous_records
 
-    for v in sorted(versions):
-        if v:
-            args.records_out.write(v + '\n')
+    with open(args.records_out, 'w') as records_out:
+        records_out.write('\n'.join(sorted(versions)))
 
 
 class DuplicateSeqnameError(Exception):

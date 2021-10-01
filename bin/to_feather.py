@@ -6,29 +6,7 @@ import argparse
 import datetime
 import pandas
 import sys
-
-DTYPES = {
-    'accession': str,
-    'ambig_count': int,
-    'description': str,
-    'download_date': str,
-    'isolate': str,
-    'isolation_source': str,
-    'keywords': str,
-    'length': int,
-    'modified_date': str,
-    'mol_type': str,
-    'name': str,
-    'organism': str,
-    'seq_start': int,
-    'seq_stop': int,
-    'seqname': str,
-    'source': str,
-    'strain': str,
-    'tax_id': str,
-    'version': str,
-    'version_num': str,
-}
+import ya16sdb
 
 
 def main(arguments):
@@ -40,7 +18,7 @@ def main(arguments):
     args = parser.parse_args(arguments)
     seq_info = pandas.read_csv(
         args.seq_info,
-        dtype=DTYPES,
+        dtype=ya16sdb.DTYPES,
         parse_dates=['download_date', 'modified_date'],
         date_parser=lambda x: datetime.datetime.strptime(x, '%d-%b-%Y'))
     seq_info.to_feather(args.out)
