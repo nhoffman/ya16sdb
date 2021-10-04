@@ -25,6 +25,7 @@ SEQ_INFO_COLS = [
 DTYPES = {
     'accession': str,
     'ambig_count': int,
+    'assembly_refseq': str,
     'description': str,
     'download_date': str,
     'isolate': str,
