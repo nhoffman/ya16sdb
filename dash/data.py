@@ -1,9 +1,13 @@
-import boto3
-from io import BytesIO
-from datetime import datetime
-import feather
+import datetime
 import gzip
+import io
 import os
+import pandas
+
+try:
+    import boto3
+except ImportError:
+    pass
 
 
 def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
@@ -18,27 +22,33 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
     print('reading data from {}'.format(pathspec))
     if pathspec.startswith('s3://'):
         s3_bucket, s3_key = pathspec.replace('s3://', '').split('/', 1)
-        s3client = boto3.client(
-            's3',
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key)
+        if aws_access_key_id:
+            print('using provided access keys')
+            s3client = boto3.client(
+                's3',
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key)
+        else:
+            # assume credentials are available in default credential chain
+            print('assuming existing aws credentials')
+            s3client = boto3.Session(region_name='us-west-2').client('s3')
         s3obj = s3client.get_object(Bucket=s3_bucket, Key=s3_key)
         last_modified = s3obj['LastModified']
         if get_data:
-            compressed = BytesIO(s3obj['Body'].read())
+            compressed = io.BytesIO(s3obj['Body'].read())
             with gzip.GzipFile(mode='rb', fileobj=compressed) as f:
-                df = feather.read_dataframe(f)
+                df = pandas.read_feather(f)
         else:
             df = None
     else:
-        last_modified = datetime.fromtimestamp(
+        last_modified = datetime.datetime.fromtimestamp(
             os.path.getmtime(pathspec)).isoformat()
         if get_data:
             if pathspec.endswith('.gz'):
                 with gzip.open(pathspec) as f:
-                    df = feather.read_dataframe(f)
+                    df = pandas.read_feather(f)
             else:
-                df = feather.read_dataframe(pathspec)
+                df = pandas.read_feather(pathspec)
         else:
             df = None
 

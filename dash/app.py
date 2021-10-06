@@ -2,10 +2,7 @@
 '''
 Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 '''
-
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import data
 import os
 import pandas
@@ -27,8 +24,9 @@ SEARCH_OPTS = ['seqname', 'accession', 'version',
 SHAPES = ['circle', 'triangle-up', 'square', 'diamond',
           'pentagon', 'cross', 'star', 'hourglass']
 
-app = dash.Dash()
+app = dash.Dash(__name__)
 app.title = 'Species Outlier Plots'
+server = app.server
 
 # access all environment variables here
 FEATHER_FILE = os.environ.get('DATA_FILE', 'filter_details.feather.gz')
@@ -80,12 +78,12 @@ def write_layout():
     genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
     axes = ['confidence', 'dist_pct', 'x', 'y', 'match_pct',
             'match_species', 'match_version', 'rank_order']
-    return html.Div(
+    return dash.html.Div(
         style={'width': 1175},
         children=[
-            dcc.Store(id='state'),
-            dcc.Location(id='url', refresh=False),
-            dcc.Markdown(
+            dash.dcc.Store(id='state'),
+            dash.dcc.Location(id='url', refresh=False),
+            dash.dcc.Markdown(
                 children=[
                     str(df['download_date'].max().strftime('%A, %B %d, %Y'))
                 ],
@@ -94,23 +92,23 @@ def write_layout():
                     'font-style': 'italic',
                     'height': 0,
                     'width': '100%'}),
-            html.Div(
+            dash.html.Div(
                 children=[
-                    dcc.Input(type='text', id='text-input'),
-                    html.Button(
+                    dash.dcc.Input(type='text', id='text-input'),
+                    dash.html.Button(
                         id='submit-button',
                         n_clicks=0,
                         children='Search')]),
-            dcc.Markdown(
+            dash.dcc.Markdown(
                 children=['**Genus**'],
                 style={
                     'display': 'inline-block',
                     'text-align': 'center',
                     'vertical-align': 'middle',
                     'width': '5%'}),
-            html.Div(
+            dash.html.Div(
                 children=[
-                    dcc.Dropdown(
+                    dash.dcc.Dropdown(
                         id='genus-column',
                         options=genus_opts,
                         clearable=False)],
@@ -118,56 +116,58 @@ def write_layout():
                     'display': 'inline-block',
                     'vertical-align': 'middle',
                     'width': '40%'}),
-            dcc.Markdown(
+            dash.dcc.Markdown(
                 children=['**Species**'],
                 style={
                     'display': 'inline-block',
                     'text-align': 'center',
                     'vertical-align': 'middle',
                     'width': '6%'}),
-            html.Div(
-                children=[dcc.Dropdown(id='species-column', clearable=False)],
+            dash.html.Div(
+                children=[
+                    dash.dcc.Dropdown(id='species-column', clearable=False)],
                 style={
                     'display': 'inline-block',
                     'vertical-align': 'middle',
                     'width': '48%'}),
-            html.Div(
+            dash.html.Div(
                 children=[
-                    html.Div(
+                    dash.html.Div(
                         style={'width': '11%', 'display': 'inline-block'}),
-                    dcc.Markdown(
+                    dash.dcc.Markdown(
                         children=['**Color**'],
                         style={
                             'width': '5%',
                             'display': 'inline-block'}),
-                    dcc.Markdown(
+                    dash.dcc.Markdown(
                         children=['**Shape**'],
                         style={
                             'width': '10%',
                             'display': 'inline-block'}),
-                    dcc.Markdown(
+                    dash.dcc.Markdown(
                         children=['**Selection**'],
                         style={
                              'width': '39%',
                              'display': 'inline-block'}),
-                    dcc.Markdown(
+                    dash.dcc.Markdown(
                         children=['**Visibility**'],
                         style={
                                 'width': '35%',
                                 'display': 'inline-block'}),
-                    html.Div(
+                    dash.html.Div(
                         children=[
-                            dcc.Markdown(children=['**Outliers**']),
-                            dcc.Markdown(children=['**Confidence**']),
-                            dcc.Markdown(children=['**Match Species**']),
-                            dcc.Markdown(children=['**Isolation Source**']),
+                            dash.dcc.Markdown(children=['**Outliers**']),
+                            dash.dcc.Markdown(children=['**Confidence**']),
+                            dash.dcc.Markdown(children=['**Match Species**']),
+                            dash.dcc.Markdown(
+                                children=['**Isolation Source**']),
                             ],
                         style={
                             'vertical-align': 'middle',
                             'width': '11%',
                             'display': 'inline-block',
                             }),
-                    dcc.RadioItems(
+                    dash.dcc.RadioItems(
                         id='color-items',
                         options=[
                             {'label': '', 'value': 'is_out'},
@@ -179,7 +179,7 @@ def write_layout():
                             'vertical-align': 'middle',
                             'width': '5%',
                             'display': 'inline-block'}),
-                    dcc.RadioItems(
+                    dash.dcc.RadioItems(
                         id='shape-items',
                         options=[
                             {'label': '', 'value': 'is_out'},
@@ -191,36 +191,36 @@ def write_layout():
                             'vertical-align': 'middle',
                             'width': '5%',
                             'display': 'inline-block'}),
-                    html.Div(
+                    dash.html.Div(
                         children=[
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='outliers-selection',
                                 multi=True),
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='confidence-selection',
                                 multi=True),
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='match-species-selection',
                                 multi=True),
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='isolation-source-selection',
                                 multi=True)],
                         style={
                             'vertical-align': 'middle',
                             'width': '39%',
                             'display': 'inline-block'}),
-                    html.Div(
+                    dash.html.Div(
                         children=[
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='outliers-visibility',
                                 multi=True),
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='confidence-visibility',
                                 multi=True),
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='match-species-visibility',
                                 multi=True),
-                            dcc.Dropdown(
+                            dash.dcc.Dropdown(
                                 id='isolation-source-visibility',
                                 multi=True)],
                         style={
@@ -233,19 +233,19 @@ def write_layout():
                     'margin': 5,
                     'padding': 10,
                     'width': '97%'}),
-            html.Div(
-                children=[dcc.Slider(id='year--slider')],
+            dash.html.Div(
+                children=[dash.dcc.Slider(id='year--slider')],
                 style={'margin': 15, 'width': '95%'}),
-            dcc.Markdown(
+            dash.dcc.Markdown(
                 children=['**Axes**'],
                 style={
                     'display': 'inline-block',
                     'text-align': 'center',
                     'vertical-align': 'middle',
                     'width': '4%'}),
-            html.Div(
+            dash.html.Div(
                 children=[
-                    dcc.Dropdown(
+                    dash.dcc.Dropdown(
                         clearable=False,
                         id='yaxis-column',
                         options=[{'label': i, 'value': i} for i in axes])],
@@ -253,9 +253,9 @@ def write_layout():
                     'width': '14%',
                     'display': 'inline-block',
                     'vertical-align': 'middle'}),
-            html.Div(
+            dash.html.Div(
                 children=[
-                    dcc.Dropdown(
+                    dash.dcc.Dropdown(
                         clearable=False,
                         id='xaxis-column',
                         options=[{'label': i, 'value': i} for i in axes])],
@@ -263,8 +263,8 @@ def write_layout():
                     'width': '14%',
                     'display': 'inline-block',
                     'vertical-align': 'middle'}),
-            dcc.Graph(id='plot'),
-            html.Table(
+            dash.dcc.Graph(id='plot'),
+            dash.html.Table(
                 id='table-div',
                 style={
                     'border': 'thin lightgrey solid',
@@ -882,27 +882,27 @@ def update_table(selected, iso, match, outliers, confidence,
         'text-align': 'left'}
     cols = ['seqname', 'description', 'is_type', 'dist_pct',
             'is_out', 'match_species', 'match_pct']
-    trs = [html.Tr(children=[
-        html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
+    trs = [dash.html.Tr(children=[
+        dash.html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
     for r in rows.to_dict('records'):
         tds = []
         for c in cols:
             if c == 'seqname':
-                cell = html.A(
+                cell = dash.html.A(
                     href=('https://www.ncbi.nlm.nih.gov/nuccore/' +
                           r['version']),
                     children=r[c],
                     target='_blank')
             elif c == 'match_species' and r[c] is not None:
-                cell = html.A(
+                cell = dash.html.A(
                     href=('https://www.ncbi.nlm.nih.gov/nuccore/' +
                           r['match_version']),
                     children=r[c],
                     target='_blank')
             else:
                 cell = r[c]
-            tds.append(html.Td(children=[cell], style=TABLE_STYLE))
-        trs.append(html.Tr(children=tds))
+            tds.append(dash.html.Td(children=[cell], style=TABLE_STYLE))
+        trs.append(dash.html.Tr(children=tds))
     return trs
 
 
