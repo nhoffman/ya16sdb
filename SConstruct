@@ -169,6 +169,9 @@ accession2taxid = env.Command(
             '--unknown-action drop '
             '- $tax_url'])
 
+"""
+FIXME: call this cache_in.py (cache_out.py will replace refresh.py)
+"""
 cache = env.Command(
     target='$out/ncbi/cache.txt',
     source=[accession2taxid, '$seq_info_cache', modified,
@@ -288,6 +291,8 @@ Refresh/append with older records
 4. Drop sequences that have a refseq equivalent
 5. Deduplicate pubmeds and references
 6. Copy and cache
+
+FIXME: Call this cache_out.py ... with --cachedir argument
 """
 fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
     target=['$out/ncbi/seqs.fasta',
@@ -332,6 +337,8 @@ taxonomy = env.Command(
 
 """
 feather file
+
+FIXME: combine all these feather steps into one step
 """
 feather = env.Command(
     target='$out/seq_info.feather',
@@ -723,6 +730,9 @@ find top hit for each sequence among type strains
 
 NOTE: alleles will never align with themselves (--self) BUT
 can align with other alleles in the same genome accession
+
+FIXME: consider displaying the most common type strain of top 10
+or something
 '''
 named_type_hits = env.Command(
     target='$out/dedup/1200bp/named/vsearch.tsv',
