@@ -61,9 +61,15 @@ This deployment depends on the labmed dokku-stack, in order to provide applicati
 routing as well as an IAM instance profile that has the Ya16sdb policy attached to it.
 Please see the dokku-stack documentation for deployment information there.
 
-Create the S3 bucket and IAM Policy, and install and configure the
-application (only needs to be done once, or to update dokku
-configuration)::
+In particular, you must add the configuration for the target server to
+your ssh config. Clone, enter, and set up the dokku-stack repo and run
+the following::
+
+  AWS_PROFILE=saml ./deploy-stack.yml -e ACCOUNT=prod -e TARGET=dokku-stack-apps -t ssh-config
+
+Return to this repo. Create the S3 bucket and IAM Policy, and install
+and configure the application (only needs to be done once, or to
+update dokku configuration)::
 
   deploy/deploy-dash.yml -e ENV=prod -t deploy-stack
 
