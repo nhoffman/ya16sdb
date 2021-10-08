@@ -1,1 +1,5 @@
-gunicorn
+boto3==1.18.57
+dash==2.0.0
+gunicorn==20.1.0
+pandas==1.1.5
+pyarrow==5.0.0
