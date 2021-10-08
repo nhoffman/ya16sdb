@@ -15,6 +15,7 @@ COLORS = ['blue', 'red', 'black', 'yellow',
 DEFAULT_COLOR = 'is_out'
 DEFAULT_SHAPE = 'confidence'
 DEFAULT_GENUS = '1350'  # Enterococcus
+DEFAULT_SPECIES = '1351'  # Enterococcus faecalis
 DEFAULT_Y = 'y'
 DEFAULT_X = 'x'
 LEGEND_OTHER = 'other'
@@ -378,7 +379,10 @@ def update_species_value(options, search, n_clicks, text, state, tax_id):
     dff = df[df['genus'] == tax_id]
     request, data = parse_search_input(dff, state, search, n_clicks, text)
     if request is None:  # no request
-        value = options[0]['value']  # return first item in dropdown
+        if state:
+            value = options[0]['value']  # return first item in dropdown
+        else:
+            value = DEFAULT_SPECIES
     elif request == 'species_name':
         value = species_to_id.get(data, options[0]['value'])
     else:
