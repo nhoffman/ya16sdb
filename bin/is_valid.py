@@ -20,7 +20,7 @@ def main():
         help='Database string URI or filename.')
     args = p.parse_args()
     info = pandas.read_feather(args.feather)
-    conf = configparser.SafeConfigParser(allow_no_value=True)
+    conf = configparser.ConfigParser(allow_no_value=True)
     conf.optionxform = str  # options are case-sensitive
     conf.read(args.url)
     url = conf.get('sqlalchemy', 'url')
