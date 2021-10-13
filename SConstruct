@@ -336,71 +336,6 @@ taxonomy = env.Command(
     action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
-feather file
-
-FIXME: combine all these feather steps into one step
-"""
-feather = env.Command(
-    target='$out/seq_info.feather',
-    source=seq_info,
-    action='to_feather.py $SOURCE $TARGET')
-
-"""Add feather file columns"""
-"""
-Add 'species' taxonomy id, species_name, genus taxid and genus name
-"""
-tax_cols = env.Command(
-    target='$out/.feather/taxonomy.md5',
-    source=[feather, taxonomy],
-    action=['taxonomy.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-
-"""
-https://github.com/nhoffman/ya16sdb/issues/11
-"""
-is_type = env.Command(
-    target='$out/.feather/is_type.md5',
-    source=[feather, types],
-    action=['is_type.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-
-is_published = env.Command(
-    target='$out/.feather/is_publshed.md5',
-    source=[feather, pubmed_info],
-    action=['is_published.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-
-"""
-add is_refseq and original column with refseq accession
-"""
-is_refseq = env.Command(
-    target='$out/.feather/is_refseq.md5',
-    source=[feather, refseq_info],
-    action=['is_refseq.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-
-'''
-is_valid attribute from taxtastic
-
-https://github.com/fhcrc/taxtastic/blob/master/taxtastic/ncbi.py#L172
-'''
-is_valid = env.Command(
-    target='$out/.feather/is_valid.md5',
-    source=feather,
-    action=['is_valid.py $SOURCE $tax_url', 'md5sum $SOURCE > $TARGET'])
-
-"""
-https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40
-"""
-confidence = env.Command(
-    target='$out/.feather/confidence.md5',
-    source=feather,
-    action=['confidence.py $SOURCE', 'md5sum $SOURCE > $TARGET'])
-Depends(confidence, [is_type, is_refseq, is_published])
-
-"""
-Download and add ANI tax-check-status annotations
-
-https://www.ncbi.nlm.nih.gov/assembly
-"""
-
-"""
 Map for WGS records without a refseq assembly accession
 """
 asm = env.Command(
@@ -412,39 +347,49 @@ asm = env.Command(
 """
 The ANI tax check report
 """
-ani_report = env.Command(
+ani = env.Command(
     target='$out/ani/ANI_report_prokaryotes.txt',
     source=None,
     action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
             'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
 
-ani = env.Command(
-    target='$out/.feather/ani.md5',
-    source=[feather, ani_report, asm],
-    action=['ani.py $SOURCES', 'md5sum $SOURCE > $TARGET'])
-
 """
-calculate md5hash of sequences
+Create feather file and initial columns
+FIXME: Switch $SOURCE and $TARGET around for each script
 """
-seqhash = env.Command(
-    target='$out/.feather/seqhash.md5',
-    source=[feather, fa],
-    action=['seqhash.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-
-"""End feather columns"""
-
-sort_values = env.Command(
-    target='$out/.feather/sorted.md5',
-    source=feather,
-    action=['sort_values.py $SOURCE %(sort_by)s' % settings,
-            'md5sum $SOURCE > $TARGET'])
-Depends(sort_values, [is_type, is_refseq, is_published, seqhash])
+feather = env.Command(
+    target='$out/seq_info.feather',
+    source=[
+        seq_info,
+        taxonomy,
+        # https://github.com/nhoffman/ya16sdb/issues/11
+        types,
+        pubmed_info,
+        refseq_info,
+        ani,
+        asm,
+        fa],
+    action=['to_feather.py ${SOURCES[0]} $TARGET',
+            # Add 'species' tax_id, species_name, genus taxid and genus name
+            'taxonomy.py $TARGET ${SOURCES[1]}',
+            # https://github.com/nhoffman/ya16sdb/issues/11
+            'is_type.py $TARGET ${SOURCES[2]}',
+            'is_published.py $TARGET ${SOURCES[3]}',
+            # add is_refseq and original column with refseq accession
+            'is_refseq.py $TARGET ${SOURCES[4]}',
+            # taxtastic GH: 172
+            'is_valid.py $TARGET $tax_url',
+            # https://gitlab.labmed.uw.edu/uwlabmed/mkrefpkg/issues/40
+            'confidence.py $TARGET',
+            'ani.py $TARGET ${SOURCES[5:7]}',
+            'seqhash.py $TARGET ${SOURCES[7]}',
+            'sort_values.py $TARGET %(sort_by)s' % settings]
+            )
 
 fa, seq_info = env.Command(
     target=['$out/seqs.fasta', '$out/seq_info.csv'],
     source=[fa, feather],
     action='partition_refs.py $SOURCES $TARGETS')
-Depends([fa, seq_info], sort_values)
 
 raw = fa
 
@@ -507,7 +452,6 @@ fa, seq_info = env.Command(
             '--prop-ambig-cutoff 0.01 '
             '--species-cap %(species_cap)s '
             '${SOURCES[:2]} $TARGETS' % settings))
-Depends([fa, seq_info], [is_valid, tax_cols, seqhash])
 
 named = fa
 
@@ -754,10 +698,9 @@ match_hits = env.Command(
     target='$out/.feather/match_hits.md5',
     source=[feather, named_type_hits],
     action=['match_hits.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
-Depends([match_hits], tax_cols)
 
 """
-gzip feather file as last step
+gzip feather file as last step for the filter_outlier plots
 """
 gzip = env.Command(
     target='${SOURCE}.gz',
