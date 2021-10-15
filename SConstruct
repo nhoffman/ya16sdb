@@ -362,7 +362,6 @@ feather = env.Command(
     source=[
         seq_info,
         taxonomy,
-        # https://github.com/nhoffman/ya16sdb/issues/11
         types,
         pubmed_info,
         refseq_info,
@@ -685,9 +684,8 @@ named_type_hits = env.Command(
             '--db ${SOURCES[1]} '
             '--blast6out $TARGET '
             '--id 0.75 '
-            '--threads 14 '
             '--self '  # reject same sequence hits
-            '--threads 12 '
+            '--threads 14 '
             '--maxaccepts 1 '
             '--strand plus'))
 
