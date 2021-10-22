@@ -47,6 +47,7 @@ def main():
         usecols=[
             '# genbank-accession',
             'refseq-accession',
+            'best-match-type-assembly',
             'best-match-species-name',
             'best-match-species-taxid',
             'taxonomy-check-status',
