@@ -2,6 +2,11 @@
 Changes for ya16sdb
 ===================
 
+0.7.1
+=====
+* Added "No Data" to ANI filters in Dash app
+* Added link to matching ANI assembly in Dash app table
+
 0.7
 ===
 * Added ANI tax check annotations
