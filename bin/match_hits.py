@@ -24,14 +24,23 @@ def main():
         usecols=['seqname', 'match_seqname', 'match_pct'])
     info = pandas.read_feather(args.feather)
     vsearch = vsearch.merge(
-        info[['seqname', 'version', 'species_name']],
+        info[['seqname', 'version', 'species_name', 'species']],
         left_on='match_seqname',
         right_on='seqname',
         suffixes=['', '_'])
     vsearch = vsearch.drop('seqname_', axis='columns')
     vsearch = vsearch.rename(
-        columns={'version': 'match_version', 'species_name': 'match_species'})
-    info = info.merge(vsearch, how='left')
+            columns={
+                'version': 'match_version',
+                'species_name': 'match_species',
+                'species': 'match_species_id'})
+    info = info.merge(vsearch, how='left', on='seqname')
+    matching = info[info['species'] == info['match_species_id']]
+    matching = matching.drop_duplicates(subset=['seqname'], keep='first')
+    not_matching = info[~info['seqname'].isin(matching['seqname'])]
+    not_matching = not_matching.drop_duplicates(
+        subset=['seqname'], keep='first')
+    info = pandas.concat([matching, not_matching]).reset_index(drop=True)
     info.to_feather(args.feather)
 
 

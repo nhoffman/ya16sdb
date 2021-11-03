@@ -3,6 +3,7 @@ Download and curate the 16S rRNA sequences from NCBI
 
 NOTE: run with `scons -j 1` only
 """
+import atexit
 import configparser
 import csv
 import errno
@@ -13,6 +14,7 @@ import time
 
 from SCons.Script import (
         ARGUMENTS,
+        GetBuildFailures,
         Depends,
         Environment,
         Help,
@@ -63,10 +65,11 @@ test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
 conf = configparser.SafeConfigParser()
 conf.read('settings.conf')
 settings = conf['TEST'] if test else conf['DEFAULT']
+out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
 vrs = Variables(None, ARGUMENTS)
 vrs.Add('base', help='Path to output directory', default=settings['outdir'])
 vrs.Add('cache', default=os.path.join('$base', '.cache'))
-vrs.Add('out', default=os.path.join('$base', time.strftime('%Y%m%d')))
+vrs.Add('out', default=out)
 vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
 # cache vars
 vrs.Add(PathVariable(
@@ -673,21 +676,19 @@ find top hit for each sequence among type strains
 
 NOTE: alleles will never align with themselves (--self) BUT
 can align with other alleles in the same genome accession
-
-FIXME: consider displaying the most common type strain of top 10
-or something
 '''
 named_type_hits = env.Command(
     target='$out/dedup/1200bp/named/vsearch.tsv',
     source=[named, fa],
     action=('vsearch --usearch_global ${SOURCES[0]} '
-            '--db ${SOURCES[1]} '
             '--blast6out $TARGET '
+            '--db ${SOURCES[1]} '
             '--id 0.75 '
+            '--maxaccepts 5 '
             '--self '  # reject same sequence hits
+            '--strand plus '
             '--threads 14 '
-            '--maxaccepts 1 '
-            '--strand plus'))
+            '--top_hits_only'))
 
 """
 add named_type_hits match columns to feather file
@@ -707,6 +708,11 @@ gzip = env.Command(
 Depends([gzip], match_hits)
 
 """
+TODO: create a RUNNING and SUCCCESS file
+https://scons.org/doc/2.0.1/HTML/scons-user/x2045.html
+"""
+
+"""
 copy taxdmp file into output dir so a ``taxit new_database``
 can be built again in the future if needed
 """
@@ -723,6 +729,24 @@ commit = env.Command(
     source='.git/objects',
     action=['(echo $$(hostname):$$(pwd); '
             'git describe --tags --dirty) > $TARGET'])
+
+
+def write_build_status():
+    """
+    Create a file SUCCESS or FAILED depending on how the pipeline finishes
+    """
+    if GetBuildFailures():
+        status = 'FAILED '
+    else:
+        status = 'SUCCESS'
+    try:
+        open(os.path.join(out, status), 'w').close()
+    except FileNotFoundError:
+        # scons --dry-run
+        pass
+
+
+atexit.register(write_build_status)
 
 """
 release steps
