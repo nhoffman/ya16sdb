@@ -2,6 +2,11 @@
 Changes for ya16sdb
 ===================
 
+0.7.2
+====
+* Preferring same species in type strain match_species report (GH: 47)
+* Added SUCCESS or FAILED "at exit" of pipeline
+
 0.7.1
 =====
 * Added "No Data" to ANI filters in Dash app
