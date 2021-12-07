@@ -296,6 +296,7 @@ Refresh/append with older records
 6. Copy and cache
 
 FIXME: Call this cache_out.py ... with --cachedir argument
+FIXME: Move refseq dedup to partition_refs.py --drop-duplicates-sequences
 """
 fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
     target=['$out/ncbi/seqs.fasta',
@@ -344,7 +345,10 @@ Map for WGS records without a refseq assembly accession
 asm = env.Command(
     target='$out/ani/assembly_summary_genbank.txt',
     source=None,
-    action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
+    action=('wget '
+            '--output-document $TARGET '
+            '--retry-connrefused '
+            'https://ftp.ncbi.nlm.nih.gov/'
             'genomes/genbank/assembly_summary_genbank.txt'))
 
 """
@@ -353,7 +357,10 @@ The ANI tax check report
 ani = env.Command(
     target='$out/ani/ANI_report_prokaryotes.txt',
     source=None,
-    action=('wget --output-document $TARGET https://ftp.ncbi.nlm.nih.gov/'
+    action=('wget '
+            '--output-document $TARGET '
+            '--retry-connrefused '
+            'https://ftp.ncbi.nlm.nih.gov/'
             'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
 
 """
@@ -736,7 +743,7 @@ def write_build_status():
     Create a file SUCCESS or FAILED depending on how the pipeline finishes
     """
     if GetBuildFailures():
-        status = 'FAILED '
+        status = 'FAILED'
     else:
         status = 'SUCCESS'
     try:
