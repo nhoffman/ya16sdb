@@ -114,6 +114,16 @@ def main():
         info = info[info['filter_outliers'] & ~info['is_out']]
 
     if args.drop_duplicate_sequences:
+        old_loci = info[
+            ~info['locus_tag'].isna() &
+            info['locus_tag'].isin(info['old_locus_tag'])]
+        old_loci = old_loci[['seqname', 'locus_tag', 'assembly_genbank']]
+        old_loci = old_loci.merge(
+            info[['old_locus_tag', 'assembly_genbank']],
+            left_on=['locus_tag', 'assembly_genbank'],
+            right_on=['old_locus_tag', 'assembly_genbank'])
+        # remove old locus tags
+        info = info[~info['seqname'].isin(old_loci['seqname'])]
         info = info.drop_duplicates(
             subset=['accession', 'seqhash'], keep='first')
 

@@ -348,6 +348,7 @@ asm = env.Command(
     action=('wget '
             '--output-document $TARGET '
             '--retry-on-http-error 403 '
+            '--waitretry 60 '
             'https://ftp.ncbi.nlm.nih.gov/'
             'genomes/genbank/assembly_summary_genbank.txt'))
 
@@ -360,6 +361,7 @@ ani = env.Command(
     action=('wget '
             '--output-document $TARGET '
             '--retry-on-http-error 403 '
+            '--waitretry 60 '
             'https://ftp.ncbi.nlm.nih.gov/'
             'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
 

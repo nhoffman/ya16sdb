@@ -4,11 +4,7 @@ Add ANI_report_prokaryotes.tsv tax check data
 """
 import argparse
 import pandas
-import re
-
-
-# assumes 4 or 6 A-Z prefix WGS record prefix
-WGS_PREFIX = re.compile(r"^([A-Z]{6}|[A-Z]{4})")
+import ya16sdb
 
 
 def extract_wgs_master_prefix(accession):
@@ -26,7 +22,7 @@ def extract_wgs_master_prefix(accession):
     # see https://www.ncbi.nlm.nih.gov/books/NBK21091/table/
     # ch18.T.refseq_accession_numbers_and_mole/?report=objectonly
     accession = accession.split("_", 1)[-1]
-    match = WGS_PREFIX.search(accession)
+    match = ya16sdb.WGS_PREFIX.search(accession)
     return match.group() if match else pandas.NA
 
 

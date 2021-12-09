@@ -143,6 +143,13 @@ def parse_coordinates(record):
 def parse_record(record):
     version, accession, version_num = parse_version(record)
 
+    # Can be used to further dedup assembly records by locus_tag
+    master = None
+    if len(record.annotations['accessions']) == 2:
+        ma = record.annotations['accessions'][1]
+        if ma != 'REGION:' and ya16sdb.WGS_PREFIX.search(ma.split('_')[-1]):
+            master = ma
+
     source = next(i for i in record.features if i.type == 'source')
     quals = source.qualifiers
 
@@ -155,6 +162,16 @@ def parse_record(record):
     # occasionally, tax_ids are missing
     else:
         tax_id = ''
+
+    rrna = next(i for i in record.features if i.type == 'rRNA')
+    if 'locus_tag' in rrna.qualifiers:
+        locus_tag = rrna.qualifiers['locus_tag'][0]
+    else:
+        locus_tag = ''
+    if 'old_locus_tag' in rrna.qualifiers:
+        old_locus_tag = rrna.qualifiers['old_locus_tag'][0]
+    else:
+        old_locus_tag = ''
 
     assembly_refseq = None
     for d in record.dbxrefs:
@@ -170,12 +187,15 @@ def parse_record(record):
     info = {'accession': accession,
             'ambig_count': sum(1 for b in record.seq if b not in ACGT),
             'assembly_refseq': assembly_refseq,
-            'modified_date': record.annotations['date'],
             'description': record.description,
             'keywords': ';'.join(record.annotations.get('keywords', [])),
             'length': len(record),
+            'locus_tag': locus_tag,
+            'master': master,
+            'modified_date': record.annotations['date'],
             'mol_type': ';'.join(quals.get('mol_type', '')),
             'name': record.name,
+            'old_locus_tag': old_locus_tag,
             'organism': record.annotations['organism'],
             'seq_start': seq_start,
             'seq_stop': seq_stop,

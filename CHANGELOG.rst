@@ -2,8 +2,12 @@
 Changes for ya16sdb
 ===================
 
+0.7.3
+=====
+* Deduplicating WGS records by locus_tag (GL: 86)
+
 0.7.2
-====
+=====
 * Preferring same species in type strain match_species report (GH: 47)
 * Added SUCCESS or FAILED "at exit" of pipeline
 

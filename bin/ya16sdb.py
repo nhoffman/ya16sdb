@@ -1,3 +1,8 @@
+import re
+
+# assumes 4 or 6 A-Z prefix WGS record prefix
+WGS_PREFIX = re.compile(r"^([A-Z]{6}|[A-Z]{4})")
+
 SEQ_INFO_COLS = [
     'seqname',
     'version',
@@ -19,7 +24,10 @@ SEQ_INFO_COLS = [
     'isolation_source',
     'seq_start',
     'seq_stop',
-    'assembly_refseq'
+    'assembly_refseq',
+    'master',
+    'locus_tag',
+    'old_locus_tag'
 ]
 
 DTYPES = {
@@ -32,9 +40,12 @@ DTYPES = {
     'isolation_source': str,
     'keywords': str,
     'length': int,
+    'locus_tag': str,
+    'master': str,
     'modified_date': str,
     'mol_type': str,
     'name': str,
+    'old_locus_tag': str,
     'organism': str,
     'seq_start': int,
     'seq_stop': int,
