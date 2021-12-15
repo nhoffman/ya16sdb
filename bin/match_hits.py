@@ -23,6 +23,10 @@ def main():
         sep='\t',
         usecols=['seqname', 'match_seqname', 'match_pct'])
     info = pandas.read_feather(args.feather)
+    cols = ['match_version', 'match_species', 'match_species_id']
+    for c in cols:
+        if c in info.columns:
+            info = info.drop(c, axis='columns')
     vsearch = vsearch.merge(
         info[['seqname', 'version', 'species_name', 'species']],
         left_on='match_seqname',
@@ -35,6 +39,8 @@ def main():
                 'species_name': 'match_species',
                 'species': 'match_species_id'})
     info = info.merge(vsearch, how='left', on='seqname')
+    print(info)
+    return
     matching = info[info['species'] == info['match_species_id']]
     matching = matching.drop_duplicates(subset=['seqname'], keep='first')
     not_matching = info[~info['seqname'].isin(matching['seqname'])]
