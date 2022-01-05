@@ -88,8 +88,6 @@ vrs.Add(PathVariable(
     'references_cache', '', '$cache/references.csv', PathIsFileCreate))
 vrs.Add(PathVariable(
     'refseq_info_cache', '', '$cache/refseq_info.csv', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'unknown_cache', '', '$cache/unknown.txt', PathIsFileCreate))
 
 environment_variables = dict(
     os.environ,
@@ -107,6 +105,7 @@ env = Environment(
     shell='bash',
     blast=settings['blast'],
     eutils=settings['eutils'],
+    infernal=settings['infernal'],
     taxit=settings['taxit'],
     deenurp=settings['deenurp'],
 )
@@ -177,8 +176,7 @@ FIXME: call this cache_in.py (cache_out.py will replace refresh.py)
 """
 cache = env.Command(
     target='$out/ncbi/cache.txt',
-    source=[accession2taxid, '$seq_info_cache', modified,
-            '$records_cache', '$unknown_cache'],
+    source=[accession2taxid, '$seq_info_cache', modified, '$records_cache'],
     action='cache.py --out $TARGET $SOURCES')
 
 """
@@ -214,7 +212,7 @@ fa, seq_info, pubmed_info, references, refseq_info = env.Command(
 Record versions returned from esearch that had no actual 16s features or were
 below `ftract -min-length`
 
-FIXME: get rid of the ugly grep
+FIXME: write script that adds the annotations to the info with no seqnames
 """
 no_features = env.Command(
     target='$out/ncbi/no_features.txt',
@@ -242,48 +240,22 @@ fa, seq_info = env.Command(
             'partition_refs.py ${SOURCES[0]} - $TARGETS'])
 
 """
-vsearch new sequences with training set to test sequence orientation
-and 16s region
-
-FIXME: consider using cmsearch or generating a
-single sequence from the rfam covariance model
+cmsearch new sequences against rfam model
 """
-vsearch = env.Command(
-    target='$out/ncbi/vsearch/vsearch.tsv',
-    source=[fa, 'data/rdp_16s_type_strains.fasta.bz2'],
-    action=('vsearch '
-            '--db ${SOURCES[1]} '
-            '--id 0.70 '
-            '--iddef 2 '  # matching cols / alignment len excluding term gaps
-            '--maxaccepts 1 '  # default is 1
-            '--maxrejects 32 '  # default is 32
-            '--mincols 350 '  # 500 (min len downloaded) * 0.70 (--query_col)
-            '--output_no_hits '
-            '--query_cov 0.70 '
-            '--strand both '
-            '--threads 14 '
-            '--top_hits_only '
-            '--usearch_global ${SOURCES[0]} '
-            '--userfields query+target+qstrand+id+tilo+tihi '
-            '--userout $TARGET'
-            ' || true'))
+cmsearch = env.Command(
+    target='$out/ncbi/extract_genbank/update_taxids/cmsearch/table.tsv',
+    source=['data/SSU_rRNA_bacteria.cm', fa],
+    action=('$infernal cmsearch --cpu 14 -E 0.01 --hmmonly -o /dev/null '
+            '--tblout $TARGET $SOURCES || true'))
 
 """
-Fix record orientation and ignore sequences with no vsearch alignments.
-
-NOTE: unknown.txt will contain records (accession.version) with ANY
-filtered 16s allele.
-
-FIXME: I think this unknown_cache should be appended not copied
+Fix record orientations
 """
-fa, seq_info, _, _ = env.Command(
-    target=['$out/ncbi/vsearch/seqs.fasta',
-            '$out/ncbi/vsearch/seq_info.csv',
-            '$out/ncbi/vsearch/unknown.fasta',
-            '$out/ncbi/vsearch/unknown.txt'],
-    source=[vsearch, fa, seq_info, '$unknown_cache'],
-    action=['vsearch.py $SOURCES $TARGETS',
-            'cp ${TARGETS[3]} $unknown_cache'])
+fa, seq_info = env.Command(
+    target=['$out/ncbi/extract_genbank/update_taxids/cmsearch/seqs.fasta',
+            '$out/ncbi/extract_genbank/update_taxids/cmsearch/seq_info.csv'],
+    source=[cmsearch, fa, seq_info],
+    action='cmsearch.py $SOURCES $TARGETS')
 
 """
 Refresh/append with older records
@@ -348,7 +320,7 @@ asm = env.Command(
     action=('wget '
             '--output-document $TARGET '
             '--retry-on-http-error 403 '
-            '--waitretry 60 '
+            '--tries 100 '
             'https://ftp.ncbi.nlm.nih.gov/'
             'genomes/genbank/assembly_summary_genbank.txt'))
 
@@ -361,7 +333,7 @@ ani = env.Command(
     action=('wget '
             '--output-document $TARGET '
             '--retry-on-http-error 403 '
-            '--waitretry 60 '
+            '--tries 100 '
             'https://ftp.ncbi.nlm.nih.gov/'
             'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
 
@@ -400,7 +372,7 @@ feather = env.Command(
 fa, seq_info = env.Command(
     target=['$out/seqs.fasta', '$out/seq_info.csv'],
     source=[fa, feather],
-    action='partition_refs.py $SOURCES $TARGETS')
+    action='partition_refs.py --drop-noaligns $SOURCES $TARGETS')
 
 raw = fa
 

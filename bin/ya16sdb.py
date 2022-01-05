@@ -24,6 +24,8 @@ SEQ_INFO_COLS = [
     'isolation_source',
     'seq_start',
     'seq_stop',
+    '16s_start',
+    '16s_stop',
     'assembly_refseq',
     'master',
     'locus_tag',
@@ -31,6 +33,8 @@ SEQ_INFO_COLS = [
 ]
 
 DTYPES = {
+    '16s_start': int,
+    '16s_stop': int,
     'accession': str,
     'ambig_count': int,
     'assembly_refseq': str,

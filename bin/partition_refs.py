@@ -33,6 +33,11 @@ def build_parser():
         '--do_not_trust',
         help='drop these sequences or tax_ids')
     f.add_argument(
+        '--drop-noaligns',
+        action='store_true',
+        help=('drop sequences that did not align '
+              'to the cmsearch covariance model'))
+    f.add_argument(
         '--inliers',
         action='store_true',
         help='choose sequences that were filtered and designated inliers')
@@ -113,9 +118,13 @@ def main():
     if args.inliers:
         info = info[info['filter_outliers'] & ~info['is_out']]
 
+    if args.drop_noaligns:
+        info = info[info['16s_stop'] != 0]
+
     if args.drop_duplicate_sequences:
         old_loci = info[
             ~info['locus_tag'].isna() &
+            ~info['assembly_genbank'].isna() &
             info['locus_tag'].isin(info['old_locus_tag'])]
         old_loci = old_loci[['seqname', 'locus_tag', 'assembly_genbank']]
         old_loci = old_loci.merge(

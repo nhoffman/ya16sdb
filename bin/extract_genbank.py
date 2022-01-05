@@ -18,6 +18,9 @@ REFERENCE_COLS = ['pubmed_id', 'title', 'authors',
 
 REFSEQ_INFO_COLS = ['seqname', 'accession', 'gi', 'seq_start', 'seq_stop']
 
+SEQ_INFO_COLS = [c for c in ya16sdb.SEQ_INFO_COLS
+                 if c not in ['16s_start', '16s_stop']]
+
 # https://www.ncbi.nlm.nih.gov/Sequin/acc.html
 REFSEQ = '[A-Z]{2}_\w+'
 ACCESSION = '[A-Z]+\d+'
@@ -56,8 +59,8 @@ def build_parser():
         help='sequences')
     parser.add_argument(
         'seq_info',
-        type=dictwriter(ya16sdb.SEQ_INFO_COLS),
-        help=str(ya16sdb.SEQ_INFO_COLS))
+        type=dictwriter(SEQ_INFO_COLS),
+        help=str(SEQ_INFO_COLS))
     parser.add_argument(
         'pubmed_info',
         type=dictwriter(PUBMED_COLS),
