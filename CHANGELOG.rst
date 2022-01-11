@@ -2,6 +2,10 @@
 Changes for ya16sdb
 ===================
 
+0.8.0
+=====
+* switching to cmsearch from vsearch to filter non-16s sequences
+
 0.7.3
 =====
 * Deduplicating WGS records by locus_tag (GL: 86)
