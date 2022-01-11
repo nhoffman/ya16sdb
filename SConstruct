@@ -59,6 +59,36 @@ def blast_db(env, sequence_file, output_base):
     return blast_out
 
 
+def taxonomy(fa, info, path):
+    """
+    Make filtered taxtable with ranked columns and no_rank rows
+    """
+    taxtable = env.Command(
+        target=os.path.join(path, 'taxonomy.csv'),
+        source=info,
+        action='$taxit taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+
+    """
+    Taxtable output replacing tax_ids with taxnames
+    """
+    lineages = env.Command(
+        target=os.path.join(path, 'lineages.csv'),
+        source=[taxtable, info],
+        action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+
+    """
+    Mothur output - https://mothur.org/wiki/Taxonomy_File
+    """
+    mothur = env.Command(
+        target=os.path.join(path, 'lineages.txt'),
+        source=[taxtable, info],
+        action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
+
+    blast = blast_db(env, fa, os.path.join(path, 'blast'))
+
+    return taxtable, lineages, mothur, blast
+
+
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
@@ -303,10 +333,7 @@ env.Command(
     source=gbs,
     action='cat $SOURCE >> $genbank_cache')
 
-"""
-taxonomy
-"""
-taxonomy = env.Command(
+taxtable = env.Command(
     target='$out/taxonomy.csv',
     source=seq_info,
     action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
@@ -345,7 +372,7 @@ feather = env.Command(
     target='$out/seq_info.feather',
     source=[
         seq_info,
-        taxonomy,
+        taxtable,
         types,
         pubmed_info,
         refseq_info,
@@ -392,33 +419,8 @@ type_fa, type_info = env.Command(
             '--prop-ambig-cutoff 0.01 '
             '$SOURCES $TARGETS'])
 
-"""
-Make sequence_from_type taxtable with all ranks included
-"""
-type_tax = env.Command(
-    target='$out/dedup/1200bp/types/taxonomy.csv',
-    source=type_info,
-    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
-
-"""
-Create taxtable output with replacing tax_ids with taxnames
-"""
-type_lineages = env.Command(
-    target='$out/dedup/1200bp/types/lineages.csv',
-    source=[type_tax, type_info],
-    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
-
-"""
-Create mothur output
-
-https://mothur.org/wiki/Taxonomy_File
-"""
-types_mothur = env.Command(
-    target='$out/dedup/1200bp/types/lineages.txt',
-    source=[type_tax, type_info],
-    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
-
-blast_db(env, type_fa, '$out/dedup/1200bp/types/blast')
+type_tax, type_lineages, types_mothur, type_blast = taxonomy(
+    type_fa, type_info, '$out/dedup/1200bp/types/')
 
 """
 filter into named set and other criteria
@@ -438,13 +440,8 @@ fa, seq_info = env.Command(
 
 named = fa
 
-"""
-Make named taxtable for filter_outliers
-"""
-taxonomy = env.Command(
-    target='$out/dedup/1200bp/named/taxonomy.csv',
-    source=seq_info,
-    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+taxtable, lineages, mothur, blast = taxonomy(
+    fa, seq_info, '$out/dedup/1200bp/named/')
 
 """
 Trimmed seqname,tax_id map file that can be easily cached by filter_outliers
@@ -455,29 +452,11 @@ taxid_map = env.Command(
     action='csvcut.py --columns seqname,tax_id --out $TARGET $SOURCE')
 
 """
-Create taxtable output with replacing tax_ids with taxnames
-"""
-lineages = env.Command(
-    target='$out/dedup/1200bp/named/lineages.csv',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
-
-"""
-Create taxtable output with replacing tax_ids with taxnames
-
-https://mothur.org/wiki/Taxonomy_File
-"""
-mothur = env.Command(
-    target='$out/dedup/1200bp/named/lineages.txt',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
-
-"""
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
 fa, details = env.Command(
-    source=[fa, taxid_map, taxonomy, '$outliers_cache'],
+    source=[fa, taxid_map, taxtable, '$outliers_cache'],
     target=['$out/dedup/1200bp/named/filtered/unsorted.fasta',
             '$out/dedup/1200bp/named/filtered/outliers.csv'],
     action=['$deenurp -vvv filter_outliers '
@@ -505,40 +484,45 @@ filter_outliers = env.Command(
     source=[feather, details],
     action=['filter_outliers.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
-"""
-Create a filtered seq_info.csv file of filter_outliers fasta
-"""
-fa, seq_info = env.Command(
-    target=['$out/dedup/1200bp/named/filtered/seqs.fasta',
-            '$out/dedup/1200bp/named/filtered/seq_info.csv'],
+taxtable, filtered_lineages, mothur, blast = taxonomy(
+    fa, seq_info, '$out/dedup/1200bp/named/filtered/')
+
+filtered_type_fa, filtered_type_info = env.Command(
+    target=['$out/dedup/1200bp/named/filtered/types/seqs.fasta',
+            '$out/dedup/1200bp/named/filtered/types/seq_info.csv'],
     source=[fa, feather],
-    action='partition_refs.py $SOURCES $TARGETS')
+    action='partition_refs.py --is_type $SOURCES $TARGETS')
 
-"""
-Make general named taxtable with all ranks included for filter_outliers
-"""
-taxonomy = env.Command(
-    target='$out/dedup/1200bp/named/filtered/taxonomy.csv',
-    source=seq_info,
-    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+filtered_type_tax, filtered_type_lineages, filtered_type_mothur, _ = taxonomy(
+    filtered_type_fa,
+    filtered_type_info,
+    '$out/dedup/1200bp/named/filtered/types/')
 
-"""
-Create taxtable output with replacing tax_ids with taxnames
-"""
-filtered_lineages = env.Command(
-    target='$out/dedup/1200bp/named/filtered/lineages.csv',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+filtered_type_hits = env.Command(
+    target='$out/dedup/1200bp/named/types_vsearch.tsv',
+    source=[named, filtered_type_fa],
+    action=('vsearch --usearch_global ${SOURCES[0]} '
+            '--blast6out $TARGET '
+            '--db ${SOURCES[1]} '
+            '--id 0.75 '
+            '--maxaccepts 5 '
+            '--self '  # reject same sequence hits
+            '--strand plus '
+            '--threads 14 '
+            '--top_hits_only'))
 
-"""
-Create mothur output
-
-https://mothur.org/wiki/Taxonomy_File
-"""
-mothur = env.Command(
-    target='$out/dedup/1200bp/named/filtered/lineages.txt',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
+filtered_type_classifications = env.Command(
+    target='$out/dedup/1200bp/named/classifications.csv',
+    source=[filtered_type_hits,
+            filtered_type_info,
+            filtered_type_tax,
+            'data/classifier_thresholds.csv'],
+    action=['classify -vv '
+            '--lineages ${SOURCES[2]} '
+            '--rank-thresholds ${SOURCES[3]} '
+            '--seq-info ${SOURCES[1]} '
+            '--out $TARGET '
+            '${SOURCES[0]}'])
 
 """
 expand taxids into descendants
@@ -586,31 +570,8 @@ fa, seq_info = env.Command(
             '${SOURCES[:2]} $TARGETS' % settings])
 Depends([fa, seq_info], filter_outliers)
 
-"""
-Make filtered taxtable with ranked columns and no_rank rows
-"""
-taxonomy = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/taxonomy.csv',
-    source=seq_info,
-    action='$taxit taxtable --seq-info $SOURCE --out $TARGET $tax_url')
-
-"""
-Taxtable output replacing tax_ids with taxnames
-"""
-lineages = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/lineages.csv',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
-
-"""
-Mothur output - https://mothur.org/wiki/Taxonomy_File
-"""
-mothur = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/lineages.txt',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
-
-blast_db(env, fa, '$out/dedup/1200bp/named/filtered/trusted/blast')
+taxtable, lineages, mothur, blast = taxonomy(
+    fa, seq_info, '$out/dedup/1200bp/named/filtered/trusted/')
 
 '''
 Pull type strains from trusted db
@@ -621,45 +582,20 @@ fa, seq_info = env.Command(
     source=[fa, feather],
     action='partition_refs.py --is_type $SOURCES $TARGETS')
 
-"""
-Make trusted type taxtable with ranked columns and no_rank rows
-"""
-taxonomy = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/types/taxonomy.csv',
-    source=seq_info,
-    action=('$taxit taxtable '
-            '--seq-info $SOURCE '
-            '--out $TARGET '
-            '$tax_url'))
 
-"""
-Create taxtable output with replacing tax_ids with taxnames
-"""
-lineages = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/types/lineages.csv',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --csv-table $TARGET $SOURCES')
-
-"""
-Mothur output
-
-https://mothur.org/wiki/Taxonomy_File
-"""
-mothur = env.Command(
-    target='$out/dedup/1200bp/named/filtered/trusted/types/lineages.txt',
-    source=[taxonomy, seq_info],
-    action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
-
-blast_db(env, fa, '$out/dedup/1200bp/named/filtered/trusted/types/blast')
+taxtable, lineages, mothur, blast = taxonomy(
+    fa, seq_info, '$out/dedup/1200bp/named/filtered/trusted/types/')
 
 '''
 find top hit for each sequence among type strains
 
 NOTE: alleles will never align with themselves (--self) BUT
 can align with other alleles in the same genome accession
+
+FIXME: use named types not trusted types
 '''
 named_type_hits = env.Command(
-    target='$out/dedup/1200bp/named/vsearch.tsv',
+    target='$out/dedup/1200bp/named/trusted_vsearch.tsv',
     source=[named, fa],
     action=('vsearch --usearch_global ${SOURCES[0]} '
             '--blast6out $TARGET '
@@ -672,7 +608,9 @@ named_type_hits = env.Command(
             '--top_hits_only'))
 
 """
-add named_type_hits match columns to feather file
+add named_type_hits match and type classifications columns to feather file
+
+DEPRECATED: Single match species columns
 """
 match_hits = env.Command(
     target='$out/.feather/match_hits.md5',
