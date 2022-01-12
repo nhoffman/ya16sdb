@@ -10,17 +10,23 @@ else
   venv=$(pwd)/$(basename $(pwd))-env
 fi
 
-# install python envs
-python3 -m venv $venv
-source $venv/bin/activate
 $venv/bin/pip3 install --requirement requirements.txt
 
 mkdir src
 
+if [[ ! -f $venv/bin/cmsearch ]]; then
+  (cd src &&
+   wget -nc --quiet http://eddylab.org/infernal/infernal-1.1.4-linux-intel-gcc.tar.gz && \
+   tar xvf infernal-1.1.4-linux-intel-gcc.tar.gz --strip-components 2 --directory $venv/bin infernal-1.1.4-linux-intel-gcc/binaries/cmsearch)
+else
+  echo "cmsearch is already installed"
+fi
+
+
 if [[ ! -f $venv/bin/makeblastdb ]]; then
   BLAST_GZ=ncbi-blast-*-x64-linux.tar.gz
   (cd src &&
-   wget -nc --user anonymous --password $(git config user.email) \
+   wget -nc --user anonymous --password anonymous \
       ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/$BLAST_GZ &&
    tar tzf $BLAST_GZ | grep makeblastdb | xargs tar xzf $BLAST_GZ --strip-components 2 --directory $venv/bin)
 else
@@ -33,7 +39,7 @@ if [[ ! -f $venv/bin/vsearch ]]; then
    tar tzf vsearch-2.13.0-linux-x86_64.tar.gz |
    grep bin/vsearch | xargs tar xzf vsearch-2.13.0-linux-x86_64.tar.gz --strip-components 2 --directory $venv/bin)
 else
-  echo "vsearch already installed: v2.13.0"
+  echo "vsearch already installed"
 fi
 
 rm -rf src
