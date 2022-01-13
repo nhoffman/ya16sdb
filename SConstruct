@@ -11,12 +11,12 @@ import os
 import SCons
 import sys
 import time
+import warnings
 
 from SCons.Script import (
         ARGUMENTS,
         GetBuildFailures,
         Depends,
-        Environment,
         Help,
         PathVariable,
         Variables,
@@ -24,9 +24,43 @@ from SCons.Script import (
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
-    sys.exit('--> an active virtualenv is required')
+    warnings.warn('No active virtualenv detected')
 if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
+
+
+class Environment(SCons.Environment.Environment):
+    def __init__(self, singularity=None, verbosity=0, **kws):
+        if singularity:
+            self.singularity = singularity
+        self.verbosity = verbosity
+        SCons.Environment.Environment.__init__(self, **kws)
+
+    def Command(self,
+                target,
+                source,
+                action,
+                singularity=None,
+                **kws):
+        if singularity and self.singularity:
+            self.Depends(target, singularity)
+            sactions = []
+            for a in self.Flatten(action):
+                sa = '{} exec {} {}'.format(self.singularity, singularity, a)
+                sactions.append(SingularityAction(a, sa, self.verbosity))
+            action = sactions
+        return SCons.Environment.Environment.Command(
+            self, target, source, action, **kws)
+
+
+class SingularityAction(SCons.Action.CommandAction):
+    def __init__(self, command, singularity, verbosity, **kw):
+        self.command = singularity if verbosity else command
+        SCons.Action.CommandAction.__init__(self, singularity, **kw)
+
+    def print_cmd_line(self, _, target, source, env):
+        c = env.subst(self.command, SCons.Subst.SUBST_RAW, target, source)
+        SCons.Action.CommandAction.print_cmd_line(self, c, target, source, env)
 
 
 def PathIsFileCreate(key, val, env):
@@ -50,8 +84,9 @@ def blast_db(env, sequence_file, output_base):
     blast_out = env.Command(
         target=[output_base + ext for ext in extensions],
         source=sequence_file,
-        action=('$blast makeblastdb -dbtype nucl '
-                '-in $SOURCE -out ' + output_base))
+        action=('makeblastdb -dbtype nucl '
+                '-in $SOURCE -out ' + output_base),
+        singularity=settings['blast'])
     env.Command(
         target=output_base,
         source=blast_out,
@@ -66,7 +101,11 @@ def taxonomy(fa, info, path):
     taxtable = env.Command(
         target=os.path.join(path, 'taxonomy.csv'),
         source=info,
-        action='$taxit taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+        action=['taxit taxtable '
+                '--seq-info $SOURCE '
+                '--out $TARGET '
+                '$tax_url'],
+        singularity=settings['taxit'])
 
     """
     Taxtable output replacing tax_ids with taxnames
@@ -74,7 +113,8 @@ def taxonomy(fa, info, path):
     lineages = env.Command(
         target=os.path.join(path, 'lineages.csv'),
         source=[taxtable, info],
-        action='$taxit lineage_table --csv-table $TARGET $SOURCES')
+        action='taxit lineage_table --csv-table $TARGET $SOURCES',
+        singularity=settings['taxit'])
 
     """
     Mothur output - https://mothur.org/wiki/Taxonomy_File
@@ -82,7 +122,8 @@ def taxonomy(fa, info, path):
     mothur = env.Command(
         target=os.path.join(path, 'lineages.txt'),
         source=[taxtable, info],
-        action='$taxit lineage_table --taxonomy-table $TARGET $SOURCES')
+        action='taxit lineage_table --taxonomy-table $TARGET $SOURCES',
+        singularity=settings['taxit'])
 
     blast = blast_db(env, fa, os.path.join(path, 'blast'))
 
@@ -123,7 +164,7 @@ environment_variables = dict(
     os.environ,
     PATH=':'.join([
         'bin',
-        os.path.join(venv, 'bin'),
+        (os.path.join(venv, 'bin') if venv else ''),
         '/usr/local/bin',
         '/usr/bin',
         '/bin']),
@@ -133,11 +174,8 @@ env = Environment(
     ENV=environment_variables,
     variables=vrs,
     shell='bash',
-    blast=settings['blast'],
-    eutils=settings['eutils'],
     infernal=settings['infernal'],
-    taxit=settings['taxit'],
-    deenurp=settings['deenurp'],
+    singularity=settings['binary']
 )
 
 env.EnsureSConsVersion(3, 0, 5)
@@ -148,8 +186,9 @@ Help(vrs.GenerateHelpText(env))
 classified = env.Command(
     source=None,
     target='$out/ncbi/classified.txt',
-    action=['$eutils %(esearch)s "%(classified)s" | '
-            '%(acc)s -out $TARGET' % settings])
+    action=['%(esearch)s "%(classified)s" | '
+            '%(acc)s -out $TARGET' % settings],
+    singularity=settings['eutils'])
 
 """
 Candidatus Saccharibacteria
@@ -158,7 +197,8 @@ https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
 tm7 = env.Command(
     source=None,
     target='$out/ncbi/tm7.txt',
-    action='$eutils %(esearch)s "%(tm7)s" | %(acc)s -out $TARGET' % settings)
+    action='%(esearch)s "%(tm7)s" | %(acc)s -out $TARGET' % settings,
+    singularity=settings['eutils'])
 
 """
 Check the cache for last download_date and download list of modified
@@ -174,10 +214,11 @@ else:
 modified = env.Command(
     source=None,
     target='$out/ncbi/modified.txt',
-    action=['$eutils %(esearch)s "(%(classified)s OR %(tm7)s) '
+    action=['%(esearch)s "(%(classified)s OR %(tm7)s) '
             'AND %(download_date)s[Modification Date] : '
             '3000[Modification Date]" | %(acc)s -out $TARGET' %
-            {'download_date': download_date, **settings}])
+            {'download_date': download_date, **settings}],
+    singularity=settings['eutils'])
 
 """
 type strains records
@@ -187,7 +228,8 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 types = env.Command(
     source=None,
     target='$out/ncbi/types.txt',
-    action='$eutils %(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings)
+    action='%(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings,
+    singularity=settings['eutils'])
 
 """
 Trim accession2taxid with 16s records and update taxids
@@ -195,11 +237,16 @@ Trim accession2taxid with 16s records and update taxids
 accession2taxid = env.Command(
     target='$out/ncbi/accession2taxid.csv',
     source=[settings['accession2taxid'], classified, tm7],
-    action=['accession2taxid.py $SOURCES | '
-            '$taxit update_taxids '
+    action='accession2taxid.py --out $TARGET $SOURCES')
+
+accession2taxid = env.Command(
+    target='$out/ncbi/accession2update_taxids.csv',
+    source=accession2taxid,
+    action=['taxit update_taxids '
             '--outfile $TARGET '
             '--unknown-action drop '
-            '- $tax_url'])
+            '$SOURCE $tax_url'],
+    singularity=settings['taxit'])
 
 """
 FIXME: call this cache_in.py (cache_out.py will replace refresh.py)
@@ -264,10 +311,11 @@ fa, seq_info = env.Command(
     target=['$out/ncbi/extract_genbank/update_taxids/seqs.fasta',
             '$out/ncbi/extract_genbank/update_taxids/seq_info.csv'],
     source=[fa, seq_info],
-    action=['$taxit update_taxids '
+    action=['taxit update_taxids '
             '--unknown-action drop '
             '${SOURCES[1]} $tax_url | '
-            'partition_refs.py ${SOURCES[0]} - $TARGETS'])
+            'partition_refs.py ${SOURCES[0]} - $TARGETS'],
+    singularity=settings['taxit'])
 
 """
 cmsearch new sequences against rfam model
@@ -275,8 +323,9 @@ cmsearch new sequences against rfam model
 cmsearch = env.Command(
     target='$out/ncbi/extract_genbank/update_taxids/cmsearch/table.tsv',
     source=['data/SSU_rRNA_bacteria.cm', fa],
-    action=('$infernal cmsearch --cpu 14 -E 0.01 --hmmonly -o /dev/null '
-            '--tblout $TARGET $SOURCES || true'))
+    action=('cmsearch --cpu 14 -E 0.01 --hmmonly -o /dev/null '
+            '--tblout $TARGET $SOURCES || true'),
+    singularity=settings['infernal'])
 
 """
 Fix record orientations
@@ -336,7 +385,8 @@ env.Command(
 taxtable = env.Command(
     target='$out/taxonomy.csv',
     source=seq_info,
-    action='$taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
+    action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url',
+    singularity=settings['taxit'])
 
 """
 Map for WGS records without a refseq assembly accession
@@ -459,7 +509,7 @@ fa, details = env.Command(
     source=[fa, taxid_map, taxtable, '$outliers_cache'],
     target=['$out/dedup/1200bp/named/filtered/unsorted.fasta',
             '$out/dedup/1200bp/named/filtered/outliers.csv'],
-    action=['$deenurp -vvv filter_outliers '
+    action=['deenurp -vvv filter_outliers '
             '--cluster-type single '
             '--detailed-seqinfo ${TARGETS[1]} '
             '--distance-percentile 90.0 '
@@ -474,7 +524,8 @@ fa, details = env.Command(
             '--strategy cluster '
             '--threads-per-job 14 '
             '${SOURCES[:3]}',
-            'cp ${TARGETS[1]} $outliers_cache'])
+            'cp ${TARGETS[1]} $outliers_cache'],
+    singularity=settings['deenurp'])
 
 """
 add distance metrics to feather file
@@ -530,7 +581,8 @@ expand taxids into descendants
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
     source=settings['trust'],
-    action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
+    action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
+    singularity=settings['taxit'])
 
 """
 expand taxids into descendants
@@ -538,7 +590,8 @@ expand taxids into descendants
 dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
-    action='$taxit get_descendants --out $TARGET $tax_url $SOURCE')
+    action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
+    singularity=settings['taxit'])
 
 trusted = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',
@@ -699,7 +752,8 @@ if release:
         source='$out',
         action=SymLink())
 
-    freeze = env.Command(
-        target='$out/requirements.txt',
-        source=venv,
-        action='pip freeze > $TARGET')
+    if venv:
+        freeze = env.Command(
+            target='$out/requirements.txt',
+            source=venv,
+            action='pip freeze > $TARGET')
