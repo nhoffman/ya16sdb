@@ -24,15 +24,14 @@ from SCons.Script import (
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
-    warnings.warn('No active virtualenv detected')
+    warnings.warn('No active virtualenv detected, using system environment')
 if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
 
 
 class Environment(SCons.Environment.Environment):
     def __init__(self, singularity=None, verbosity=0, **kws):
-        if singularity:
-            self.singularity = singularity
+        self.singularity = singularity
         self.verbosity = verbosity
         SCons.Environment.Environment.__init__(self, **kws)
 
