@@ -706,6 +706,10 @@ def write_build_status():
     """
     Create a file SUCCESS or FAILED depending on how the pipeline finishes
     """
+    if os.path.isfile('FAILED'):
+        os.remove('FAILED')
+    if os.path.isfile('SUCCESS'):
+        os.remove('SUCCESS')
     if GetBuildFailures():
         status = 'FAILED'
     else:
