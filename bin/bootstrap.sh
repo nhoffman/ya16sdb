@@ -31,6 +31,10 @@ VSEARCH_GZ=vsearch-2.13.0-linux-x86_64.tar.gz
  tar tzf $VSEARCH_GZ | \
  grep bin/vsearch | xargs tar xzf $VSEARCH_GZ --strip-components 2 --directory $venv/bin)
 
+(cd src &&
+ wget --quiet https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz &&
+ tar tzf edirect.tar.gz | grep -E 'esearch$|ecommon.sh' | xargs tar xzf edirect.tar.gz --strip-components 1 --directory $venv/bin)
+
 rm -rf src
 
 echo 'All done!'
