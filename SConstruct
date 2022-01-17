@@ -132,11 +132,12 @@ def taxonomy(fa, info, path):
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
+absolute_dir = os.path.dirname((lambda x: x).__code__.co_filename)
 conf = configparser.SafeConfigParser()
 conf.read('settings.conf')
 settings = conf['TEST'] if test else conf['DEFAULT']
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
-vrs = Variables(None, ARGUMENTS)
+vrs = Variables()
 vrs.Add('base', help='Path to output directory', default=settings['outdir'])
 vrs.Add('cache', default=os.path.join('$base', '.cache'))
 vrs.Add('out', default=out)
@@ -159,10 +160,11 @@ vrs.Add(PathVariable(
 vrs.Add(PathVariable(
     'refseq_info_cache', '', '$cache/refseq_info.csv', PathIsFileCreate))
 
+
 environment_variables = dict(
     os.environ,
     PATH=':'.join([
-        'bin',
+        os.path.join(absolute_dir, 'bin'),
         (os.path.join(venv, 'bin') if venv else ''),
         '/usr/local/bin',
         '/usr/bin',
@@ -171,9 +173,9 @@ environment_variables = dict(
 
 env = Environment(
     ENV=environment_variables,
+    pipeline=absolute_dir,
     variables=vrs,
     shell='bash',
-    infernal=settings['infernal'],
     singularity=settings['binary']
 )
 

@@ -18,6 +18,8 @@ RUN git clone https://github.com/fhcrc/taxtastic.git /usr/local/share/taxtastic 
 RUN git clone https://github.com/nhoffman/ya16sdb.git /usr/local/share/ya16sdb && \
     cd /usr/local/share/ya16sdb && bin/bootstrap.sh /usr/local/
 
-WORKDIR /usr/local/share/ya16sdb
+ADD SConstruct /usr/local/share/ya16sdb/
 
-CMD ["scons", "--dry-run"]
+ENTRYPOINT scons --file /usr/local/share/ya16sdb/SConstruct test=yes
+
+CMD ["--dry-run"]
