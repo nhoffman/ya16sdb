@@ -14,6 +14,13 @@ $venv/bin/pip3 install --requirement requirements.txt
 
 mkdir src
 
+(cd src &&
+ git clone --branch 070-python3 https://github.com/fhcrc/deenurp.git  &&
+ cd deenurp &&
+ PYTHON=$venv/bin/python3 \
+ DEENURP=$(pwd) \
+ bin/bootstrap.sh $venv)
+
 INFERNAL_GZ=infernal-1.1.4-linux-intel-gcc.tar.gz
 (cd src &&
  wget -nc --quiet http://eddylab.org/infernal/$INFERNAL_GZ &&
