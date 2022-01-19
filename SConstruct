@@ -41,11 +41,12 @@ class Environment(SCons.Environment.Environment):
                 action,
                 singularity=None,
                 **kws):
+        # if docker and self.docker:  # TODO: implement this
         if singularity and self.singularity:
             self.Depends(target, singularity)
             sactions = []
             for a in self.Flatten(action):
-                sa = '{} exec {} {}'.format(self.singularity, singularity, a)
+                sa = '{} {} {}'.format(self.singularity, singularity, a)
                 sactions.append(VirtualAction(a, sa, self.verbosity))
             action = sactions
         return SCons.Environment.Environment.Command(
