@@ -46,13 +46,13 @@ class Environment(SCons.Environment.Environment):
             sactions = []
             for a in self.Flatten(action):
                 sa = '{} exec {} {}'.format(self.singularity, singularity, a)
-                sactions.append(SingularityAction(a, sa, self.verbosity))
+                sactions.append(VirtualAction(a, sa, self.verbosity))
             action = sactions
         return SCons.Environment.Environment.Command(
             self, target, source, action, **kws)
 
 
-class SingularityAction(SCons.Action.CommandAction):
+class VirtualAction(SCons.Action.CommandAction):
     def __init__(self, command, singularity, verbosity, **kw):
         self.command = singularity if verbosity else command
         SCons.Action.CommandAction.__init__(self, singularity, **kw)
@@ -176,7 +176,7 @@ env = Environment(
     pipeline=absolute_dir,
     variables=vrs,
     shell='bash',
-    singularity=settings['binary']
+    singularity=settings['singularity']
 )
 
 env.EnsureSConsVersion(3, 0, 5)
