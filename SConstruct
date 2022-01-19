@@ -323,7 +323,7 @@ cmsearch new sequences against rfam model
 """
 cmsearch = env.Command(
     target='$out/ncbi/extract_genbank/update_taxids/cmsearch/table.tsv',
-    source=['data/SSU_rRNA_bacteria.cm', fa],
+    source=['$pipeline/data/SSU_rRNA_bacteria.cm', fa],
     action=('cmsearch --cpu 14 -E 0.01 --hmmonly -o /dev/null '
             '--tblout $TARGET $SOURCES || true'),
     singularity=settings['infernal'])
@@ -568,7 +568,7 @@ filtered_type_classifications = env.Command(
     source=[filtered_type_hits,
             filtered_type_info,
             filtered_type_tax,
-            'data/classifier_thresholds.csv'],
+            os.path.join('$pipeline', 'data/classifier_thresholds.csv')],
     action=['classify -vv '
             '--lineages ${SOURCES[2]} '
             '--rank-thresholds ${SOURCES[3]} '
@@ -699,9 +699,9 @@ git version used to generate output
 """
 commit = env.Command(
     target='$out/git_version.txt',
-    source='.git/objects',
-    action=['(echo $$(hostname):$$(pwd); '
-            'git describe --tags --dirty) > $TARGET'])
+    source=os.path.join('$pipeline', '.git/objects'),
+    action=['(echo $$(hostname):$pipeline;'
+            'git --git-dir $pipeline/.git describe --tags --dirty) > $TARGET'])
 
 
 def write_build_status():
