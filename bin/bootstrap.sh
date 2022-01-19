@@ -10,7 +10,10 @@ else
   venv=$(pwd)/$(basename $(pwd))-env
 fi
 
-$venv/bin/pip3 install --requirement requirements.txt
+bin_dir=$(dirname "$(readlink -f "$0")")
+pipeline_dir=$(dirname $bin_dir)
+
+$venv/bin/pip3 install --requirement $pipeline_dir/requirements.txt
 
 mkdir src
 
