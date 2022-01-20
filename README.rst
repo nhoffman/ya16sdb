@@ -62,3 +62,36 @@ At a high level, this pipeline does the following:
   * type strains only
   * outliers removed
   * downsampled to a subset of sequences for each species, prioritizing type strains and "published" records.
+
+Docker
+======
+
+Docker image can be built with the following:
+::
+
+  docker build --tag ya16sdb:latest .
+
+Once a Docker image has been built a Singularity image can be built using the docker daemon:
+::
+
+  singularity build ya16sdb.img docker-daemon://ya16sdb:latest
+
+A Singularity image can also be built using a Singularity Docker container:
+::
+
+  docker run --volume /var/run/:/var/run/ --volume $(pwd):$(pwd) --workdir $(pwd) singularity:latest build ya16sdb.img docker-daemon://ya16sdb:latest
+
+Pipeline execution
+------------------
+
+The virtual containers have a predefined entry point to the SConstruct pipeline file.
+
+To execute using Docker just a settings.conf file is required and can be run as follows:
+::
+
+  docker run ya16sdb:latest --volume $(pwd):$(pwd) --workdir $(pwd)
+
+And with Singularity
+::
+
+  singularity run ya16sdb.img --bind $(pwd) --pwd $(pwd)
