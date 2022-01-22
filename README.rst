@@ -89,9 +89,9 @@ The virtual containers have a predefined entry point to the SConstruct pipeline 
 To execute using Docker just a settings.conf file is required and can be run as follows:
 ::
 
-  docker run ya16sdb:latest --volume $(pwd):$(pwd) --workdir $(pwd)
+  docker run --volume $(pwd):$(pwd) --workdir $(pwd) ya16sdb:latest
 
 And with Singularity
 ::
 
-  singularity run ya16sdb.img --bind $(pwd) --pwd $(pwd)
+  singularity run --bind $(pwd) --pwd $(pwd) ya16sdb.img
