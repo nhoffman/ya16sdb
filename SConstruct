@@ -400,6 +400,7 @@ asm = env.Command(
     source=None,
     action=('wget '
             '--output-document $TARGET '
+            '--quiet '
             '--retry-on-http-error 403 '
             '--tries 100 '
             'https://ftp.ncbi.nlm.nih.gov/'
@@ -413,6 +414,7 @@ ani = env.Command(
     source=None,
     action=('wget '
             '--output-document $TARGET '
+            '--quiet '
             '--retry-on-http-error 403 '
             '--tries 100 '
             'https://ftp.ncbi.nlm.nih.gov/'
