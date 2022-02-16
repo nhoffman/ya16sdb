@@ -13,14 +13,7 @@ import sys
 import time
 import warnings
 
-from SCons.Script import (
-        ARGUMENTS,
-        GetBuildFailures,
-        Depends,
-        Help,
-        PathVariable,
-        Variables,
-        )
+from SCons.Script import ARGUMENTS, GetBuildFailures, Depends
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
@@ -40,13 +33,17 @@ class Environment(SCons.Environment.Environment):
                 source,
                 action,
                 singularity=None,
+                options=None,
                 **kws):
         # if docker and self.docker:  # TODO: implement this
         if singularity and self.singularity:
             self.Depends(target, singularity)
             sactions = []
             for a in self.Flatten(action):
-                sa = '{} {} {}'.format(self.singularity, singularity, a)
+                sa = self.singularity
+                if options:
+                    sa = '{} {}'.format(sa, options)
+                sa = '{} {} {}'.format(sa, singularity, a)
                 sactions.append(VirtualAction(a, sa, self.verbosity))
             action = sactions
         return SCons.Environment.Environment.Command(
@@ -61,19 +58,6 @@ class VirtualAction(SCons.Action.CommandAction):
     def print_cmd_line(self, _, target, source, env):
         c = env.subst(self.command, SCons.Subst.SUBST_RAW, target, source)
         SCons.Action.CommandAction.print_cmd_line(self, c, target, source, env)
-
-
-def PathIsFileCreate(key, val, env):
-    """check if Path is a cache file and
-    creating it if it does not exist."""
-    if os.path.isdir(val):
-        m = 'Path for option %s is a directory, not a file: %s'
-        raise SCons.Errors.UserError(m % (key, val))
-    if not os.path.exists(val):
-        d = os.path.dirname(val)
-        if not os.path.exists(d):
-            os.makedirs(d)
-        open(val, 'w').close()
 
 
 def blast_db(env, sequence_file, output_base):
@@ -105,7 +89,8 @@ def taxonomy(fa, info, path):
                 '--seq-info $SOURCE '
                 '--out $TARGET '
                 '$tax_url'],
-        singularity=settings['taxit'])
+        singularity=settings['taxit'],
+        options='--bind $tax_url')
 
     """
     Taxtable output replacing tax_ids with taxnames
@@ -135,32 +120,29 @@ release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
 absolute_dir = os.path.dirname((lambda x: x).__code__.co_filename)
 conf = configparser.SafeConfigParser()
-conf.read('settings.conf')
+conf.read(['settings.conf', 'ncbi.conf'])
 settings = conf['TEST'] if test else conf['DEFAULT']
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
-vrs = Variables()
-vrs.Add('base', help='Path to output directory', default=settings['outdir'])
-vrs.Add('cache', default=os.path.join('$base', '.cache'))
-vrs.Add('out', default=out)
-vrs.Add('tax_url', default=settings['taxonomy'], help='database url')
-# cache vars
-vrs.Add(PathVariable(
-    'genbank_cache', '', '$cache/records.gb', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'outliers_cache', '', '$cache/filter_outliers.csv', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'pubmed_info_cache', '', '$cache/pubmed_info.csv', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'seqs_cache', '', '$cache/seqs.fasta', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'seq_info_cache', '', '$cache/seq_info.csv', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'records_cache', '', '$cache/records.txt', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'references_cache', '', '$cache/references.csv', PathIsFileCreate))
-vrs.Add(PathVariable(
-    'refseq_info_cache', '', '$cache/refseq_info.csv', PathIsFileCreate))
+cachedir = settings.get('cachedir', os.path.join(settings['outdir'], '.cache'))
 
+cfiles = {
+    'genbank_cache': os.path.join(cachedir, 'records.gb'),
+    'outliers_cache': os.path.join(cachedir, 'filter_outliers.csv'),
+    'pubmed_info_cache': os.path.join(cachedir, 'pubmed_info.csv'),
+    'seqs_cache': os.path.join(cachedir, 'seqs.fasta'),
+    'seq_info_cache': os.path.join(cachedir, 'seq_info.csv'),
+    'records_cache': os.path.join(cachedir, 'records.txt'),
+    'references_cache': os.path.join(cachedir, 'references.csv'),
+    'refseq_info_cache': os.path.join(cachedir, 'refseq_info.gb')
+    }
+
+# create cache files if they do not exist
+for k, v in cfiles.items():
+    if not os.path.exists(v):
+        d = os.path.dirname(v)
+        if not os.path.exists(d):
+            os.makedirs(d)
+        open(v, 'w').close()
 
 environment_variables = dict(
     os.environ,
@@ -174,22 +156,33 @@ environment_variables = dict(
 
 env = Environment(
     ENV=environment_variables,
+    log=os.path.join(out, 'log.txt'),
+    out=out,
     pipeline=absolute_dir,
-    variables=vrs,
     shell='bash',
-    singularity=settings['singularity']
+    tax_url=settings['taxonomy'],
+    verbosity=1,
+    **settings
 )
 
 env.EnsureSConsVersion(3, 0, 5)
 env.Decider('MD5')
 
-Help(vrs.GenerateHelpText(env))
+mefetch = ('mefetch -vv '
+           '-api-key $api_key '
+           '-db nucleotide '
+           '-email $email '
+           '-log $log '
+           '-max-retry -1 '
+           '-mode text '
+           '-proc $nreq '
+           '-retry $retry')
 
 classified = env.Command(
     source=None,
     target='$out/ncbi/classified.txt',
-    action=['%(esearch)s "%(classified)s" | '
-            '%(acc)s -out $TARGET' % settings],
+    action=['esearch -db nucleotide -query "$classified" | ' +
+            mefetch + ' -format acc -out $TARGET'],
     singularity=settings['eutils'])
 
 """
@@ -199,7 +192,8 @@ https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
 tm7 = env.Command(
     source=None,
     target='$out/ncbi/tm7.txt',
-    action='%(esearch)s "%(tm7)s" | %(acc)s -out $TARGET' % settings,
+    action=['esearch -db nucleotide -query "$tm7" | ' +
+            mefetch + ' -format acc -out $TARGET'],
     singularity=settings['eutils'])
 
 """
@@ -207,19 +201,19 @@ Check the cache for last download_date and download list of modified
 records in order to re-download modified records that we have previously
 downloaded.
 """
-si = csv.DictReader(open(env.subst('$seq_info_cache')))
+si = csv.DictReader(open(env.subst(cfiles['seq_info_cache'])))
 si = [time.strptime(r['download_date'], '%d-%b-%Y') for r in si]
 if si:
-    download_date = time.strftime('%Y/%m/%d', sorted(si)[-1])
+    env['download_date'] = time.strftime('%Y/%m/%d', sorted(si)[-1])
 else:
-    download_date = time.strftime('%Y/%m/%d')
+    env['download_date'] = time.strftime('%Y/%m/%d')
 modified = env.Command(
     source=None,
     target='$out/ncbi/modified.txt',
-    action=['%(esearch)s "(%(classified)s OR %(tm7)s) '
-            'AND %(download_date)s[Modification Date] : '
-            '3000[Modification Date]" | %(acc)s -out $TARGET' %
-            {'download_date': download_date, **settings}],
+    action=[
+        'esearch -db nucleotide -query "($classified OR $tm7) AND '
+        'AND $download_date[Modification Date] : 3000[Modification Date]" | ' +
+        mefetch + ' -format acc -out $TARGET'],
     singularity=settings['eutils'])
 
 """
@@ -230,7 +224,8 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 types = env.Command(
     source=None,
     target='$out/ncbi/types.txt',
-    action='%(esearch)s "%(types)s" | %(acc)s -out $TARGET' % settings,
+    action=['esearch -db nucleotide -query "$types" | ' +
+            mefetch + ' -format acc -out $TARGET'],
     singularity=settings['eutils'])
 
 """
@@ -248,14 +243,16 @@ accession2taxid = env.Command(
             '--outfile $TARGET '
             '--unknown-action drop '
             '$SOURCE $tax_url'],
-    singularity=settings['taxit'])
+    singularity=settings['taxit'],
+    options='--bind $tax_url')
 
 """
 FIXME: call this cache_in.py (cache_out.py will replace refresh.py)
 """
 cache = env.Command(
     target='$out/ncbi/cache.txt',
-    source=[accession2taxid, '$seq_info_cache', modified, '$records_cache'],
+    source=[accession2taxid, cfiles['seq_info_cache'],
+            modified, cfiles['records_cache']],
     action='cache.py --out $TARGET $SOURCES')
 
 """
@@ -273,9 +270,12 @@ download genbank records
 gbs = env.Command(
     target='$out/ncbi/download.gb',
     source=download,
-    action=['%(fts)s -id $SOURCE | '
-            '%(ftract)s | '
-            '%(gbs)s -out $TARGET' % settings])
+    action=[mefetch + ' -format ft -id $SOURCE -retmax 1 | '
+            'ftract -feature "rrna:product:16S ribosomal RNA" '
+            '-log $log '
+            '-on-error continue '
+            '-min-length 1200 | ' +
+            mefetch + ' -csv -format gbwithparts -out $TARGET -retmax 1'])
 
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
@@ -317,7 +317,8 @@ fa, seq_info = env.Command(
             '--unknown-action drop '
             '${SOURCES[1]} $tax_url | '
             'partition_refs.py ${SOURCES[0]} - $TARGETS'],
-    singularity=settings['taxit'])
+    singularity=settings['taxit'],
+    options='--bind $tax_url')
 
 """
 cmsearch new sequences against rfam model
@@ -359,20 +360,20 @@ fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
             '$out/refseq_info.csv',
             '$out/records.txt'],
     source=[accession2taxid,
-            fa, '$seqs_cache',
-            seq_info, '$seq_info_cache',
-            pubmed_info, '$pubmed_info_cache',
-            references, '$references_cache',
-            refseq_info, '$refseq_info_cache',
-            no_features, '$records_cache'],
+            fa, cfiles['seqs_cache'],
+            seq_info, cfiles['seq_info_cache'],
+            pubmed_info, cfiles['pubmed_info_cache'],
+            references, cfiles['references_cache'],
+            refseq_info, cfiles['refseq_info_cache'],
+            no_features, cfiles['records_cache']],
     action=['refresh.py $SOURCES $TARGETS',
             # cache
-            'cp ${TARGETS[0]} $seqs_cache',
-            'cp ${TARGETS[1]} $seq_info_cache',
-            'cp ${TARGETS[2]} $pubmed_info_cache',
-            'cp ${TARGETS[3]} $references_cache',
-            'cp ${TARGETS[4]} $refseq_info_cache',
-            'cp ${TARGETS[5]} $records_cache'])
+            'cp ${TARGETS[0]} ' + cfiles['seqs_cache'],
+            'cp ${TARGETS[1]} ' + cfiles['seq_info_cache'],
+            'cp ${TARGETS[2]} ' + cfiles['pubmed_info_cache'],
+            'cp ${TARGETS[3]} ' + cfiles['references_cache'],
+            'cp ${TARGETS[4]} ' + cfiles['refseq_info_cache'],
+            'cp ${TARGETS[5]} ' + cfiles['records_cache']])
 
 """
 append new records to global list
@@ -382,13 +383,14 @@ TODO: create bin/dedup_gb.py for genbank record cache maintenance
 env.Command(
     target=None,
     source=gbs,
-    action='cat $SOURCE >> $genbank_cache')
+    action='cat $SOURCE >> ' + cfiles['genbank_cache'])
 
 taxtable = env.Command(
     target='$out/taxonomy.csv',
     source=seq_info,
     action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url',
-    singularity=settings['taxit'])
+    singularity=settings['taxit'],
+    options='--bind $tax_url')
 
 """
 Map for WGS records without a refseq assembly accession
@@ -467,7 +469,6 @@ type_fa, type_info = env.Command(
             '--is_species '
             '--is_type '
             '--is_valid '
-            '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '$SOURCES $TARGETS'])
 
@@ -485,7 +486,6 @@ fa, seq_info = env.Command(
             '--drop-duplicate-sequences '
             '--is_species '
             '--is_valid '
-            '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '--species-cap %(species_cap)s '
             '${SOURCES[:2]} $TARGETS' % settings))
@@ -508,7 +508,7 @@ Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
 """
 fa, details = env.Command(
-    source=[fa, taxid_map, taxtable, '$outliers_cache'],
+    source=[fa, taxid_map, taxtable, cfiles['outliers_cache']],
     target=['$out/dedup/1200bp/named/filtered/unsorted.fasta',
             '$out/dedup/1200bp/named/filtered/outliers.csv'],
     action=['deenurp -vvv filter_outliers '
@@ -517,7 +517,7 @@ fa, details = env.Command(
             '--distance-percentile 90.0 '
             '--filter-rank species '
             '--jobs 1 '
-            '--log $out/dedup/1200bp/named/filtered/deenurp.log '
+            '--log $log '
             '--max-distance 0.02 '
             '--min-distance 0.01 '
             '--min-seqs-for-filtering 5 '
@@ -526,7 +526,7 @@ fa, details = env.Command(
             '--strategy cluster '
             '--threads-per-job 14 '
             '${SOURCES[:3]}',
-            'cp ${TARGETS[1]} $outliers_cache'],
+            'cp ${TARGETS[1]} ' + cfiles['outliers_cache']],
     singularity=settings['deenurp'])
 
 """
@@ -584,7 +584,8 @@ trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
     source=settings['trust'],
     action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
-    singularity=settings['taxit'])
+    singularity=settings['taxit'],
+    options='--bind $tax_url')
 
 """
 expand taxids into descendants
@@ -593,7 +594,8 @@ dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
     action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
-    singularity=settings['taxit'])
+    singularity=settings['taxit'],
+    options='--bind $tax_url')
 
 trusted = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',
@@ -618,7 +620,6 @@ fa, seq_info = env.Command(
             '--inliers '  # filter_outliers = True & is_out = False
             '--is_species '
             '--is_valid '
-            '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '--species-cap %(species_cap)s '
             '--trusted ${SOURCES[2]} '
@@ -709,16 +710,18 @@ def write_build_status():
     """
     Create a file SUCCESS or FAILED depending on how the pipeline finishes
     """
-    if os.path.isfile('FAILED'):
-        os.remove('FAILED')
-    if os.path.isfile('SUCCESS'):
-        os.remove('SUCCESS')
+    success = os.path.join(out, 'SUCCESS')
+    failed = os.path.join(out, 'FAILED')
+    if os.path.isfile(success):
+        os.remove(success)
+    if os.path.isfile(failed):
+        os.remove(failed)
     if GetBuildFailures():
-        status = 'FAILED'
+        status = failed
     else:
-        status = 'SUCCESS'
+        status = success
     try:
-        open(os.path.join(out, status), 'w').close()
+        open(status, 'w').close()
     except FileNotFoundError:
         # scons --dry-run
         pass
@@ -754,7 +757,7 @@ if release:
     create symbolic link LATEST on directory up to point to $out dir
     '''
     latest = env.Command(
-        target=os.path.join('$base', 'LATEST'),
+        target=os.path.join('$outdir', 'LATEST'),
         source='$out',
         action=SymLink())
 
