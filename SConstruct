@@ -566,6 +566,9 @@ filtered_type_hits = env.Command(
             '--threads 14 '
             '--top_hits_only'))
 
+"""
+This output will be used in the filter plots
+"""
 filtered_type_classifications = env.Command(
     target='$out/dedup/1200bp/named/classifications.csv',
     source=[filtered_type_hits,
@@ -615,7 +618,7 @@ Same as named set with inliers and trust/no_trust records
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
-    source=[raw, feather, trusted, dnt],
+    source=[named, feather, trusted, dnt],
     action=['partition_refs.py '
             '--do_not_trust ${SOURCES[3]} '
             '--drop-duplicate-sequences '
