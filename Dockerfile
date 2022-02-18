@@ -3,8 +3,14 @@ FROM python:3.9
 RUN apt-get update && apt-get install --assume-yes --no-install-recommends \
     ca-certificates git wget
 
-# install ya16sdb pipeline
-RUN git clone https://github.com/nhoffman/ya16sdb.git /usr/local/share/ya16sdb && \
-    cd /usr/local/share/ya16sdb && bin/bootstrap.sh /usr/local/
+ADD requirements.txt /usr/local/share/ya16sdb/
+ADD bin/bootstrap.sh /usr/local/share/ya16sdb/bin/
+
+RUN cd /usr/local/share/ya16sdb && bin/bootstrap.sh /usr/local/
+
+ADD .git/ /usr/local/share/ya16sdb/.git/
+ADD data/ /usr/local/share/ya16sdb/data/
+ADD bin/ /usr/local/share/ya16sdb/bin/
+ADD SConstruct ncbi.conf /usr/local/share/ya16sdb/
 
 ENTRYPOINT ["scons", "--file", "/usr/local/share/ya16sdb/SConstruct"]
