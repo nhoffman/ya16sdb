@@ -120,7 +120,7 @@ release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
 absolute_dir = os.path.dirname((lambda x: x).__code__.co_filename)
 conf = configparser.SafeConfigParser()
-conf.read(['settings.conf', 'ncbi.conf'])
+conf.read(['settings.conf', os.path.join(absolute_dir, 'ncbi.conf')])
 settings = conf['TEST'] if test else conf['DEFAULT']
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
 cachedir = settings.get('cachedir', os.path.join(settings['outdir'], '.cache'))
