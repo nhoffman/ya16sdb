@@ -123,7 +123,7 @@ conf = configparser.SafeConfigParser()
 conf.read(['settings.conf', os.path.join(absolute_dir, 'ncbi.conf')])
 settings = conf['TEST'] if test else conf['DEFAULT']
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
-cachedir = settings.get('cachedir', os.path.join(settings['outdir'], '.cache'))
+cachedir = settings['cachedir']
 
 cfiles = {
     'genbank_cache': os.path.join(cachedir, 'records.gb'),
@@ -169,7 +169,7 @@ env.EnsureSConsVersion(3, 0, 5)
 env.Decider('MD5')
 
 mefetch = ('mefetch -vv '
-           '-api-key $api_key '
+           '-api-key $api_key '  # FIXME: what happens if no $api_key?
            '-db nucleotide '
            '-email $email '
            '-log $log '
