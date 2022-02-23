@@ -1,6 +1,6 @@
 FROM python:3.9
 
-RUN apt-get update && apt-get install --assume-yes --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install --assume-yes --no-install-recommends \
     ca-certificates git wget
 
 ADD requirements.txt /usr/local/share/ya16sdb/
@@ -13,4 +13,4 @@ ADD data/ /usr/local/share/ya16sdb/data/
 ADD bin/ /usr/local/share/ya16sdb/bin/
 ADD SConstruct ncbi.conf /usr/local/share/ya16sdb/
 
-ENTRYPOINT ["scons", "--file", "/usr/local/share/ya16sdb/SConstruct"]
+ENV SCONSFLAGS="--file /usr/local/share/ya16sdb/SConstruct"
