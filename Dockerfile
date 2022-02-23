@@ -14,3 +14,5 @@ ADD bin/ /usr/local/share/ya16sdb/bin/
 ADD SConstruct ncbi.conf /usr/local/share/ya16sdb/
 
 ENV SCONSFLAGS="--file /usr/local/share/ya16sdb/SConstruct"
+
+CMD ["scons", "--dry-run"]
