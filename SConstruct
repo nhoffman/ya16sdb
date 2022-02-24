@@ -133,7 +133,7 @@ cfiles = {
     'seq_info_cache': os.path.join(cachedir, 'seq_info.csv'),
     'records_cache': os.path.join(cachedir, 'records.txt'),
     'references_cache': os.path.join(cachedir, 'references.csv'),
-    'refseq_info_cache': os.path.join(cachedir, 'refseq_info.gb')
+    'refseq_info_cache': os.path.join(cachedir, 'refseq_info.csv')
     }
 
 # create cache files if they do not exist
