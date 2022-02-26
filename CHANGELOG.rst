@@ -2,9 +2,11 @@
 Changes for ya16sdb
 ===================
 
-0.8.0
-=====
-* switching to cmsearch from vsearch to filter non-16s sequences
+0.8.0-dev
+=========
+* Switching to cmsearch from vsearch to filter non-16s sequences
+* New pipeline Dockerfile (GH: 41)
+* Basic length and ambiguity filtering for trusted type strains (GL: 89)
 
 0.7.3
 =====
