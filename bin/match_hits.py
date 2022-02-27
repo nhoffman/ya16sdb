@@ -39,8 +39,6 @@ def main():
                 'species_name': 'match_species',
                 'species': 'match_species_id'})
     info = info.merge(vsearch, how='left', on='seqname')
-    print(info)
-    return
     matching = info[info['species'] == info['match_species_id']]
     matching = matching.drop_duplicates(subset=['seqname'], keep='first')
     not_matching = info[~info['seqname'].isin(matching['seqname'])]
