@@ -471,6 +471,7 @@ type_fa, type_info = env.Command(
             '--is_species '
             '--is_type '
             '--is_valid '
+            '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '$SOURCES $TARGETS'])
 
@@ -488,6 +489,7 @@ fa, seq_info = env.Command(
             '--drop-duplicate-sequences '
             '--is_species '
             '--is_valid '
+            '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '--species-cap %(species_cap)s '
             '${SOURCES[:2]} $TARGETS' % settings))
@@ -625,6 +627,7 @@ fa, seq_info = env.Command(
             '--inliers '  # filter_outliers = True & is_out = False
             '--is_species '
             '--is_valid '
+            '--min-length 1200 '
             '--prop-ambig-cutoff 0.01 '
             '--species-cap %(species_cap)s '
             '--trusted ${SOURCES[2]} '
