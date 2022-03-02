@@ -2,11 +2,12 @@
 Changes for ya16sdb
 ===================
 
-0.8.0-dev
-=========
+0.8.0
+=====
 * Switching to cmsearch from vsearch to filter non-16s sequences
 * New pipeline Dockerfile (GH: 41)
 * Basic length and ambiguity filtering for trusted type strains (GL: 89)
+* Dash app replaces match_species with type_classification (GH: 49)
 
 0.7.3
 =====
