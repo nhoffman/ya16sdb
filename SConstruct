@@ -581,8 +581,18 @@ filtered_type_classifications = env.Command(
             '--lineages ${SOURCES[2]} '
             '--rank-thresholds ${SOURCES[3]} '
             '--seq-info ${SOURCES[1]} '
+            '--starred 101 '
             '--out $TARGET '
             '${SOURCES[0]}'])
+
+"""
+Adds type_classification to feather file for Dash application
+"""
+type_classifications = env.Command(
+    target='$out/.feather/type_classifications.md5',
+    source=[feather, filtered_type_classifications],
+    action=['type_classifications.py $SOURCES',
+            'md5sum ${SOURCES[0]} > $TARGET'])
 
 """
 expand taxids into descendants
@@ -672,9 +682,9 @@ named_type_hits = env.Command(
             '--top_hits_only'))
 
 """
-add named_type_hits match and type classifications columns to feather file
-
-DEPRECATED: Single match species columns
+Creates match_seqname, match_pct, match_version, match_species and
+match_species_id columns for best type strain hits from the trusted
+dataset
 """
 match_hits = env.Command(
     target='$out/.feather/match_hits.md5',

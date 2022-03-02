@@ -82,8 +82,8 @@ def write_layout():
     set_global_data()
     genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
     genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
-    axes = ['confidence', 'dist_pct', 'x', 'y', 'match_pct',
-            'match_species', 'match_version', 'rank_order']
+    axes = ['confidence', 'dist_pct', 'x', 'y',
+            'type_classification', 'rank_order']
     return dash.html.Div(
         style={'width': 1175},
         children=[
@@ -164,7 +164,8 @@ def write_layout():
                         children=[
                             dash.dcc.Markdown(children=['**Outliers**']),
                             dash.dcc.Markdown(children=['**Confidence**']),
-                            dash.dcc.Markdown(children=['**Match Species**']),
+                            dash.dcc.Markdown(
+                                children=['**Type Classification**']),
                             dash.dcc.Markdown(children=['**ANI Tax Check**']),
                             dash.dcc.Markdown(children=['**ANI Species**']),
                             dash.dcc.Markdown(
@@ -180,7 +181,7 @@ def write_layout():
                         options=[
                             {'label': '', 'value': 'is_out'},
                             {'label': '', 'value': 'confidence'},
-                            {'label': '', 'value': 'match_species'},
+                            {'label': '', 'value': 'type_classification'},
                             {'label': '', 'value': 'taxonomy-check-status'},
                             {'label': '', 'value': 'best-match-species-name'},
                             {'label': '', 'value': 'isolation_source'}],
@@ -194,7 +195,7 @@ def write_layout():
                         options=[
                             {'label': '', 'value': 'is_out'},
                             {'label': '', 'value': 'confidence'},
-                            {'label': '', 'value': 'match_species'},
+                            {'label': '', 'value': 'type_classification'},
                             {'label': '', 'value': 'taxonomy-check-status'},
                             {'label': '', 'value': 'best-match-species-name'},
                             {'label': '', 'value': 'isolation_source'}],
@@ -212,7 +213,7 @@ def write_layout():
                                 id='confidence-selection',
                                 multi=True),
                             dash.dcc.Dropdown(
-                                id='match-species-selection',
+                                id='type-classification-selection',
                                 multi=True),
                             dash.dcc.Dropdown(
                                 id='taxcheck-selection',
@@ -236,7 +237,7 @@ def write_layout():
                                 id='confidence-visibility',
                                 multi=True),
                             dash.dcc.Dropdown(
-                                id='match-species-visibility',
+                                id='type-classification-visibility',
                                 multi=True),
                             dash.dcc.Dropdown(
                                 id='taxcheck-visibility',
@@ -313,7 +314,7 @@ def assign_hover_text(s):
         text = ('seqname: {seqname}<br>'
                 'accession: {version}<br>'
                 'modified_date: {modified_date}<br>'
-                'match_species: {match_species}<br>'
+                'type_classification: {type_classification}<br>'
                 'ani_tax_check: {taxonomy-check-status}<br>'
                 'ani_species: {best-match-species-name}<br>'
                 'isolation source: {isolation_source}'.format(**s))
@@ -503,29 +504,29 @@ def update_isolation_visiblity(tax_id):
 
 
 @app.callback(
-    Output('match-species-selection', 'options'),
+    Output('type-classification-selection', 'options'),
     [Input('species-column', 'value')])
-def update_match_species_selection(tax_id):
+def update_type_classification_selection(tax_id):
     '''
     '''
     dff = df[df['species'] == tax_id]
-    match_species = dff['match_species']
+    type_classification = dff['type_classification']
     options = []
-    for k, v in match_species.value_counts().items():
+    for k, v in type_classification.value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
     return options
 
 
 @app.callback(
-    Output('match-species-visibility', 'options'),
+    Output('type-classification-visibility', 'options'),
     [Input('species-column', 'value')])
-def update_match_species_visibility(tax_id):
+def update_type_classification_visibility(tax_id):
     '''
     '''
     dff = df[df['species'] == tax_id]
-    match_species = dff['match_species']
+    type_classification = dff['type_classification']
     options = []
-    for k, v in match_species.value_counts().items():
+    for k, v in type_classification.value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
     return options
 
@@ -668,21 +669,21 @@ def update_isolation_source_visiblity_value(_, state, search):
 
 
 @app.callback(
-    Output('match-species-selection', 'value'),
+    Output('type-classification-selection', 'value'),
     [Input('species-column', 'value')],
     [State('state', 'data'),
      State('url', 'search')])
-def update_match_species_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_match_species')
+def update_type_classification_selection_value(_, state, search):
+    return parse_multi(state, search, 'selection_type_classification')
 
 
 @app.callback(
-    Output('match-species-visibility', 'value'),
+    Output('type-classification-visibility', 'value'),
     [Input('species-column', 'value')],
     [State('state', 'data'),
      State('url', 'search')])
-def update_match_species_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_match_species')
+def update_type_classification_visibility_value(_, state, search):
+    return parse_multi(state, search, 'visibility_type_classification')
 
 
 @app.callback(
@@ -781,8 +782,8 @@ def update_symbol_items(search):
      Input('year--slider', 'value'),
      Input('isolation-source-visibility', 'value'),
      Input('isolation-source-selection', 'value'),
-     Input('match-species-visibility', 'value'),
-     Input('match-species-selection', 'value'),
+     Input('type-classification-visibility', 'value'),
+     Input('type-classification-selection', 'value'),
      Input('taxcheck-visibility', 'value'),
      Input('taxcheck-selection', 'value'),
      Input('ani-species-visibility', 'value'),
@@ -830,7 +831,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     if viso_source:
         dff = dff[dff['isolation_source'].isin(viso_source)]
     if vmatch:
-        dff = dff[dff['match_species'].isin(vmatch)]
+        dff = dff[dff['type_classification'].isin(vmatch)]
     if vani:
         dff = dff[dff['best-match-species-name'].isin(vani)]
     if vout:
@@ -848,7 +849,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     if siso_source:
         dff.loc[dff['isolation_source'].isin(siso_source), 'selected'] = True
     if smatch:
-        dff.loc[dff['match_species'].isin(smatch), 'selected'] = True
+        dff.loc[dff['type_classification'].isin(smatch), 'selected'] = True
     if sani:
         dff.loc[dff['best-match-species-name'].isin(sani), 'selected'] = True
     if sout:
@@ -919,8 +920,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             'height': 900,
             'hovermode': 'closest',
             'margin': {
-                'b': 200 if xaxis == 'match_species' else None,
-                'l': 200 if yaxis == 'match_species' else None
+                'b': 200 if xaxis == 'type_classification' else None,
+                'l': 200 if yaxis == 'type_classification' else None
                 },
             'showlegend': True,
             'title': '{}, tax_id {} outliers: {} ({:.0%}), total: {}'.format(
@@ -932,13 +933,13 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             'xaxis': {
                 'scaleanchor': 'y' if xaxis == 'x' else None,
                 'title': xaxis,
-                'showgrid': True if xaxis == 'match_species' else False,
+                'showgrid': True if xaxis == 'type_classification' else False,
                 'range': x_range
             },
             'yaxis': {
                 'scaleanchor': 'x' if yaxis == 'y' else None,
                 'title': yaxis,
-                'showgrid': True if yaxis == 'match_species' else False,
+                'showgrid': True if yaxis == 'type_classification' else False,
                 'range': y_range
             }
         }}
@@ -970,7 +971,7 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
     Output('table-div', 'children'),
     [Input('plot', 'selectedData'),
      Input('isolation-source-selection', 'value'),
-     Input('match-species-selection', 'value'),
+     Input('type-classification-selection', 'value'),
      Input('ani-species-selection', 'value'),
      Input('outliers-selection', 'value'),
      Input('confidence-selection', 'value')],
@@ -993,7 +994,7 @@ def update_table(selected, iso, match, ani, outliers, confidence,
         if iso:
             irows |= dff['isolation_source'].isin(iso)
         if match:
-            irows |= dff['match_species'].isin(match)
+            irows |= dff['type_classification'].isin(match)
         if ani:
             irows |= dff['best-match-species-name'].isin(ani)
         if outliers:
@@ -1019,8 +1020,8 @@ def update_table(selected, iso, match, ani, outliers, confidence,
         'padding': 10,
         'border-bottom': '1px solid #ddd',
         'text-align': 'left'}
-    cols = ['seqname', 'is_type', 'dist_pct', 'outlier', 'match_species',
-            'match_pct', 'ani_tax_check', 'ani_species', 'ani_pct']
+    cols = ['seqname', 'is_type', 'dist_pct', 'outlier', 'type_classification',
+            'ani_tax_check', 'ani_species', 'ani_pct']
     trs = [dash.html.Tr(children=[
         dash.html.Th(children=[c], style=TABLE_STYLE) for c in cols])]
     for r in rows.to_dict('records'):
@@ -1033,12 +1034,6 @@ def update_table(selected, iso, match, ani, outliers, confidence,
                     children=r[c],
                     target='_blank',
                     title=r['description'])
-            elif c == 'match_species' and r[c] is not None:
-                cell = dash.html.A(
-                    href=('https://www.ncbi.nlm.nih.gov/nuccore/' +
-                          r['match_version']),
-                    children=r[c],
-                    target='_blank')
             elif c == 'ani_species':
                 if r['best-match-type-assembly']:
                     cell = dash.html.A(
