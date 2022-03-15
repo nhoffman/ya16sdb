@@ -18,7 +18,7 @@ $venv/bin/pip3 install --requirement $pipeline_dir/requirements.txt
 mkdir src
 
 (cd src &&
- git clone --branch 070-python3 https://github.com/fhcrc/deenurp.git  &&
+ git clone --branch 0.3.0 https://github.com/fhcrc/deenurp.git  &&
  cd deenurp &&
  PYTHON=$venv/bin/python3 \
  DEENURP=$(pwd) \
