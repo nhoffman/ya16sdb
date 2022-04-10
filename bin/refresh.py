@@ -120,10 +120,14 @@ def main():
     # combine seq_info files
     seq_info = prev_seq_info.append(new_seq_info)
 
-    # remove anything dropped from ncbi
+    # remove anything dropped from ncbi or suddenly without features
     ncbi = pandas.read_csv(
         args.ncbi, dtype=str, squeeze=True, usecols=['version'])
     seq_info = seq_info[seq_info['version'].isin(ncbi)]
+
+    # remove anything that previously had features but now does not
+    no_features = set(ya16sdb.open_clean(args.no_features))
+    seq_info = seq_info[~seq_info['version'].isin(no_features)]
 
     # include with records_out
     current_records = set(v for v in seq_info['version'].tolist())
@@ -210,12 +214,12 @@ def main():
     up to this point
     '''
     versions = set(seq_info['version'].tolist())
-    versions |= set(ya16sdb.open_clean(args.no_features))
+    versions |= no_features
     versions |= current_records
     versions |= previous_records
 
     with open(args.records_out, 'w') as records_out:
-        records_out.write('\n'.join(sorted(versions)))
+        records_out.write('\n'.join(sorted(versions)) + '\n')
 
 
 class DuplicateSeqnameError(Exception):
