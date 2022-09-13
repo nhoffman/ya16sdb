@@ -41,6 +41,7 @@ class Environment(SCons.Environment.Environment):
             sactions = []
             for a in self.Flatten(action):
                 sa = self.singularity
+                sa = '{} --bind $pipeline'.format(sa)
                 if options:
                     sa = '{} {}'.format(sa, options)
                 sa = '{} {} {}'.format(sa, singularity, a)
@@ -160,7 +161,7 @@ env = Environment(
     out=out,
     pipeline=absolute_dir,
     shell='bash',
-    tax_url=settings['taxonomy'],
+    tax_url=os.path.abspath(settings['taxonomy']),
     verbosity=1,
     **settings
 )
@@ -247,6 +248,14 @@ accession2taxid = env.Command(
     options='--bind $tax_url')
 
 """
+Create a list of cached records removing:
+
+1. Modified records
+2. Records not included in esearch query
+3. Records with new tax_ids
+
+Modified and records with new tax_ids will be redownloaded
+
 FIXME: call this cache_in.py (cache_out.py will replace refresh.py)
 """
 cache = env.Command(
@@ -566,7 +575,8 @@ filtered_type_hits = env.Command(
             '--self '  # reject same sequence hits
             '--strand plus '
             '--threads 14 '
-            '--top_hits_only'))
+            '--top_hits_only'),
+    singularity=settings['vsearch'])
 
 """
 This output will be used in the filter plots
@@ -679,7 +689,8 @@ named_type_hits = env.Command(
             '--self '  # reject same sequence hits
             '--strand plus '
             '--threads 14 '
-            '--top_hits_only'))
+            '--top_hits_only'),
+    singularity=settings['deenurp'])
 
 """
 Creates match_seqname, match_pct, match_version, match_species and

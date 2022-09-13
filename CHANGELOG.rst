@@ -2,6 +2,10 @@
 Changes for ya16sdb
 ===================
 
+0.8.1
+=====
+* records are re-downloaded if their tax_ids have changed (GL: 100)
+
 0.8.0
 =====
 * Switching to cmsearch from vsearch to filter non-16s sequences
