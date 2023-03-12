@@ -4,8 +4,11 @@ name: Build and push docker images
 #   push:
 #     tags: [ '*.*.*' ]
 
+# on:
+#   - workflow_dispatch
+
 on:
-  - workflow_dispatch
+  - push
 
 jobs:
   push_to_registry:
