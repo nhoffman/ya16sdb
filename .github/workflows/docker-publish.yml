@@ -30,6 +30,8 @@ jobs:
         run: echo "${{ env.GIT_DESC }}"
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  #fetch all history, required for 'git describe'
       - name: Set GIT_DESC
         run: echo "GIT_DESC=$(git describe --tags)" >> $GITHUB_ENV
       - name: Set up Docker Buildx
