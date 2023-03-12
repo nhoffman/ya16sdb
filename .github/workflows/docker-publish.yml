@@ -17,9 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile: ./Dockerfile
-            context: .
-            image: ghcr.io/${{ github.repository_owner }}/ya16sdb
+          # - dockerfile: ./Dockerfile
+          #   context: .
+          #   image: ghcr.io/${{ github.repository_owner }}/ya16sdb
           - dockerfile: ./dash/Dockerfile
             image: ghcr.io/${{ github.repository_owner }}/ya16sdb-app
             context: ./dash
