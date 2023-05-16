@@ -5,7 +5,7 @@ on:
     tags: [ '*.*.*' ]
 
 jobs:
-  push_to_registry:
+  build_pipeline_image:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
