@@ -10,6 +10,9 @@ RUN /usr/local/share/venv/bin/python -m pip install -r requirements.txt
 
 COPY app.py data.py entrypoint.sh filter_details.feather.gz .
 
+ARG VERSION
+ENV VERSION ${VERSION}
+
 EXPOSE 8000
 ENTRYPOINT ["/opt/run/entrypoint.sh"]
 CMD ["run"]
