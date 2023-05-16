@@ -7,8 +7,11 @@ import data
 import os
 import pandas
 import urllib
+import logging
 
 from dash.dependencies import Input, State, Output
+
+log = logging.getLogger(__name__)
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']

@@ -32,7 +32,7 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
 
     """
 
-    log.info('reading data from {}'.format(pathspec))
+    log.warning('reading data from {}'.format(pathspec))
     if pathspec.startswith('s3://'):
         s3_bucket, s3_key = pathspec.replace('s3://', '').split('/', 1)
         if aws_access_key_id:

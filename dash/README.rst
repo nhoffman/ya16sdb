@@ -51,3 +51,7 @@ Run the application from Docker::
 
   docker run --platform=linux/amd64 --rm -p 8000:8000 ya16sdb
 
+Or from an image hosted on GitHub Container Registry::
+
+  docker run --platform=linux/amd64 --rm -p 8000:8000 ghcr.io/nhoffman/ya16sdb-app:latest
+
