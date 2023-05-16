@@ -1,8 +1,0 @@
----
-
-AWS_PROFILE: saml
-APPNAME: ya16sdb
-HOSTNAME: ya16sdb.labmed.uw.edu
-STACK_NAME: "{{ APPNAME }}-data-stack"
-S3_BUCKET: "{{ APPNAME }}-data"
-DATA_FILE: s3://{{ S3_BUCKET }}/filter_details.feather.gz
