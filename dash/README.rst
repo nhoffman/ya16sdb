@@ -45,7 +45,7 @@ Docker
 
 Building a Docker image::
 
-  docker build --platform=linux/amd64 . -t ya16sdb
+  docker build --platform=linux/amd64 . -t ya16sdb --build-arg VERSION=$(git describe --tags)
 
 Run the application from Docker::
 
