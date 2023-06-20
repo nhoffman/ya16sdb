@@ -89,9 +89,7 @@ def taxonomy(fa, info, path):
         action=['taxit taxtable '
                 '--seq-info $SOURCE '
                 '--out $TARGET '
-                '$tax_url'],
-        singularity=settings['taxit'],
-        options='--bind $tax_url')
+                '$tax_url'])
 
     """
     Taxtable output replacing tax_ids with taxnames
@@ -99,8 +97,7 @@ def taxonomy(fa, info, path):
     lineages = env.Command(
         target=os.path.join(path, 'lineages.csv'),
         source=[taxtable, info],
-        action='taxit lineage_table --csv-table $TARGET $SOURCES',
-        singularity=settings['taxit'])
+        action='taxit lineage_table --csv-table $TARGET $SOURCES')
 
     """
     Mothur output - https://mothur.org/wiki/Taxonomy_File
@@ -108,8 +105,7 @@ def taxonomy(fa, info, path):
     mothur = env.Command(
         target=os.path.join(path, 'lineages.txt'),
         source=[taxtable, info],
-        action='taxit lineage_table --taxonomy-table $TARGET $SOURCES',
-        singularity=settings['taxit'])
+        action='taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
     blast = blast_db(env, fa, os.path.join(path, 'blast'))
 
@@ -243,9 +239,7 @@ accession2taxid = env.Command(
     action=['taxit update_taxids '
             '--outfile $TARGET '
             '--unknown-action drop '
-            '$SOURCE $tax_url'],
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+            '$SOURCE $tax_url'])
 
 """
 Create a list of cached records removing:
@@ -325,9 +319,7 @@ fa, seq_info = env.Command(
     action=['taxit update_taxids '
             '--unknown-action drop '
             '${SOURCES[1]} $tax_url | '
-            'partition_refs.py ${SOURCES[0]} - $TARGETS'],
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+            'partition_refs.py ${SOURCES[0]} - $TARGETS'])
 
 """
 cmsearch new sequences against rfam model
@@ -397,9 +389,7 @@ env.Command(
 taxtable = env.Command(
     target='$out/taxonomy.csv',
     source=seq_info,
-    action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url',
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Map for WGS records without a refseq assembly accession
@@ -610,9 +600,7 @@ expand taxids into descendants
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
     source=settings['trust'],
-    action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 """
 expand taxids into descendants
@@ -620,9 +608,7 @@ expand taxids into descendants
 dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
-    action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 trusted = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',

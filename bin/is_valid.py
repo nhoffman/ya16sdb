@@ -29,7 +29,7 @@ def main():
     meta = sqlalchemy.MetaData()
     meta.reflect(bind=engine)
     nodes = meta.tables['nodes']
-    s = sqlalchemy.select([nodes.c.tax_id]).where(nodes.c.is_valid)
+    s = sqlalchemy.select(nodes.c.tax_id).where(nodes.c.is_valid)
     named = set(i[0] for i in conn.execute(s))
     info['is_valid'] = False
     info.loc[info['tax_id'].isin(named), 'is_valid'] = True
