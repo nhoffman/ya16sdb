@@ -64,10 +64,11 @@ def main():
         args.asm,
         dtype=str,
         header=1,
+        na_values=['na'],
         sep='\t',
-        usecols=['wgs_master', '# assembly_accession'])
+        usecols=['wgs_master', '#assembly_accession'])
     asm_map = asm_map.rename(
-        columns={'# assembly_accession': 'assembly_genbank'})
+        columns={'#assembly_accession': 'assembly_genbank'})
     asm_map = asm_map[~asm_map['wgs_master'].isna()]
     asm_map['wgs_prefix'] = asm_map['wgs_master'].apply(
         lambda x: extract_wgs_master_prefix(x))
