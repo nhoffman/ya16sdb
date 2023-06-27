@@ -94,8 +94,8 @@ def write_layout():
                     str(df['download_date'].max().strftime('%A, %B %d, %Y'))
                 ],
                 style={
-                    'text-align': 'right',
-                    'font-style': 'italic',
+                    'textAlign': 'right',
+                    'fontStyle': 'italic',
                     'height': 0,
                     'width': '100%'}),
             dash.html.Div(
@@ -109,8 +109,8 @@ def write_layout():
                 children=['**Genus**'],
                 style={
                     'display': 'inline-block',
-                    'text-align': 'center',
-                    'vertical-align': 'middle',
+                    'textAlign': 'center',
+                    'verticalAlign': 'middle',
                     'width': '5%'}),
             dash.html.Div(
                 children=[
@@ -120,21 +120,21 @@ def write_layout():
                         clearable=False)],
                 style={
                     'display': 'inline-block',
-                    'vertical-align': 'middle',
+                    'verticalAlign': 'middle',
                     'width': '40%'}),
             dash.dcc.Markdown(
                 children=['**Species**'],
                 style={
                     'display': 'inline-block',
-                    'text-align': 'center',
-                    'vertical-align': 'middle',
+                    'textAlign': 'center',
+                    'verticalAlign': 'middle',
                     'width': '6%'}),
             dash.html.Div(
                 children=[
                     dash.dcc.Dropdown(id='species-column', clearable=False)],
                 style={
                     'display': 'inline-block',
-                    'vertical-align': 'middle',
+                    'verticalAlign': 'middle',
                     'width': '48%'}),
             dash.html.Div(
                 children=[
@@ -172,7 +172,7 @@ def write_layout():
                                 children=['**Isolation Source**']),
                             ],
                         style={
-                            'vertical-align': 'middle',
+                            'verticalAlign': 'middle',
                             'width': '11%',
                             'display': 'inline-block',
                             }),
@@ -187,7 +187,7 @@ def write_layout():
                             {'label': '', 'value': 'isolation_source'}],
                         inputStyle={'height': 15, 'width': 15, 'margin': 11},
                         style={
-                            'vertical-align': 'middle',
+                            'verticalAlign': 'middle',
                             'width': '5%',
                             'display': 'inline-block'}),
                     dash.dcc.RadioItems(
@@ -201,7 +201,7 @@ def write_layout():
                             {'label': '', 'value': 'isolation_source'}],
                         inputStyle={'height': 15, 'width': 15, 'margin': 11},
                         style={
-                            'vertical-align': 'middle',
+                            'verticalAlign': 'middle',
                             'width': '5%',
                             'display': 'inline-block'}),
                     dash.html.Div(
@@ -225,7 +225,7 @@ def write_layout():
                                 id='isolation-source-selection',
                                 multi=True)],
                         style={
-                            'vertical-align': 'middle',
+                            'verticalAlign': 'middle',
                             'width': '39%',
                             'display': 'inline-block'}),
                     dash.html.Div(
@@ -249,7 +249,7 @@ def write_layout():
                                 id='isolation-source-visibility',
                                 multi=True)],
                         style={
-                            'vertical-align': 'middle',
+                            'verticalAlign': 'middle',
                             'width': '39%',
                             'display': 'inline-block'})],
                 style={
@@ -259,14 +259,14 @@ def write_layout():
                     'padding': 10,
                     'width': '97%'}),
             dash.html.Div(
-                children=[dash.dcc.Slider(id='year--slider')],
+                children=[dash.dcc.Slider(id='year--slider', marks=None)],
                 style={'margin': 15, 'width': '95%'}),
             dash.dcc.Markdown(
                 children=['**Axes**'],
                 style={
                     'display': 'inline-block',
-                    'text-align': 'center',
-                    'vertical-align': 'middle',
+                    'textAlign': 'center',
+                    'verticalAlign': 'middle',
                     'width': '4%'}),
             dash.html.Div(
                 children=[
@@ -277,7 +277,7 @@ def write_layout():
                 style={
                     'width': '14%',
                     'display': 'inline-block',
-                    'vertical-align': 'middle'}),
+                    'verticalAlign': 'middle'}),
             dash.html.Div(
                 children=[
                     dash.dcc.Dropdown(
@@ -287,7 +287,7 @@ def write_layout():
                 style={
                     'width': '14%',
                     'display': 'inline-block',
-                    'vertical-align': 'middle'}),
+                    'verticalAlign': 'middle'}),
             dash.dcc.Graph(id='plot'),
             dash.html.Table(
                 id='table-div',
@@ -297,7 +297,7 @@ def write_layout():
                     'display': 'inline-block',
                     'height': 413,
                     'margin': 5,
-                    'overflow-y': 'scroll',
+                    'overflowY': 'scroll',
                     'padding': 10,
                     'width': '97%'})])
 
@@ -1018,8 +1018,8 @@ def update_table(selected, iso, match, ani, outliers, confidence,
     TABLE_STYLE = {
         'width': 500,
         'padding': 10,
-        'border-bottom': '1px solid #ddd',
-        'text-align': 'left'}
+        'borderBottom': '1px solid #ddd',
+        'textAlign': 'left'}
     cols = ['seqname', 'is_type', 'dist_pct', 'outlier', 'type_classification',
             'ani_tax_check', 'ani_species', 'ani_pct']
     trs = [dash.html.Tr(children=[
