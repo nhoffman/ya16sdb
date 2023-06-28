@@ -5,6 +5,7 @@ Changes for ya16sdb
 0.8.2
 =====
 * Update to new NCBI assembly_summary_genbank.txt format
+* Other pipeline requirement updates
 
 0.8.1
 =====
