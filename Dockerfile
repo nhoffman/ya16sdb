@@ -1,4 +1,4 @@
-FROM python:3.9-bookworm
+FROM python:3.9.17-bookworm
 
 RUN apt-get update && apt-get upgrade -y && apt-get install --assume-yes --no-install-recommends \
     ca-certificates git wget
