@@ -1,4 +1,4 @@
-FROM python:3.10.12-bookworm
+FROM python:3.9-bookworm
 
 RUN apt-get update && apt-get upgrade -y && apt-get install --assume-yes --no-install-recommends \
     ca-certificates git wget
@@ -7,7 +7,7 @@ ADD requirements.txt /usr/local/share/ya16sdb/
 ADD bin/bootstrap.sh /usr/local/share/ya16sdb/bin/
 
 WORKDIR /usr/local/share/ya16sdb/
-RUN /bin/bash -c "bin/bootstrap.sh /usr/local/"
+RUN ["/bin/bash", "-c", "bin/bootstrap.sh /usr/local/"]
 
 ADD .git/ /usr/local/share/ya16sdb/.git/
 ADD data/ /usr/local/share/ya16sdb/data/
