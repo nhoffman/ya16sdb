@@ -7,7 +7,7 @@ ADD requirements.txt /usr/local/share/ya16sdb/
 ADD bin/bootstrap.sh /usr/local/share/ya16sdb/bin/
 
 WORKDIR /usr/local/share/ya16sdb/
-RUN ["/bin/bash", "-c", "bin/bootstrap.sh /usr/local/"]
+RUN ["/bin/bash", "-c", "bin/bootstrap.sh", "/usr/local/"]
 
 ADD .git/ /usr/local/share/ya16sdb/.git/
 ADD data/ /usr/local/share/ya16sdb/data/
