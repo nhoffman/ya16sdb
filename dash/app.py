@@ -302,7 +302,21 @@ def write_layout():
                     'margin': 5,
                     'overflowY': 'scroll',
                     'padding': 10,
-                    'width': '97%'})])
+                    'width': '97%'}),
+            dash.html.A(
+                os.environ.get(
+                    'VERSION',
+                    'github.com/nhoffman/ya16sdb'),
+                href='https://github.com/nhoffman/'
+                     'ya16sdb/pkgs/container/ya16sdb-app',
+                style={
+                    'display': 'inline-block',
+                    'textAlign': 'center',
+                    'verticalAlign': 'middle',
+                    'width': '100%',
+                    'textDecoration': 'none'},
+                target='_blank')
+                ])
 
 
 app.layout = write_layout
