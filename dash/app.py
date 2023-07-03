@@ -306,7 +306,7 @@ def write_layout():
             dash.html.A(
                 os.environ.get(
                     'VERSION',
-                    'github.com/nhoffman/ya16sdb'),
+                    'github.com/nhoffman/ya16sdb/dash'),
                 href='https://github.com/nhoffman/'
                      'ya16sdb/pkgs/container/ya16sdb-app',
                 style={
