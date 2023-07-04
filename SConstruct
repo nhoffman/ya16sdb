@@ -212,7 +212,7 @@ modified = env.Command(
     source=None,
     target='$out/ncbi/modified.txt',
     action=[
-        'esearch -db nucleotide -query "($classified OR $tm7) AND '
+        'esearch -db nucleotide -query "($classified OR $tm7) '
         'AND $download_date[Modification Date] : 3000[Modification Date]" | ' +
         mefetch + ' -format acc -out $TARGET'],
     singularity=settings['eutils'])
