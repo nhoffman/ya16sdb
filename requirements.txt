@@ -1,7 +1,7 @@
 biopython==1.79
-medirect==0.22.0
+medirect==0.23.0
 moose-classifier==0.9
-pandas==1.4.1
+pandas==1.3.5
 psycopg2-binary==2.9.3
 pyarrow==12.0.1
 SCons==4.5.2
