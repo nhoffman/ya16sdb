@@ -5,20 +5,16 @@ select species.
 
 """
 
+import boto3
 import datetime
 import gzip
 import io
 import os
+import pandas as pd
 import sys
 import argparse
 import logging
 
-import pandas as pd
-
-try:
-    import boto3
-except ImportError:
-    pass
 
 log = logging.getLogger(__name__)
 
@@ -103,5 +99,3 @@ def main(arguments):
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
-
-
