@@ -18,6 +18,7 @@ COLORS = ['blue', 'red', 'black', 'yellow',
 DEFAULT_COLOR = 'is_out'
 DEFAULT_SHAPE = 'confidence'
 DEFAULT_GENUS = '1350'  # Enterococcus
+DEFAULT_GENUS_NAME = 'Enterococcus'
 DEFAULT_SPECIES = '1351'  # Enterococcus faecalis
 DEFAULT_Y = 'y'
 DEFAULT_X = 'x'
@@ -82,9 +83,8 @@ def write_layout():
     This is done using a function so Dash will not cache it allowing us to
     update the underlining data.
     '''
-    set_global_data()
-    genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
-    genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
+    # genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
+    # genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
     axes = ['confidence', 'dist_pct', 'x', 'y',
             'type_classification', 'rank_order']
     return dash.html.Div(
@@ -92,15 +92,15 @@ def write_layout():
         children=[
             dash.dcc.Store(id='state'),
             dash.dcc.Location(id='url', refresh=False),
-            dash.dcc.Markdown(
-                children=[
-                    str(df['download_date'].max().strftime('%A, %B %d, %Y'))
-                ],
-                style={
-                    'textAlign': 'right',
-                    'fontStyle': 'italic',
-                    'height': 0,
-                    'width': '100%'}),
+            # dash.dcc.Markdown(
+            #     children=[
+            #         str(df['download_date'].max().strftime('%A, %B %d, %Y'))
+            #     ],
+            #     style={
+            #         'textAlign': 'right',
+            #         'fontStyle': 'italic',
+            #         'height': 0,
+            #         'width': '100%'}),
             dash.html.Div(
                 children=[
                     dash.dcc.Input(type='text', id='text-input'),
@@ -119,7 +119,9 @@ def write_layout():
                 children=[
                     dash.dcc.Dropdown(
                         id='genus-column',
-                        options=genus_opts,
+                        options=[
+                            {'label': DEFAULT_GENUS_NAME,
+                             'value': DEFAULT_GENUS}],
                         clearable=False)],
                 style={
                     'display': 'inline-block',
@@ -391,6 +393,7 @@ def update_xaxis_value(search):
     [State('text-input', 'value'),
      State('state', 'data')])
 def update_genus_value(search, n_clicks, text, state):
+    set_global_data()
     request, data = parse_search_input(df, state, search, n_clicks, text)
     if request is None:
         value = DEFAULT_GENUS
