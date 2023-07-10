@@ -119,9 +119,6 @@ def write_layout():
                 children=[
                     dash.dcc.Dropdown(
                         id='genus-column',
-                        options=[
-                            {'label': DEFAULT_GENUS_NAME,
-                             'value': DEFAULT_GENUS}],
                         clearable=False)],
                 style={
                     'display': 'inline-block',
@@ -384,6 +381,15 @@ def update_xaxis_value(search):
 #     [Input('species-column', 'value')])
 # def update_url_search(value):
 #     return '?' + urllib.parse.urlencode({'species_to_id': value})
+
+
+@app.callback(Output('genus-column', 'options'), Input('state', 'data'))
+def update_genus_options(state):
+    if state is None:
+        set_global_data()
+    opts = tax[['genus', 'genus_name']].drop_duplicates().values
+    opts = [{'label': gn, 'value': gi} for gi, gn in opts]
+    return opts
 
 
 @app.callback(
