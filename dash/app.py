@@ -83,8 +83,6 @@ def write_layout():
     This is done using a function so Dash will not cache it allowing us to
     update the underlining data.
     '''
-    # genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
-    # genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
     axes = ['confidence', 'dist_pct', 'x', 'y',
             'type_classification', 'rank_order']
     return dash.html.Div(
@@ -92,15 +90,13 @@ def write_layout():
         children=[
             dash.dcc.Store(id='state'),
             dash.dcc.Location(id='url', refresh=False),
-            # dash.dcc.Markdown(
-            #     children=[
-            #         str(df['download_date'].max().strftime('%A, %B %d, %Y'))
-            #     ],
-            #     style={
-            #         'textAlign': 'right',
-            #         'fontStyle': 'italic',
-            #         'height': 0,
-            #         'width': '100%'}),
+            dash.dcc.Markdown(
+                id='download-date',
+                style={
+                    'textAlign': 'right',
+                    'fontStyle': 'italic',
+                    'height': 0,
+                    'width': '100%'}),
             dash.html.Div(
                 children=[
                     dash.dcc.Input(type='text', id='text-input'),
@@ -383,10 +379,15 @@ def update_xaxis_value(search):
 #     return '?' + urllib.parse.urlencode({'species_to_id': value})
 
 
-@app.callback(Output('genus-column', 'options'), Input('state', 'data'))
-def update_genus_options(state):
+@app.callback(Output('download-date', 'children'), Input('state', 'data'))
+def update_download_date(state):
     if state is None:
         set_global_data()
+    return str(df['download_date'].max().strftime('%A, %B %d, %Y'))
+
+
+@app.callback(Output('genus-column', 'options'), Input('state', 'data'))
+def update_genus_options(state):
     opts = tax[['genus', 'genus_name']].drop_duplicates().values
     opts = [{'label': gn, 'value': gi} for gi, gn in opts]
     return opts
