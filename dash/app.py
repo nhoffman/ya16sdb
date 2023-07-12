@@ -91,6 +91,7 @@ def write_layout():
             dash.dcc.Store(id='state'),
             dash.dcc.Location(id='url', refresh=False),
             dash.dcc.Markdown(
+                children='Loading...',
                 id='download-date',
                 style={
                     'textAlign': 'right',
