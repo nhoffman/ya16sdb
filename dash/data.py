@@ -28,7 +28,6 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
 
     """
 
-    log.warning('reading data from {}'.format(pathspec))
     if pathspec.startswith('s3://'):
         s3_bucket, s3_key = pathspec.replace('s3://', '').split('/', 1)
         if aws_access_key_id:
@@ -41,9 +40,11 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
             # assume credentials are available in default credential chain
             log.info('assuming existing aws credentials')
             s3client = boto3.Session(region_name='us-west-2').client('s3')
-        s3obj = s3client.get_object(Bucket=s3_bucket, Key=s3_key)
+        s3obj = s3client.head_object(Bucket=s3_bucket, Key=s3_key)
         last_modified = s3obj['LastModified']
         if get_data:
+            log.warning('reading data from {}'.format(pathspec))
+            s3obj = s3client.get_object(Bucket=s3_bucket, Key=s3_key)
             compressed = io.BytesIO(s3obj['Body'].read())
             with gzip.GzipFile(mode='rb', fileobj=compressed) as f:
                 df = pd.read_feather(f)
@@ -53,6 +54,7 @@ def read_feather(pathspec, aws_access_key_id=None, aws_secret_access_key=None,
         last_modified = datetime.datetime.fromtimestamp(
             os.path.getmtime(pathspec)).isoformat()
         if get_data:
+            log.warning('reading data from {}'.format(pathspec))
             if pathspec.endswith('.gz'):
                 with gzip.open(pathspec) as f:
                     df = pd.read_feather(f)
