@@ -401,7 +401,8 @@ def update_genus_options(state):
     [State('text-input', 'value'),
      State('state', 'data')])
 def update_genus_value(search, n_clicks, text, state):
-    set_global_data()
+    if state is None:
+        set_global_data()
     request, data = parse_search_input(df, state, search, n_clicks, text)
     if request is None:
         value = DEFAULT_GENUS
