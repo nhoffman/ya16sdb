@@ -7,14 +7,18 @@ import data
 import os
 import pandas
 import urllib
+import logging
 
 from dash.dependencies import Input, State, Output
+
+log = logging.getLogger(__name__)
 
 COLORS = ['blue', 'red', 'black', 'yellow',
           'gray', 'green', 'violet', 'silver']
 DEFAULT_COLOR = 'is_out'
 DEFAULT_SHAPE = 'confidence'
 DEFAULT_GENUS = '1350'  # Enterococcus
+DEFAULT_GENUS_NAME = 'Enterococcus'
 DEFAULT_SPECIES = '1351'  # Enterococcus faecalis
 DEFAULT_Y = 'y'
 DEFAULT_X = 'x'
@@ -79,9 +83,6 @@ def write_layout():
     This is done using a function so Dash will not cache it allowing us to
     update the underlining data.
     '''
-    set_global_data()
-    genus_opts = tax[['genus', 'genus_name']].drop_duplicates().values
-    genus_opts = [{'label': gn, 'value': gi} for gi, gn in genus_opts]
     axes = ['confidence', 'dist_pct', 'x', 'y',
             'type_classification', 'rank_order']
     return dash.html.Div(
@@ -90,9 +91,8 @@ def write_layout():
             dash.dcc.Store(id='state'),
             dash.dcc.Location(id='url', refresh=False),
             dash.dcc.Markdown(
-                children=[
-                    str(df['download_date'].max().strftime('%A, %B %d, %Y'))
-                ],
+                children='Loading...',
+                id='download-date',
                 style={
                     'textAlign': 'right',
                     'fontStyle': 'italic',
@@ -116,7 +116,6 @@ def write_layout():
                 children=[
                     dash.dcc.Dropdown(
                         id='genus-column',
-                        options=genus_opts,
                         clearable=False)],
                 style={
                     'display': 'inline-block',
@@ -299,7 +298,21 @@ def write_layout():
                     'margin': 5,
                     'overflowY': 'scroll',
                     'padding': 10,
-                    'width': '97%'})])
+                    'width': '97%'}),
+            dash.html.A(
+                os.environ.get(
+                    'VERSION',
+                    'github.com/nhoffman/ya16sdb/dash'),
+                href='https://github.com/nhoffman/'
+                     'ya16sdb/pkgs/container/ya16sdb-app',
+                style={
+                    'display': 'inline-block',
+                    'textAlign': 'center',
+                    'verticalAlign': 'middle',
+                    'width': '100%',
+                    'textDecoration': 'none'},
+                target='_blank')
+                ])
 
 
 app.layout = write_layout
@@ -367,6 +380,20 @@ def update_xaxis_value(search):
 #     return '?' + urllib.parse.urlencode({'species_to_id': value})
 
 
+@app.callback(Output('download-date', 'children'), Input('state', 'data'))
+def update_download_date(state):
+    if state is None:
+        set_global_data()
+    return str(df['download_date'].max().strftime('%A, %B %d, %Y'))
+
+
+@app.callback(Output('genus-column', 'options'), Input('state', 'data'))
+def update_genus_options(state):
+    opts = tax[['genus', 'genus_name']].drop_duplicates().values
+    opts = [{'label': gn, 'value': gi} for gi, gn in opts]
+    return opts
+
+
 @app.callback(
     Output('genus-column', 'value'),
     [Input('url', 'search'),
@@ -374,6 +401,8 @@ def update_xaxis_value(search):
     [State('text-input', 'value'),
      State('state', 'data')])
 def update_genus_value(search, n_clicks, text, state):
+    if state is None:
+        set_global_data()
     request, data = parse_search_input(df, state, search, n_clicks, text)
     if request is None:
         value = DEFAULT_GENUS

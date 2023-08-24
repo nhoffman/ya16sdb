@@ -1,0 +1,36 @@
+name: Build and push Docker image for Dash application
+
+on:
+  - push
+
+jobs:
+  build_app_image:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  #fetch all history, required for 'git describe'
+      - name: Set GIT_DESC
+        run: echo "GIT_DESC=$(git describe --tags)" >> $GITHUB_ENV
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          cache-from: type=gha
+          context: ./dash
+          file: ./dash/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ya16sdb-app:latest
+          build-args: |
+            "VERSION=${{ env.GIT_DESC }}"
