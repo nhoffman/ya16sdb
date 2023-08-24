@@ -35,6 +35,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/ya16sdb-app:latest
-            ghcr.io/${{ github.repository_owner }}/ya16sdb-app:$sha_short
+            ghcr.io/${{ github.repository_owner }}/ya16sdb-app:${{ steps.vars.outputs.sha_short }}
           build-args: |
             "VERSION=${{ env.GIT_DESC }}"
