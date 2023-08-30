@@ -4,10 +4,10 @@ Plotly Dash app exploring NCBI 16s records grouped by species taxonomy id
 '''
 import dash
 import data
+import logging
 import os
 import pandas
 import urllib
-import logging
 
 from dash.dependencies import Input, State, Output
 
