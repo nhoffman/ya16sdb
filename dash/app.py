@@ -8,7 +8,6 @@ import logging
 import os
 import pandas
 import urllib
-
 from dash.dependencies import Input, State, Output
 
 log = logging.getLogger(__name__)
