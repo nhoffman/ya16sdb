@@ -1,0 +1,6 @@
+*
+!/app.py
+!/data.py
+!/entrypoint.sh
+!/filter_details.feather.gz
+!/requirements.txt
