@@ -959,13 +959,11 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
                 (len(outliers) / len(dff)),
                 len(dff)),
             'xaxis': {
-                'scaleanchor': 'y' if xaxis == 'x' else None,
                 'title': xaxis,
                 'showgrid': True if xaxis == 'type_classification' else False,
                 'range': x_range
             },
             'yaxis': {
-                'scaleanchor': 'x' if yaxis == 'y' else None,
                 'title': yaxis,
                 'showgrid': True if yaxis == 'type_classification' else False,
                 'range': y_range
