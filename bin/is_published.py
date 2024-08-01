@@ -14,7 +14,7 @@ def main():
     p.add_argument('pubmed_ids')
     args = p.parse_args()
     published = pandas.read_csv(
-        args.pubmed_ids, dtype=str, squeeze=True, usecols=['version'])
+        args.pubmed_ids, dtype=str, usecols=['version']).squeeze()
     info = pandas.read_feather(args.feather)
     info['is_published'] = False
     info.loc[info['version'].isin(published), 'is_published'] = True

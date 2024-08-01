@@ -14,7 +14,7 @@ def main():
     p.add_argument('refseqs')
     args = p.parse_args()
     refseqs = pandas.read_csv(
-        args.refseqs, squeeze=True, dtype=str, usecols=['seqname'])
+        args.refseqs, dtype=str, usecols=['seqname']).squeeze()
     info = pandas.read_feather(args.feather)
     info['is_refseq'] = False
     info.loc[info['seqname'].isin(refseqs), 'is_refseq'] = True

@@ -118,11 +118,10 @@ def main():
         ~prev_seq_info['accession'].isin(new_seq_info['accession'])]
 
     # combine seq_info files
-    seq_info = prev_seq_info.append(new_seq_info)
+    seq_info = pandas.concat([prev_seq_info, new_seq_info])
 
     # remove anything dropped from ncbi or suddenly without features
-    ncbi = pandas.read_csv(
-        args.ncbi, dtype=str, squeeze=True, usecols=['version'])
+    ncbi = pandas.read_csv(args.ncbi, dtype=str, usecols=['version']).squeeze()
     seq_info = seq_info[seq_info['version'].isin(ncbi)]
 
     # remove anything that previously had features but now does not
@@ -140,7 +139,7 @@ def main():
         prev_refseqs = pandas.read_csv(args.previous_refseq_info, dtype=str)
     prev_refseqs = prev_refseqs[
         ~prev_refseqs['seqname'].isin(new_refseq_info['seqname'])]
-    refseqs = new_refseq_info.append(prev_refseqs)
+    refseqs = pandas.concat([new_refseq_info, prev_refseqs])
     refseqs = refseqs[refseqs['seqname'].isin(seq_info['seqname'])]
     assert(len(refseqs) == len(refseqs['seqname'].drop_duplicates()))
     refseqs.to_csv(args.refseq_info_out, index=False)
@@ -181,7 +180,7 @@ def main():
     else:
         prev_pubmed = pandas.read_csv(args.previous_pubmed_seq_info, dtype=str)
     prev_pubmed = prev_pubmed[~prev_pubmed.isin(prev_pubmed['accession'])]
-    pubmed_info = prev_pubmed.append(new_pubmed).drop_duplicates()
+    pubmed_info = pandas.concat([prev_pubmed, new_pubmed]).drop_duplicates()
     pubmed_info = pubmed_info[pubmed_info['version'].isin(seq_info['version'])]
     pubmed_info.to_csv(args.pubmed_seq_info_out, index=False)
 
@@ -195,7 +194,7 @@ def main():
     else:
         prev_refs = pandas.read_csv(args.previous_references, dtype=str)
     prev_refs = prev_refs[~prev_refs['pubmed_id'].isin(new_refs['pubmed_id'])]
-    refs = prev_refs.append(new_refs)
+    refs = pandas.concat([prev_refs, new_refs])
     refs = refs[refs['pubmed_id'].isin(pubmed_info['pubmed_id'])]
     refs = refs.drop_duplicates()
     refs.to_csv(args.references_out, index=False)

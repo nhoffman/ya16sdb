@@ -13,12 +13,14 @@ fi
 bin_dir=$(dirname "$(readlink -f "$0")")
 pipeline_dir=$(dirname $bin_dir)
 
+$venv/bin/pip3 install --upgrade pip
 $venv/bin/pip3 install --requirement $pipeline_dir/requirements.txt
 
 mkdir src
 
 (cd src &&
- git clone --branch v0.3.1 https://github.com/fhcrc/deenurp.git  &&
+ # git clone --branch v0.3.1 https://github.com/fhcrc/deenurp.git  &&
+ git clone https://github.com/fhcrc/deenurp.git  &&
  cd deenurp &&
  PYTHON=$venv/bin/python3 \
  DEENURP=$(pwd) \

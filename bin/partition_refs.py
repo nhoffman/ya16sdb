@@ -90,11 +90,11 @@ def main():
         recs = set(i for i in recs if i)
         # add special trusted recs after type strains
         # because they are preferred
-        trusted = trusted.append(info[
+        trusted = pandas.concat([trusted, info[
             (info['version'].isin(recs)) |
             (info['accession'].isin(recs)) |
             (info['tax_id'].isin(recs)) |
-            (info['seqname'].isin(recs))])
+            (info['seqname'].isin(recs))]])
 
     if args.is_valid:
         info = info[info['is_valid']]
@@ -140,7 +140,7 @@ def main():
         # trusted sequences are preferred and appended
         # last to ensure they pass species_cap
         trusted = trusted[~trusted['seqname'].isin(info['seqname'])]
-        info = info.append(trusted)
+        info = pandas.concat([info, trusted])
 
     # apply args.do_not_trust after adding args.trusted in case a
     # type strain needs to be removed

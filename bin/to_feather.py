@@ -18,9 +18,10 @@ def main(arguments):
     args = parser.parse_args(arguments)
     seq_info = pandas.read_csv(
         args.seq_info,
+        date_format='%d-%b-%Y',
         dtype=ya16sdb.DTYPES,
-        parse_dates=['download_date', 'modified_date'],
-        date_parser=lambda x: datetime.datetime.strptime(x, '%d-%b-%Y'))
+        parse_dates=['download_date', 'modified_date']
+        )
     seq_info.to_feather(args.out)
 
 
