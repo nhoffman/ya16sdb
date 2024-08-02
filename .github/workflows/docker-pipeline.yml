@@ -4,35 +4,36 @@ on:
   push:
     tags: [ '*.*.*' ]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build_pipeline_image:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
+
     steps:
-      # - name: Set RELEASE_VERSION
-      #   run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  #fetch all history, required for 'git describe'
-      - name: Set GIT_DESC
-        run: echo "GIT_DESC=$(git describe --tags)" >> $GITHUB_ENV
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          cache-from: type=gha
-          context: .
-          file: "Dockerfile"
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/ya16sdb:latest
-            ghcr.io/${{ github.repository_owner }}/ya16sdb:${{ env.GIT_DESC }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log into registry ${{ env.REGISTRY }}
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract Docker metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+    - name: Build and push tag
+      uses: docker/build-push-action@v6
+      with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        labels: ${{ steps.meta.outputs.labels }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
