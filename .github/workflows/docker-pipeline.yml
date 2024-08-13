@@ -37,7 +37,7 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-    - name: Build and push tag
+    - name: Build image
       uses: docker/build-push-action@v6
       with:
         annotations: ${{ steps.meta.outputs.annotations }}
@@ -52,7 +52,9 @@ jobs:
           gha_image
 
     - name: Test run and unnitests
-      run: docker run --volume $(pwd):$(pwd) --workdir $(pwd) gha_image /bin/bash -c "scons test=yes;python -m unnitest"
+      run: |
+        ls
+        docker run --volume $(pwd):$(pwd) --workdir $(pwd) gha_image /bin/bash -c "scons test=yes;python -m unnitest"
 
     - name: Build and push tag
       if: github.ref_type == 'tag'
@@ -61,6 +63,7 @@ jobs:
         annotations: ${{ steps.meta.outputs.annotations }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        context: "."
         labels: ${{ steps.meta.outputs.labels }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
