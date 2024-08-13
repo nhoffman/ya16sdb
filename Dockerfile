@@ -1,18 +1,20 @@
 FROM python:3.11-bookworm
 
-RUN apt-get update && apt-get upgrade -y && apt-get install --assume-yes --no-install-recommends \
-    ca-certificates git wget
+ENV PIP_ROOT_USER_ACTION=ignore
 
-ADD requirements.txt /usr/local/share/ya16sdb/
-ADD bin/bootstrap.sh /usr/local/share/ya16sdb/bin/
+RUN apt-get update && apt-get upgrade -y && \
+apt-get install --assume-yes ca-certificates git wget
+
+COPY requirements.txt /usr/local/share/ya16sdb/
+COPY bin/bootstrap.sh /usr/local/share/ya16sdb/bin/
 
 WORKDIR /usr/local/share/ya16sdb/
 RUN ["/bin/bash", "-c", "bin/bootstrap.sh /usr/local/"]
 
-ADD .git/ /usr/local/share/ya16sdb/.git/
-ADD data/ /usr/local/share/ya16sdb/data/
-ADD bin/ /usr/local/share/ya16sdb/bin/
-ADD SConstruct ncbi.conf /usr/local/share/ya16sdb/
+COPY .git/ /usr/local/share/ya16sdb/.git/
+COPY data/ /usr/local/share/ya16sdb/data/
+COPY bin/ /usr/local/share/ya16sdb/bin/
+COPY SConstruct ncbi.conf /usr/local/share/ya16sdb/
 
 RUN find /usr/local/share/ya16sdb/ -type f -exec chmod 644 {} \; && \
 find /usr/local/share/ya16sdb/ -type d -exec chmod 755 {} \; && \
