@@ -44,25 +44,3 @@ jobs:
         tags: |
           ${{ steps.meta.outputs.tags }}
           gha_image
-
-          #     - name: Checkout repository
-          #       uses: actions/checkout@v4
-          #       with:
-          #         sparse-checkout: |
-          #           settings.conf
-          #           testfiles
-          #           tests
-          # 
-          #     - name: Test run and unnitests
-          #       run: docker run --volume $(pwd):$(pwd) --workdir $(pwd) gha_image /bin/bash -c "scons test=yes;python -m unnitest"
-          # 
-          #     - name: Build and push tag
-          #       if: github.ref_type == 'tag'
-          #       uses: docker/build-push-action@v6
-          #       with:
-          #         annotations: ${{ steps.meta.outputs.annotations }}
-          #         cache-from: type=gha
-          #         cache-to: type=gha,mode=max
-          #         labels: ${{ steps.meta.outputs.labels }}
-          #         push: true
-          #         tags: ${{ steps.meta.outputs.tags }}
