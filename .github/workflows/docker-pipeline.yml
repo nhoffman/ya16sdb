@@ -2,6 +2,8 @@ name: Build and push docker image for pipeline
 
 on:
   push:
+    branches:
+      - "*"
     tags: [ '*.*.*' ]
 
 env:
