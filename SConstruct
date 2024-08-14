@@ -8,57 +8,17 @@ import configparser
 import csv
 import errno
 import os
-import SCons
 import sys
 import time
 import warnings
 
-from SCons.Script import ARGUMENTS, GetBuildFailures, Depends
+from SCons.Script import ARGUMENTS, Environment, GetBuildFailures, Depends
 
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     warnings.warn('No active virtualenv detected, using system environment')
 if not os.path.exists('settings.conf'):
     sys.exit("Can't find settings.conf")
-
-
-class Environment(SCons.Environment.Environment):
-    def __init__(self, singularity=None, verbosity=0, **kws):
-        self.singularity = singularity
-        self.verbosity = verbosity
-        SCons.Environment.Environment.__init__(self, **kws)
-
-    def Command(self,
-                target,
-                source,
-                action,
-                singularity=None,
-                options=None,
-                **kws):
-        # if docker and self.docker:  # TODO: implement this
-        if singularity and self.singularity:
-            self.Depends(target, singularity)
-            sactions = []
-            for a in self.Flatten(action):
-                sa = self.singularity
-                sa = '{} --bind $pipeline'.format(sa)
-                if options:
-                    sa = '{} {}'.format(sa, options)
-                sa = '{} {} {}'.format(sa, singularity, a)
-                sactions.append(VirtualAction(a, sa, self.verbosity))
-            action = sactions
-        return SCons.Environment.Environment.Command(
-            self, target, source, action, **kws)
-
-
-class VirtualAction(SCons.Action.CommandAction):
-    def __init__(self, command, singularity, verbosity, **kw):
-        self.command = singularity if verbosity else command
-        SCons.Action.CommandAction.__init__(self, singularity, **kw)
-
-    def print_cmd_line(self, _, target, source, env):
-        c = env.subst(self.command, SCons.Subst.SUBST_RAW, target, source)
-        SCons.Action.CommandAction.print_cmd_line(self, c, target, source, env)
 
 
 def blast_db(env, sequence_file, output_base):
@@ -69,9 +29,8 @@ def blast_db(env, sequence_file, output_base):
     blast_out = env.Command(
         target=[output_base + ext for ext in extensions],
         source=sequence_file,
-        action=('makeblastdb -dbtype nucl '
-                '-in $SOURCE -out ' + output_base),
-        singularity=settings['blast'])
+        action='makeblastdb -dbtype nucl '
+               '-in $SOURCE -out ' + output_base)
     env.Command(
         target=output_base,
         source=blast_out,
@@ -86,12 +45,10 @@ def taxonomy(fa, info, path):
     taxtable = env.Command(
         target=os.path.join(path, 'taxonomy.csv'),
         source=info,
-        action=['taxit taxtable '
-                '--seq-info $SOURCE '
-                '--out $TARGET '
-                '$tax_url'],
-        singularity=settings['taxit'],
-        options='--bind $tax_url')
+        action='taxit taxtable '
+               '--seq-info $SOURCE '
+               '--out $TARGET '
+               '$tax_url')
 
     """
     Taxtable output replacing tax_ids with taxnames
@@ -99,8 +56,7 @@ def taxonomy(fa, info, path):
     lineages = env.Command(
         target=os.path.join(path, 'lineages.csv'),
         source=[taxtable, info],
-        action='taxit lineage_table --csv-table $TARGET $SOURCES',
-        singularity=settings['taxit'])
+        action='taxit lineage_table --csv-table $TARGET $SOURCES')
 
     """
     Mothur output - https://mothur.org/wiki/Taxonomy_File
@@ -108,8 +64,7 @@ def taxonomy(fa, info, path):
     mothur = env.Command(
         target=os.path.join(path, 'lineages.txt'),
         source=[taxtable, info],
-        action='taxit lineage_table --taxonomy-table $TARGET $SOURCES',
-        singularity=settings['taxit'])
+        action='taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
     blast = blast_db(env, fa, os.path.join(path, 'blast'))
 
@@ -156,7 +111,17 @@ environment_variables = dict(
 )
 
 env = Environment(
-    ENV=environment_variables,
+    ENV=dict(
+        MEFETCH_API_KEY='92d3869862d971bf7a5bdcc3ddecef319c09',
+        MEFETCH_DB='nucleotide',
+        MEFETCH_EMAIL='crosenth@uw.edu',
+        MEFETCH_LOG=os.path.join(out, 'log.txt'),
+        MEFETCH_MODE='text',
+        MEFETCH_MAX_RETRY=-1,
+        MEFETCH_RETRY=10000,
+        MEFETCH_WORKERS=100,
+        **environment_variables
+        ),
     log=os.path.join(out, 'log.txt'),
     out=out,
     pipeline=absolute_dir,
@@ -166,25 +131,14 @@ env = Environment(
     **settings
 )
 
-env.EnsureSConsVersion(3, 0, 5)
 env.Decider('MD5')
-
-mefetch = ('mefetch -vv '
-           '-api-key $api_key '  # FIXME: what happens if no $api_key?
-           '-db nucleotide '
-           '-email $email '
-           '-log $log '
-           '-max-retry -1 '
-           '-mode text '
-           '-proc $nreq '
-           '-retry $retry')
 
 classified = env.Command(
     source=None,
     target='$out/ncbi/classified.txt',
-    action=['esearch -db nucleotide -query "$classified" | ' +
-            mefetch + ' -format acc -out $TARGET'],
-    singularity=settings['eutils'])
+    action='esearch -db nucleotide -query "$classified" | '
+           'mefetch -vv -format acc -out $TARGET'
+    )
 
 """
 Candidatus Saccharibacteria
@@ -193,9 +147,8 @@ https://gitlab.labmed.uw.edu/molmicro/mkrefpkg/issues/36
 tm7 = env.Command(
     source=None,
     target='$out/ncbi/tm7.txt',
-    action=['esearch -db nucleotide -query "$tm7" | ' +
-            mefetch + ' -format acc -out $TARGET'],
-    singularity=settings['eutils'])
+    action='esearch -db nucleotide -query "$tm7" | '
+           'mefetch -vv -format acc -out $TARGET')
 
 """
 Check the cache for last download_date and download list of modified
@@ -211,11 +164,9 @@ else:
 modified = env.Command(
     source=None,
     target='$out/ncbi/modified.txt',
-    action=[
-        'esearch -db nucleotide -query "($classified OR $tm7) '
-        'AND $download_date[Modification Date] : 3000[Modification Date]" | ' +
-        mefetch + ' -format acc -out $TARGET'],
-    singularity=settings['eutils'])
+    action='esearch -db nucleotide -query "($classified OR $tm7) AND '
+           '$download_date[Modification Date] : 3000[Modification Date]" | '
+           'mefetch -vv -format acc -out $TARGET')
 
 """
 type strains records
@@ -225,9 +176,8 @@ http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
 types = env.Command(
     source=None,
     target='$out/ncbi/types.txt',
-    action=['esearch -db nucleotide -query "$types" | ' +
-            mefetch + ' -format acc -out $TARGET'],
-    singularity=settings['eutils'])
+    action='esearch -db nucleotide -query "$types" | '
+           'mefetch -vv -format acc -out $TARGET')
 
 """
 Trim accession2taxid with 16s records and update taxids
@@ -240,12 +190,10 @@ accession2taxid = env.Command(
 accession2taxid = env.Command(
     target='$out/ncbi/accession2update_taxids.csv',
     source=accession2taxid,
-    action=['taxit update_taxids '
-            '--outfile $TARGET '
-            '--unknown-action drop '
-            '$SOURCE $tax_url'],
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit update_taxids '
+           '--outfile $TARGET '
+           '--unknown-action drop '
+           '$SOURCE $tax_url')
 
 """
 Create a list of cached records removing:
@@ -279,12 +227,12 @@ download genbank records
 gbs = env.Command(
     target='$out/ncbi/download.gb',
     source=download,
-    action=[mefetch + ' -format ft -id $SOURCE -retmax 1 | '
+    action=['mefetch -vv -format ft -id $SOURCE -retmax 1 | '
             'ftract -feature "rrna:product:16S ribosomal RNA" '
             '-log $log '
             '-on-error continue '
             '-min-length 1200 | ' +
-            mefetch + ' -csv -format gbwithparts -out $TARGET -retmax 1'])
+            'mefetch -vv -csv -format gbwithparts -out $TARGET -retmax 1'])
 
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
@@ -322,12 +270,10 @@ fa, seq_info = env.Command(
     target=['$out/ncbi/extract_genbank/update_taxids/seqs.fasta',
             '$out/ncbi/extract_genbank/update_taxids/seq_info.csv'],
     source=[fa, seq_info],
-    action=['taxit update_taxids '
-            '--unknown-action drop '
-            '${SOURCES[1]} $tax_url | '
-            'partition_refs.py ${SOURCES[0]} - $TARGETS'],
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit update_taxids '
+           '--unknown-action drop '
+           '${SOURCES[1]} $tax_url | '
+           'partition_refs.py ${SOURCES[0]} - $TARGETS')
 
 """
 cmsearch new sequences against rfam model
@@ -335,9 +281,8 @@ cmsearch new sequences against rfam model
 cmsearch = env.Command(
     target='$out/ncbi/extract_genbank/update_taxids/cmsearch/table.tsv',
     source=['$pipeline/data/SSU_rRNA_bacteria.cm', fa],
-    action=('cmsearch --cpu 14 -E 0.01 --hmmonly -o /dev/null '
-            '--tblout $TARGET $SOURCES || true'),
-    singularity=settings['infernal'])
+    action='cmsearch --cpu 14 -E 0.01 --hmmonly -o /dev/null '
+           '--tblout $TARGET $SOURCES || true')
 
 """
 Fix record orientations
@@ -397,9 +342,7 @@ env.Command(
 taxtable = env.Command(
     target='$out/taxonomy.csv',
     source=seq_info,
-    action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url',
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
 Map for WGS records without a refseq assembly accession
@@ -407,13 +350,13 @@ Map for WGS records without a refseq assembly accession
 asm = env.Command(
     target='$out/ani/assembly_summary_genbank.txt',
     source=None,
-    action=('wget '
-            '--output-document $TARGET '
-            '--quiet '
-            '--retry-on-http-error 403 '
-            '--tries 100 '
-            'https://ftp.ncbi.nlm.nih.gov/'
-            'genomes/genbank/assembly_summary_genbank.txt'))
+    action='wget '
+           '--output-document $TARGET '
+           '--quiet '
+           '--retry-on-http-error 403 '
+           '--tries 100 '
+           'https://ftp.ncbi.nlm.nih.gov/'
+           'genomes/genbank/assembly_summary_genbank.txt')
 
 """
 The ANI tax check report
@@ -421,13 +364,13 @@ The ANI tax check report
 ani = env.Command(
     target='$out/ani/ANI_report_prokaryotes.txt',
     source=None,
-    action=('wget '
-            '--output-document $TARGET '
-            '--quiet '
-            '--retry-on-http-error 403 '
-            '--tries 100 '
-            'https://ftp.ncbi.nlm.nih.gov/'
-            'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt'))
+    action='wget '
+           '--output-document $TARGET '
+           '--quiet '
+           '--retry-on-http-error 403 '
+           '--tries 100 '
+           'https://ftp.ncbi.nlm.nih.gov/'
+           'genomes/ASSEMBLY_REPORTS/ANI_report_prokaryotes.txt')
 
 """
 Create feather file and initial columns
@@ -475,14 +418,14 @@ type_fa, type_info = env.Command(
     target=['$out/dedup/1200bp/types/seqs.fasta',
             '$out/dedup/1200bp/types/seq_info.csv'],
     source=[fa, feather],
-    action=['partition_refs.py '
-            '--drop-duplicate-sequences '
-            '--is_species '
-            '--is_type '
-            '--is_valid '
-            '--min-length 1200 '
-            '--prop-ambig-cutoff 0.01 '
-            '$SOURCES $TARGETS'])
+    action='partition_refs.py '
+           '--drop-duplicate-sequences '
+           '--is_species '
+           '--is_type '
+           '--is_valid '
+           '--min-length 1200 '
+           '--prop-ambig-cutoff 0.01 '
+           '$SOURCES $TARGETS')
 
 type_tax, type_lineages, types_mothur, type_blast = taxonomy(
     type_fa, type_info, '$out/dedup/1200bp/types/')
@@ -494,14 +437,14 @@ fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
             '$out/dedup/1200bp/named/seq_info.csv'],
     source=[fa, feather],
-    action=('partition_refs.py '
-            '--drop-duplicate-sequences '
-            '--is_species '
-            '--is_valid '
-            '--min-length 1200 '
-            '--prop-ambig-cutoff 0.01 '
-            '--species-cap %(species_cap)s '
-            '${SOURCES[:2]} $TARGETS' % settings))
+    action='partition_refs.py '
+           '--drop-duplicate-sequences '
+           '--is_species '
+           '--is_valid '
+           '--min-length 1200 '
+           '--prop-ambig-cutoff 0.01 '
+           '--species-cap %(species_cap)s '
+           '${SOURCES[:2]} $TARGETS' % settings)
 
 named = fa
 
@@ -539,8 +482,7 @@ fa, details = env.Command(
             '--strategy cluster '
             '--threads-per-job 14 '
             '${SOURCES[:3]}',
-            'cp ${TARGETS[1]} ' + cfiles['outliers_cache']],
-    singularity=settings['deenurp'])
+            'cp ${TARGETS[1]} ' + cfiles['outliers_cache']])
 
 """
 add distance metrics to feather file
@@ -567,16 +509,15 @@ filtered_type_tax, filtered_type_lineages, filtered_type_mothur, _ = taxonomy(
 filtered_type_hits = env.Command(
     target='$out/dedup/1200bp/named/types_vsearch.tsv',
     source=[named, filtered_type_fa],
-    action=('vsearch --usearch_global ${SOURCES[0]} '
-            '--blast6out $TARGET '
-            '--db ${SOURCES[1]} '
-            '--id 0.75 '
-            '--maxaccepts 5 '
-            '--self '  # reject same sequence hits
-            '--strand plus '
-            '--threads 14 '
-            '--top_hits_only'),
-    singularity=settings['vsearch'])
+    action='vsearch --usearch_global ${SOURCES[0]} '
+           '--blast6out $TARGET '
+           '--db ${SOURCES[1]} '
+           '--id 0.75 '
+           '--maxaccepts 5 '
+           '--self '  # reject same sequence hits
+           '--strand plus '
+           '--threads 14 '
+           '--top_hits_only')
 
 """
 This output will be used in the filter plots
@@ -587,13 +528,13 @@ filtered_type_classifications = env.Command(
             filtered_type_info,
             filtered_type_tax,
             os.path.join('$pipeline', 'data/classifier_thresholds.csv')],
-    action=['classify -vv '
-            '--lineages ${SOURCES[2]} '
-            '--rank-thresholds ${SOURCES[3]} '
-            '--seq-info ${SOURCES[1]} '
-            '--starred 101 '
-            '--out $TARGET '
-            '${SOURCES[0]}'])
+    action='classify -vv '
+           '--lineages ${SOURCES[2]} '
+           '--rank-thresholds ${SOURCES[3]} '
+           '--seq-info ${SOURCES[1]} '
+           '--starred 101 '
+           '--out $TARGET '
+           '${SOURCES[0]}')
 
 """
 Adds type_classification to feather file for Dash application
@@ -610,9 +551,7 @@ expand taxids into descendants
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
     source=settings['trust'],
-    action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 """
 expand taxids into descendants
@@ -620,9 +559,7 @@ expand taxids into descendants
 dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
-    action='taxit get_descendants --out $TARGET $tax_url $SOURCE',
-    singularity=settings['taxit'],
-    options='--bind $tax_url')
+    action='taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 trusted = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',
@@ -641,17 +578,17 @@ fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/trusted/seq_info.csv'],
     source=[named, feather, trusted, dnt],
-    action=['partition_refs.py '
-            '--do_not_trust ${SOURCES[3]} '
-            '--drop-duplicate-sequences '
-            '--inliers '  # filter_outliers = True & is_out = False
-            '--is_species '
-            '--is_valid '
-            '--min-length 1200 '
-            '--prop-ambig-cutoff 0.01 '
-            '--species-cap %(species_cap)s '
-            '--trusted ${SOURCES[2]} '
-            '${SOURCES[:2]} $TARGETS' % settings])
+    action='partition_refs.py '
+           '--do_not_trust ${SOURCES[3]} '
+           '--drop-duplicate-sequences '
+           '--inliers '  # filter_outliers = True & is_out = False
+           '--is_species '
+           '--is_valid '
+           '--min-length 1200 '
+           '--prop-ambig-cutoff 0.01 '
+           '--species-cap %(species_cap)s '
+           '--trusted ${SOURCES[2]} '
+           '${SOURCES[:2]} $TARGETS' % settings)
 Depends([fa, seq_info], filter_outliers)
 
 taxtable, lineages, mothur, blast = taxonomy(
@@ -681,16 +618,15 @@ FIXME: use named types not trusted types
 named_type_hits = env.Command(
     target='$out/dedup/1200bp/named/trusted_vsearch.tsv',
     source=[named, fa],
-    action=('vsearch --usearch_global ${SOURCES[0]} '
-            '--blast6out $TARGET '
-            '--db ${SOURCES[1]} '
-            '--id 0.75 '
-            '--maxaccepts 5 '
-            '--self '  # reject same sequence hits
-            '--strand plus '
-            '--threads 14 '
-            '--top_hits_only'),
-    singularity=settings['deenurp'])
+    action='vsearch --usearch_global ${SOURCES[0]} '
+           '--blast6out $TARGET '
+           '--db ${SOURCES[1]} '
+           '--id 0.75 '
+           '--maxaccepts 5 '
+           '--self '  # reject same sequence hits
+           '--strand plus '
+           '--threads 14 '
+           '--top_hits_only')
 
 """
 Creates match_seqname, match_pct, match_version, match_species and
@@ -731,8 +667,8 @@ git version used to generate output
 commit = env.Command(
     target='$out/git_version.txt',
     source=os.path.join('$pipeline', '.git/objects'),
-    action=['(echo $$(hostname):$pipeline;'
-            'git --git-dir $pipeline/.git describe --tags --dirty) > $TARGET'])
+    action='(echo $$(hostname):$pipeline;'
+           'git --git-dir $pipeline/.git describe --tags --dirty) > $TARGET')
 
 
 def write_build_status():
