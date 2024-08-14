@@ -17,7 +17,8 @@ from SCons.Script import ARGUMENTS, Environment, GetBuildFailures, Depends
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     warnings.warn('No active virtualenv detected, using system environment')
-if not os.path.exists('settings.conf'):
+settings_file = ARGUMENTS.get('settings', 'settings.conf')
+if not os.path.isfile(settings_file):
     sys.exit("Can't find settings.conf")
 
 
@@ -76,8 +77,9 @@ release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
 absolute_dir = os.path.dirname((lambda x: x).__code__.co_filename)
 conf = configparser.SafeConfigParser()
-conf.read(['settings.conf', os.path.join(absolute_dir, 'ncbi.conf')])
-settings = conf['TEST'] if test else conf['DEFAULT']
+conf.read(settings_file)
+settings = conf['DEFAULT']
+conf.read(os.path.join(absolute_dir, settings['ncbi_conf']))
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
 cachedir = settings['cachedir']
 
