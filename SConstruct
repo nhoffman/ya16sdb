@@ -14,12 +14,22 @@ import warnings
 
 from SCons.Script import ARGUMENTS, Environment, GetBuildFailures, Depends
 
+this_dir = os.path.dirname((lambda x: x).__code__.co_filename)
 venv = os.environ.get('VIRTUAL_ENV')
 if not venv:
     warnings.warn('No active virtualenv detected, using system environment')
 settings_file = ARGUMENTS.get('settings', 'settings.conf')
 if not os.path.isfile(settings_file):
     sys.exit("Can't find settings.conf")
+conf = configparser.ConfigParser()
+conf.read(settings_file)
+settings = conf['DEFAULT']
+conf.read(os.path.join(this_dir, settings['ncbi_conf']))
+true_vals = ['t', 'y', '1']
+release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
+out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
+log = os.path.join(out, 'log.txt')
+cachedir = settings['cachedir']
 
 
 def blast_db(env, sequence_file, output_base):
@@ -72,17 +82,6 @@ def taxonomy(fa, info, path):
     return taxtable, lineages, mothur, blast
 
 
-true_vals = ['t', 'y', '1']
-release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
-test = ARGUMENTS.get('test', 'no').lower()[0] in true_vals
-absolute_dir = os.path.dirname((lambda x: x).__code__.co_filename)
-conf = configparser.SafeConfigParser()
-conf.read(settings_file)
-settings = conf['DEFAULT']
-conf.read(os.path.join(absolute_dir, settings['ncbi_conf']))
-out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
-cachedir = settings['cachedir']
-
 cfiles = {
     'genbank_cache': os.path.join(cachedir, 'records.gb'),
     'outliers_cache': os.path.join(cachedir, 'filter_outliers.csv'),
@@ -102,44 +101,25 @@ for k, v in cfiles.items():
             os.makedirs(d)
         open(v, 'w').close()
 
-environment_variables = dict(
-    os.environ,
-    PATH=':'.join([
-        os.path.join(absolute_dir, 'bin'),
-        (os.path.join(venv, 'bin') if venv else ''),
-        '/usr/local/bin',
-        '/usr/bin',
-        '/bin']),
-)
-
 env = Environment(
-    ENV=dict(
-        MEFETCH_API_KEY='92d3869862d971bf7a5bdcc3ddecef319c09',
-        MEFETCH_DB='nucleotide',
-        MEFETCH_EMAIL='crosenth@uw.edu',
-        MEFETCH_LOG=os.path.join(out, 'log.txt'),
-        MEFETCH_MODE='text',
-        MEFETCH_MAX_RETRY=-1,
-        MEFETCH_RETRY=10000,
-        MEFETCH_WORKERS=100,
-        **environment_variables
-        ),
-    log=os.path.join(out, 'log.txt'),
+    log=log,
     out=out,
-    pipeline=absolute_dir,
-    shell='bash',
+    pipeline=this_dir,
     tax_url=os.path.abspath(settings['taxonomy']),
-    verbosity=1,
     **settings
 )
-
-env.Decider('MD5')
+env.PrependENVPath('PATH', os.path.join(this_dir, 'bin'))
+for k, v in settings.items():
+    if k.startswith('mefetch_'):
+        env.AppendENVPath(k.upper(), v)
+env.AppendENVPath('MEFETCH_LOG', log)
+env.Decider('MD5-timestamp')
 
 classified = env.Command(
     source=None,
     target='$out/ncbi/classified.txt',
     action='esearch -db nucleotide -query "$classified" | '
-           'mefetch -vv -format acc -out $TARGET'
+           'mefetch -vv -format acc -out $TARGET -reqs 3'
     )
 
 """
@@ -168,7 +148,7 @@ modified = env.Command(
     target='$out/ncbi/modified.txt',
     action='esearch -db nucleotide -query "($classified OR $tm7) AND '
            '$download_date[Modification Date] : 3000[Modification Date]" | '
-           'mefetch -vv -format acc -out $TARGET')
+           'mefetch -vv -format acc -out $TARGET -reqs 3')
 
 """
 type strains records
@@ -179,7 +159,7 @@ types = env.Command(
     source=None,
     target='$out/ncbi/types.txt',
     action='esearch -db nucleotide -query "$types" | '
-           'mefetch -vv -format acc -out $TARGET')
+           'mefetch -vv -format acc -out $TARGET -reqs 3')
 
 """
 Trim accession2taxid with 16s records and update taxids
@@ -229,12 +209,12 @@ download genbank records
 gbs = env.Command(
     target='$out/ncbi/download.gb',
     source=download,
-    action=['mefetch -vv -format ft -id $SOURCE -retmax 1 | '
+    action=['mefetch -vv -format ft -id $SOURCE -retmax 10 | '
             'ftract -feature "rrna:product:16S ribosomal RNA" '
             '-log $log '
             '-on-error continue '
             '-min-length 1200 | ' +
-            'mefetch -vv -csv -format gbwithparts -out $TARGET -retmax 1'])
+            'mefetch -vv -csv -format gb -out $TARGET'])
 
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
