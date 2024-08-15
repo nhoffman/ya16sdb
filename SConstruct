@@ -22,6 +22,7 @@ settings_file = ARGUMENTS.get('settings', 'settings.conf')
 if not os.path.isfile(settings_file):
     sys.exit("Can't find settings.conf")
 conf = configparser.ConfigParser()
+conf.optionxform = str  # preserve key case-sensitivity
 conf.read(settings_file)
 settings = conf['DEFAULT']
 conf.read(os.path.join(this_dir, settings['ncbi_conf']))
@@ -101,18 +102,22 @@ for k, v in cfiles.items():
             os.makedirs(d)
         open(v, 'w').close()
 
+# MEFETCH vars in settings.conf will override os.environ
+mefetch = list(os.environ.items()) + list(settings.items())
+mefetch = {k: v for k, v in mefetch if k.startswith('MEFETCH_') and v}
+mefetch['MEFETCH_LOG'] = log
+
 env = Environment(
+    ENV={
+        'PATH': os.path.join(this_dir, 'bin'),
+        **mefetch
+        },
     log=log,
     out=out,
     pipeline=this_dir,
     tax_url=os.path.abspath(settings['taxonomy']),
     **settings
 )
-env.PrependENVPath('PATH', os.path.join(this_dir, 'bin'))
-for k, v in settings.items():
-    if k.startswith('mefetch_'):
-        env.AppendENVPath(k.upper(), v)
-env.AppendENVPath('MEFETCH_LOG', log)
 env.Decider('MD5-timestamp')
 
 classified = env.Command(
@@ -203,18 +208,30 @@ download = env.Command(
     source=[accession2taxid, cache, settings['do_not_download']],
     action='download.py --out $TARGET $SOURCES')
 
+coordinates = env.Command(
+    target='$out/ncbi/genbank.csv',
+    source=download,
+    action='mefetch -vv '
+           '-failed $out/ncbi/ft_failed.txt '
+           '-format ft '
+           '-id $SOURCE '
+           '-retmax 10 '
+           '| ftract -feature "rrna:product:16S ribosomal RNA" -out $TARGET'
+           )
+env.Precious(coordinates)
+
 """
 download genbank records
 """
 gbs = env.Command(
     target='$out/ncbi/download.gb',
-    source=download,
-    action=['mefetch -vv -format ft -id $SOURCE -retmax 10 | '
-            'ftract -feature "rrna:product:16S ribosomal RNA" '
-            '-log $log '
-            '-on-error continue '
-            '-min-length 1200 | ' +
-            'mefetch -vv -csv -format gb -out $TARGET'])
+    source=coordinates,
+    action='mefetch -vv '
+           '-csv '
+           '-failed $out/ncbi/failed.gb '
+           '-format gb '
+           '-id $SOURCE '
+           '-out $TARGET')
 
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
