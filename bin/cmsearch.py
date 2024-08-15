@@ -39,11 +39,11 @@ def main():
     else:
         cmsearch = pandas.read_csv(
             args.cmsearch,
-            delim_whitespace=True,
             comment='#',
             dtype=dtypes,
             header=None,
             names=CMSEARCH_COLS,
+            sep='\\s+',
             usecols=dtypes.keys())
     # alignments are already sorted by bitscore quality
     cmsearch = cmsearch.drop_duplicates(subset='seqname', keep='first')
