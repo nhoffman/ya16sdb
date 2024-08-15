@@ -31,6 +31,10 @@ release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
 log = os.path.join(out, 'log.txt')
 cachedir = settings['cachedir']
+# MEFETCH vars in settings.conf will override os.environ
+mefetch = list(os.environ.items()) + list(settings.items())
+mefetch = {k: v for k, v in mefetch if k.startswith('MEFETCH_') and v}
+mefetch['MEFETCH_LOG'] = log
 
 
 def blast_db(env, sequence_file, output_base):
@@ -102,22 +106,16 @@ for k, v in cfiles.items():
             os.makedirs(d)
         open(v, 'w').close()
 
-# MEFETCH vars in settings.conf will override os.environ
-mefetch = list(os.environ.items()) + list(settings.items())
-mefetch = {k: v for k, v in mefetch if k.startswith('MEFETCH_') and v}
-mefetch['MEFETCH_LOG'] = log
-
+# use default ENV and add/append values after
 env = Environment(
-    ENV={
-        'PATH': os.path.join(this_dir, 'bin'),
-        **mefetch
-        },
     log=log,
     out=out,
     pipeline=this_dir,
     tax_url=os.path.abspath(settings['taxonomy']),
     **settings
 )
+env.PrependENVPath('PATH', os.path.join(this_dir, 'bin'))
+env['ENV'].update(mefetch)
 env.Decider('MD5-timestamp')
 
 classified = env.Command(
@@ -222,6 +220,8 @@ env.Precious(coordinates)
 
 """
 download genbank records
+
+-retmax 1 when reading from -csv file
 """
 gbs = env.Command(
     target='$out/ncbi/download.gb',
