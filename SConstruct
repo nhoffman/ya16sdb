@@ -666,8 +666,7 @@ git version used to generate output
 commit = env.Command(
     target='$out/git_version.txt',
     source=os.path.join('$pipeline', '.git/objects'),
-    action='(echo $$(hostname):$pipeline;'
-           'git --git-dir $pipeline/.git describe --tags --dirty) > $TARGET')
+    action='(echo $$(hostname):$pipeline;version.py) > $TARGET')
 
 
 def write_build_status():
