@@ -665,7 +665,7 @@ git version used to generate output
 """
 commit = env.Command(
     target='$out/git_version.txt',
-    source=os.path.join('$pipeline', '.git/objects'),
+    source=None,
     action='(echo $$(hostname):$pipeline;version.py) > $TARGET')
 
 
