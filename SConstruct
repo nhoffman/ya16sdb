@@ -25,7 +25,10 @@ conf = configparser.ConfigParser()
 conf.optionxform = str  # preserve key case-sensitivity
 conf.read(settings_file)
 settings = conf['DEFAULT']
-conf.read(os.path.join(this_dir, settings['ncbi_conf']))
+if 'ncbi_conf' in settings:
+    conf.read(settings['ncbi_conf'])
+else:
+    conf.read(os.path.join(this_dir, 'ncbi.conf'))
 true_vals = ['t', 'y', '1']
 release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
