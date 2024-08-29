@@ -34,10 +34,6 @@ release = ARGUMENTS.get('release', 'no').lower()[0] in true_vals
 out = os.path.join(settings['outdir'], time.strftime('%Y%m%d'))
 log = os.path.join(out, 'log.txt')
 cachedir = settings['cachedir']
-# MEFETCH vars in settings.conf will override os.environ
-mefetch = list(os.environ.items()) + list(settings.items())
-mefetch = {k: v for k, v in mefetch if k.startswith('MEFETCH_') and v}
-mefetch['MEFETCH_LOG'] = log
 
 
 def blast_db(env, sequence_file, output_base):
@@ -118,7 +114,15 @@ env = Environment(
     **settings
 )
 env.PrependENVPath('PATH', os.path.join(this_dir, 'bin'))
-env['ENV'].update(mefetch)
+
+for k, v in os.environ.items():
+    if k.startswith('MEFETCH_'):
+        env['ENV'][k] = v
+env['ENV'].update(conf['ENV'])
+env['ENV']['MEFETCH_DB'] = 'nucleotide'
+env['ENV']['MEFETCH_LOG'] = log
+env['ENV']['MEFETCH_MODE'] = 'text'
+
 env.Decider('MD5-timestamp')
 
 classified = env.Command(
