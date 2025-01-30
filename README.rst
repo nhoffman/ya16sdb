@@ -67,7 +67,7 @@ At a high level, this pipeline does the following:
 Database feather file
 ================================
 
-Record annotations are stored in a single table database feather file with the following datatypes:
+Record annotations are stored in a single table database feather file with the following columns and datatypes:
 
 .. list-table::  `Genbank <https://www.ncbi.nlm.nih.gov/genbank/samplerecord/>`_                                                                                                                                                                                                                                                                                                                                                                             
                                                                                                                                                                                                                                                                                                                                                                                               
