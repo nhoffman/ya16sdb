@@ -69,7 +69,7 @@ Database feather file
 
 Record annotations are stored in a single table database feather file with the following columns and datatypes:
 
-.. list-table::  `Genbank <https://www.ncbi.nlm.nih.gov/genbank/samplerecord/>`_                                                                                                                                                                                                                                                                                                                                                                             
+.. list-table::  `extract_genbank.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/extract_genbank.py>`_                                                                                                                                                                                                                                                                                                                                                                             
                                                                                                                                                                                                                                                                                                                                                                                               
  * - seqname                                                                                                                                                                                                                                                                                                                                                                                  
    - string                                                                                                                                                                                                                                                                                                                                                                                   
@@ -124,7 +124,7 @@ Record annotations are stored in a single table database feather file with the f
 
 
 
-.. list-table:: `Taxonomy <https://www.ncbi.nlm.nih.gov/taxonomy>`_
+.. list-table:: `taxonomy.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/taxonomy.py>`_
 
  * - species                                                                                                                                                                                                                                                                                                                                                                                  
    - string                                                                                                                                                                                                                                                                                                                                                                                   
@@ -136,21 +136,33 @@ Record annotations are stored in a single table database feather file with the f
    - string
 
 
-.. list-table:: `NCBI <https://www.ncbi.nlm.nih.gov/>`_
+.. list-table:: `is_type.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/is_type.py>`_
 
  * - is_type                                                                                                                                                                                                                                                                                                                                                                                  
-   - bool                                                                                                                                                                                                                                                                                                                                                                                     
+   - bool
+
+.. list-table:: `is_published.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/is_published.py>`_
+
  * - is_published                                                                                                                                                                                                                                                                                                                                                                             
-   - bool                                                                                                                                                                                                                                                                                                                                                                                     
+   - bool
+
+.. list-table:: `is_refseq.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/is_refseq.py>`_
+
  * - is_refseq                                                                                                                                                                                                                                                                                                                                                                                
-   - bool                                                                                                                                                                                                                                                                                                                                                                                     
+   - bool
+
+.. list-table:: `is_valid.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/is_valid.py>`_
+
  * - is_valid                                                                                                                                                                                                                                                                                                                                                                                 
    - bool                                                                                                                                                                                                                                                                                                                                                                                     
+
+.. list-table:: `confidence.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/confidence.py>`_
+
  * - confidence                                                                                                                                                                                                                                                                                                                                                                               
    - string                                                                                                                                                                                                                                                                                                                                                                                   
 
 
-.. list-table:: `WGS ANI <https://ncbiinsights.ncbi.nlm.nih.gov/2022/05/27/ani-for-assembly-validation/>`_
+.. list-table:: `ani.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/ani.py>`_
 
  * - assembly_genbank                                                                                                                                                                                                                                                                                                                                                                         
    - string                                                                                                                                                                                                                                                                                                                                                                                   
@@ -175,7 +187,7 @@ Record annotations are stored in a single table database feather file with the f
  * - taxonomy-check-status                                                                                                                                                                                                                                                                                                                                                                    
    - string                                                                                                                                                                                                                                                                                                                                                                                   
                                                                                                                                                                                                                                                                                                                                                                                              
-.. list-table:: `Filter outliers <https://github.com/fhcrc/deenurp>`_
+.. list-table:: `filter_outliers.py <https://github.com/nhoffman/ya16sdb/blob/master/bin/filter_outliers.py>`_
 
  * - seqhash                                                                                                                                                                                                                                                                                                                                                                                  
    - string                                                                                                                                                                                                                                                                                                                                                                                   
