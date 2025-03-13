@@ -179,6 +179,8 @@ def main():
         prev_pubmed = pandas.DataFrame(columns=new_pubmed.columns)
     else:
         prev_pubmed = pandas.read_csv(args.previous_pubmed_seq_info, dtype=str)
+    # FIXME: this line should be something like
+    # prev_pubmed[~new_pubmed['accession'].isin(prev_pubmed['accession'])]
     prev_pubmed = prev_pubmed[~prev_pubmed.isin(prev_pubmed['accession'])]
     pubmed_info = pandas.concat([prev_pubmed, new_pubmed]).drop_duplicates()
     pubmed_info = pubmed_info[pubmed_info['version'].isin(seq_info['version'])]
