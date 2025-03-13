@@ -56,6 +56,8 @@ def blast_db(env, sequence_file, output_base):
 def taxonomy(fa, info, path):
     """
     Make filtered taxtable with ranked columns and no_rank rows
+
+    1.
     """
     taxtable = env.Command(
         target=os.path.join(path, 'taxonomy.csv'),
@@ -67,6 +69,8 @@ def taxonomy(fa, info, path):
 
     """
     Taxtable output replacing tax_ids with taxnames
+
+    2.
     """
     lineages = env.Command(
         target=os.path.join(path, 'lineages.csv'),
@@ -75,6 +79,8 @@ def taxonomy(fa, info, path):
 
     """
     Mothur output - https://mothur.org/wiki/Taxonomy_File
+
+    3.
     """
     mothur = env.Command(
         target=os.path.join(path, 'lineages.txt'),
@@ -125,6 +131,13 @@ env['ENV']['MEFETCH_MODE'] = 'text'
 
 env.Decider('MD5-timestamp')
 
+"""
+1. NCBI sequence accessions indexed as Bacteria and Candidatus
+Saccharibacteria 16S and rRNA are queried using the NCBI esearch Entrez
+Programming tool and downloaded using mefetch. Mefetch is a command
+line, multithreaded Python application that breaks up and downloads large
+efetch requests in parallel.
+"""
 classified = env.Command(
     source=None,
     target='$out/ncbi/classified.txt',
@@ -146,6 +159,9 @@ tm7 = env.Command(
 Check the cache for last download_date and download list of modified
 records in order to re-download modified records that we have previously
 downloaded.
+
+1. Records with a modified date after the last download date are re-downloaded
+and updated in the record cache.
 """
 si = csv.DictReader(open(env.subst(cfiles['seq_info_cache'])))
 si = [time.strptime(r['download_date'], '%d-%b-%Y') for r in si]
@@ -164,6 +180,9 @@ modified = env.Command(
 type strains records
 NCBI web blast uses `sequence_from_type[Filter]` so we will use that
 http://www.ncbi.nlm.nih.gov/news/01-21-2014-sequence-by-type/
+
+1. Type strains are queried using the NCBI filter sequence_from_type and
+downloaded using mefetch.
 """
 types = env.Command(
     source=None,
@@ -173,12 +192,20 @@ types = env.Command(
 
 """
 Trim accession2taxid with 16s records and update taxids
+
+1. For each potential 16s accession taxonomy ids are downloaded from NCBI's
+ftp accession2taxid site.  Accessions without a taxonomy id are dropped.
 """
 accession2taxid = env.Command(
     target='$out/ncbi/accession2taxid.csv',
     source=[settings['accession2taxid'], classified, tm7],
     action='accession2taxid.py --out $TARGET $SOURCES')
 
+"""
+1. Taxonomy ids are updated using the Taxtastic update_taxids subcommand
+Taxtastic is a command line Python application with a suite of subcommands
+that help update and manage NCBI taxonomy ids.
+"""
 accession2taxid = env.Command(
     target='$out/ncbi/accession2update_taxids.csv',
     source=accession2taxid,
@@ -197,6 +224,11 @@ Create a list of cached records removing:
 Modified and records with new tax_ids will be redownloaded
 
 FIXME: call this cache_in.py (cache_out.py will replace refresh.py)
+
+1. A list of potential 16s accessions is compiled for download if they are not
+present in or have a different taxonomy id in the record cache or have been
+modified.  A list of accessions can be automatically excluded from download
+can be supplied.
 """
 cache = env.Command(
     target='$out/ncbi/cache.txt',
@@ -213,6 +245,14 @@ download = env.Command(
     source=[accession2taxid, cache, settings['do_not_download']],
     action='download.py --out $TARGET $SOURCES')
 
+"""
+1. Potential 16s record feature tables are downloaded using mefetch.  Record
+coordinates cooresponding to feature rrna product=16S ribosomal RNA are
+selected using medirect ftract.  Ftract is part of the medirect application
+suite that parses NCBI feature tables for string patterns.  It parses feature
+tables in raw text format and is a faster alternative to NCBI's xml xtract
+utility.
+"""
 coordinates = env.Command(
     target='$out/ncbi/genbank.csv',
     source=download,
@@ -229,6 +269,8 @@ env.Precious(coordinates)
 download genbank records
 
 -retmax 1 when reading from -csv file
+
+1. 16s records are downloaded at the feature coordinates using mefetch.
 """
 gbs = env.Command(
     target='$out/ncbi/download.gb',
@@ -240,6 +282,10 @@ gbs = env.Command(
            '-id $SOURCE '
            '-out $TARGET')
 
+"""
+1. Downloaded Genbank records are parsed into fasta and csv formats. For a full
+list of parsed annotations see Table [].
+"""
 today = time.strftime('%d-%b-%Y')
 fa, seq_info, pubmed_info, references, refseq_info = env.Command(
     target=['$out/ncbi/extract_genbank/seqs.fasta',
@@ -255,6 +301,10 @@ Record versions returned from esearch that had no actual 16s features or were
 below `ftract -min-length`
 
 FIXME: write script that adds the annotations to the info with no seqnames
+
+1. Record accession returned from the esearch query but do not contain
+rRNA product "16S ribosomal RNA" feautres are saved in a no_features.txt
+file to avoid redownloaded in future pipeline runs.
 """
 no_features = env.Command(
     target='$out/ncbi/no_features.txt',
@@ -271,6 +321,10 @@ no_features = env.Command(
 
 """
 Remove new records with tax_ids not in our taxonomy database
+
+1. Taxonomy ids are again updated this time from the downloaded Genbank
+extracted taxonomy ids.  Records where are taxonomy id is unknown are
+discarded.
 """
 fa, seq_info = env.Command(
     target=['$out/ncbi/extract_genbank/update_taxids/seqs.fasta',
@@ -283,6 +337,13 @@ fa, seq_info = env.Command(
 
 """
 cmsearch new sequences against rfam model
+
+1. Record sequence orientation and quality are assessed using Infernal cmsearch
+against a curated 16S coveriance model available from the publicly available
+rfam database.  Sequences in 3'-5' orientation are put into their
+reverse complement 5'-3' orientation.  Sequences with an E value
+below 0.01 are considered of low sequence quality or missannotated
+and are discarded.
 """
 cmsearch = env.Command(
     target='$out/ncbi/extract_genbank/update_taxids/cmsearch/table.tsv',
@@ -311,6 +372,8 @@ Refresh/append with older records
 
 FIXME: Call this cache_out.py ... with --cachedir argument
 FIXME: Move refseq dedup to partition_refs.py --drop-duplicates-sequences
+
+1. Newly downloaded records are combined and added to the record cache.
 """
 fa, seq_info, pubmed_info, _, refseq_info, _ = env.Command(
     target=['$out/ncbi/seqs.fasta',
@@ -345,6 +408,10 @@ env.Command(
     source=gbs,
     action='cat $SOURCE >> ' + cfiles['genbank_cache'])
 
+"""
+1. A csv taxtable is created for classification using pplacer or Moose
+classifiers.
+"""
 taxtable = env.Command(
     target='$out/taxonomy.csv',
     source=seq_info,
@@ -352,6 +419,8 @@ taxtable = env.Command(
 
 """
 Map for WGS records without a refseq assembly accession
+
+1.
 """
 asm = env.Command(
     target='$out/ani/assembly_summary_genbank.txt',
@@ -366,6 +435,9 @@ asm = env.Command(
 
 """
 The ANI tax check report
+
+1. ANI Tax Check reports are downloaded from NCBI and added to the
+seq_info.csv file using an genbank to assembly accession map file if needed.
 """
 ani = env.Command(
     target='$out/ani/ANI_report_prokaryotes.txt',
@@ -381,6 +453,26 @@ ani = env.Command(
 """
 Create feather file and initial columns
 FIXME: Switch $SOURCE and $TARGET around for each script
+
+1. The seq_info.csv file is converted to a feather file (make this sqlite file)
+Non Genbank annotations are added including for each record species and genus
+taxonomy ids and taxonomy names.  A boolean column is_type is added and record
+set to true if record accession appears in the downloaded sequence_from _type
+list of accessions. A boolean column is_published is added and set to true if
+record has an associated pubmed_id.  A boolean column is_refseq is added and
+set to true if record accession contains an underscore indicating the record
+is a refseq.  A boolean is_valid is added and set to true if a record species
+name passes the Taxtastic classified regex expression.  Unclassified species
+names, in general, are typically environmental or non-specific taxonomy names
+[]. A string column confidence is added and each record is designated as either
+type, published, refseq or direct depending on which true attribute comes first
+to best describes each record. A column seqhash is added and for each record
+sequence a sha1 hash is generated and added to this column and used for
+deduplication purposes.  Finally, if a cap on species representatives is
+specified then an optional sort_by value can be set to prioritize records by
+column attributes.  By default, the number of species representatives is capped
+at 5,000 records and sorted by columns is_type, is_published, is_refseq,
+ambig_count, modified_date and download_date.
 """
 feather = env.Command(
     target='$out/seq_info.feather',
@@ -410,6 +502,15 @@ feather = env.Command(
             'sort_values.py $TARGET %(sort_by)s' % settings]
             )
 
+"""
+1. Records are paritioned into Blast databases with the following sequence and
+annotaiton filtering.  Record sequences must have a minimum sequence length of
+1200 base pairs, a 1% maximimum proportion of ambiguous bases and an
+alignment to the 16S coveriance model with an E-value of 0.01 or higher.
+Record annotations must bee of species rank or below with a Taxtastic
+classified species level name.  Sequences are grouped by accession and
+deduplicated.
+"""
 fa, seq_info = env.Command(
     target=['$out/seqs.fasta', '$out/seq_info.csv'],
     source=[fa, feather],
@@ -418,7 +519,7 @@ fa, seq_info = env.Command(
 raw = fa
 
 """
-pull type sequences
+A type strain database is partitioned
 """
 type_fa, type_info = env.Command(
     target=['$out/dedup/1200bp/types/seqs.fasta',
@@ -438,6 +539,8 @@ type_tax, type_lineages, types_mothur, type_blast = taxonomy(
 
 """
 filter into named set and other criteria
+
+1. a
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/seqs.fasta',
@@ -459,6 +562,8 @@ taxtable, lineages, mothur, blast = taxonomy(
 
 """
 Trimmed seqname,tax_id map file that can be easily cached by filter_outliers
+
+1.
 """
 taxid_map = env.Command(
     target='$out/dedup/1200bp/named/tax_id_map.csv',
@@ -468,6 +573,8 @@ taxid_map = env.Command(
 """
 Filter sequences. Use --threads if you need to to limit the number
 of processes - otherwise deenurp will use all of them!
+
+1.
 """
 fa, details = env.Command(
     source=[fa, taxid_map, taxtable, cfiles['outliers_cache']],
@@ -501,6 +608,9 @@ filter_outliers = env.Command(
 taxtable, filtered_lineages, mothur, blast = taxonomy(
     fa, seq_info, '$out/dedup/1200bp/named/filtered/')
 
+"""
+1.
+"""
 filtered_type_fa, filtered_type_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/types/seqs.fasta',
             '$out/dedup/1200bp/named/filtered/types/seq_info.csv'],
@@ -512,6 +622,9 @@ filtered_type_tax, filtered_type_lineages, filtered_type_mothur, _ = taxonomy(
     filtered_type_info,
     '$out/dedup/1200bp/named/filtered/types/')
 
+"""
+1.
+"""
 filtered_type_hits = env.Command(
     target='$out/dedup/1200bp/named/types_vsearch.tsv',
     source=[named, filtered_type_fa],
@@ -527,6 +640,8 @@ filtered_type_hits = env.Command(
 
 """
 This output will be used in the filter plots
+
+1.
 """
 filtered_type_classifications = env.Command(
     target='$out/dedup/1200bp/named/classifications.csv',
@@ -544,6 +659,8 @@ filtered_type_classifications = env.Command(
 
 """
 Adds type_classification to feather file for Dash application
+
+1.
 """
 type_classifications = env.Command(
     target='$out/.feather/type_classifications.md5',
@@ -553,6 +670,8 @@ type_classifications = env.Command(
 
 """
 expand taxids into descendants
+
+1.
 """
 trusted_taxids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/taxids.txt',
@@ -561,17 +680,25 @@ trusted_taxids = env.Command(
 
 """
 expand taxids into descendants
+
+1.
 """
 dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
     source=settings['do_not_trust'],
     action='taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
+"""
+1.
+"""
 trusted = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',
     source=[settings['trust'], trusted_taxids],
     action='cat $SOURCES > $TARGET')
 
+"""
+1.
+"""
 dnt = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt.txt',
     source=[settings['do_not_trust'], dnt_ids],
@@ -579,6 +706,8 @@ dnt = env.Command(
 
 """
 Same as named set with inliers and trust/no_trust records
+
+1.
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
@@ -620,6 +749,8 @@ NOTE: alleles will never align with themselves (--self) BUT
 can align with other alleles in the same genome accession
 
 FIXME: use named types not trusted types
+
+1.
 '''
 named_type_hits = env.Command(
     target='$out/dedup/1200bp/named/trusted_vsearch.tsv',
@@ -638,6 +769,8 @@ named_type_hits = env.Command(
 Creates match_seqname, match_pct, match_version, match_species and
 match_species_id columns for best type strain hits from the trusted
 dataset
+
+1.
 """
 match_hits = env.Command(
     target='$out/.feather/match_hits.md5',
@@ -646,6 +779,8 @@ match_hits = env.Command(
 
 """
 gzip feather file as last step for the filter_outlier plots
+
+1.
 """
 gzip = env.Command(
     target='${SOURCE}.gz',
@@ -661,6 +796,8 @@ https://scons.org/doc/2.0.1/HTML/scons-user/x2045.html
 """
 copy taxdmp file into output dir so a ``taxit new_database``
 can be built again in the future if needed
+
+1.
 """
 taxdmp = env.Command(
     source=settings['taxdmp'],
