@@ -160,8 +160,8 @@ Check the cache for last download_date and download list of modified
 records in order to re-download modified records that we have previously
 downloaded.
 
-METHODS: Records with a modified date after the last download date are re-downloaded
-and updated in the record cache.
+METHODS: Records with a modified date after the last download date are
+re-downloaded and updated in the record cache.
 """
 si = csv.DictReader(open(env.subst(cfiles['seq_info_cache'])))
 si = [time.strptime(r['download_date'], '%d-%b-%Y') for r in si]
@@ -193,8 +193,8 @@ types = env.Command(
 """
 Trim accession2taxid with 16s records and update taxids
 
-METHODS: For each potential 16s accession taxonomy ids are downloaded from NCBI's
-ftp accession2taxid site.  Accessions without a taxonomy id are dropped.
+METHODS: For each potential 16s accession taxonomy ids are downloaded from
+NCBI's ftp accession2taxid site.  Accessions without a taxonomy id are dropped.
 """
 accession2taxid = env.Command(
     target='$out/ncbi/accession2taxid.csv',
@@ -509,8 +509,9 @@ annotaiton filtering.  Record sequences must have a minimum sequence length of
 alignment to the 16S coveriance model with an E-value of 0.01 or higher.
 Record annotations must bee of species rank or below with a Taxtastic
 classified species level name.  Sequences are grouped by accession and
-deduplicated.  Species groups are capped at a maxium of 5,000
-representatives
+deduplicated.  Following initial filtering a partion of type strain
+records and a parition of all records group by species and
+capped at a maxium of 5,000 representatives is created.
 """
 fa, seq_info = env.Command(
     target=['$out/seqs.fasta', '$out/seq_info.csv'],
@@ -609,11 +610,16 @@ filter_outliers = env.Command(
     source=[feather, details],
     action=['filter_outliers.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
+"""
+METHODS: After species outliers are determined a partition of records is
+created with species outlier records discarded.
+"""
 taxtable, filtered_lineages, mothur, blast = taxonomy(
     fa, seq_info, '$out/dedup/1200bp/named/filtered/')
 
 """
-METHODS:
+METHODS: From the species outlier filtered partition a partition of type
+strain records is created.
 """
 filtered_type_fa, filtered_type_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/types/seqs.fasta',
@@ -627,7 +633,9 @@ filtered_type_tax, filtered_type_lineages, filtered_type_mothur, _ = taxonomy(
     '$out/dedup/1200bp/named/filtered/types/')
 
 """
-METHODS:
+METHODS:  All named records are parwise aligned with the outlier filtered
+type strain database using vsearch to determine the top five closest type
+strain hits.
 """
 filtered_type_hits = env.Command(
     target='$out/dedup/1200bp/named/types_vsearch.tsv',
@@ -645,7 +653,8 @@ filtered_type_hits = env.Command(
 """
 This output will be used in the filter plots
 
-METHODS:
+METHODS: Using the top five type strain hits a classification is generated
+and used to determine taxonomy annotation accuracy.
 """
 filtered_type_classifications = env.Command(
     target='$out/dedup/1200bp/named/classifications.csv',
@@ -684,8 +693,6 @@ trusted_taxids = env.Command(
 
 """
 expand taxids into descendants
-
-METHODS:
 """
 dnt_ids = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt_ids.txt',
@@ -693,7 +700,6 @@ dnt_ids = env.Command(
     action='taxit get_descendants --out $TARGET $tax_url $SOURCE')
 
 """
-METHODS:
 """
 trusted = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/trust_ids.txt',
@@ -701,7 +707,6 @@ trusted = env.Command(
     action='cat $SOURCES > $TARGET')
 
 """
-METHODS:
 """
 dnt = env.Command(
     target='$out/dedup/1200bp/named/filtered/trusted/dnt.txt',
@@ -710,8 +715,6 @@ dnt = env.Command(
 
 """
 Same as named set with inliers and trust/no_trust records
-
-METHODS:
 """
 fa, seq_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/trusted/seqs.fasta',
