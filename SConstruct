@@ -36,16 +36,22 @@ log = os.path.join(out, 'log.txt')
 cachedir = settings['cachedir']
 
 
-def blast_db(env, sequence_file, output_base):
+def blast_db(env, sequence_file, seqmap, btaxdb, output_base):
     '''
     Create a blast database and file md5sum
     '''
     extensions = ['.nhr', '.nin', '.nsq']
     blast_out = env.Command(
         target=[output_base + ext for ext in extensions],
-        source=sequence_file,
-        action='makeblastdb -dbtype nucl '
-               '-in $SOURCE -out ' + output_base)
+        source=[sequence_file, seqmap, btaxdb],
+        action=['makeblastdb '
+                '-dbtype nucl '
+                '-in ${SOURCES[0]} '
+                f'-out {output_base} '
+                '-parse_seqids '
+                '-taxid_map ${SOURCES[1]}',
+                'tar xf ${SOURCES[2]} -C ${TARGET.dir}'
+                ])
     env.Command(
         target=output_base,
         source=blast_out,
@@ -53,17 +59,20 @@ def blast_db(env, sequence_file, output_base):
     return blast_out
 
 
-def taxonomy(fa, info, path):
+def taxonomy(fa, info, btaxdb, path):
     """
     Make filtered taxtable with ranked columns and no_rank rows
     """
-    taxtable = env.Command(
-        target=os.path.join(path, 'taxonomy.csv'),
+    taxtable, seqmap = env.Command(
+        target=[
+            os.path.join(path, 'taxonomy.csv'),
+            os.path.join(path, 'seqmap.txt')
+            ],
         source=info,
-        action='taxit taxtable '
-               '--seq-info $SOURCE '
-               '--out $TARGET '
-               '$tax_url')
+        action=[
+            'taxit taxtable --seq-info $SOURCE --out ${TARGETS[0]} $tax_url',
+            'seqmap.py --out ${TARGETS[1]} $SOURCE'
+            ])
 
     """
     Taxtable output replacing tax_ids with taxnames
@@ -81,7 +90,7 @@ def taxonomy(fa, info, path):
         source=[taxtable, info],
         action='taxit lineage_table --taxonomy-table $TARGET $SOURCES')
 
-    blast = blast_db(env, fa, os.path.join(path, 'blast'))
+    blast = blast_db(env, fa, seqmap, btaxdb, os.path.join(path, 'blast'))
 
     return taxtable, lineages, mothur, blast
 
@@ -351,6 +360,17 @@ taxtable = env.Command(
     action='taxit -v taxtable --seq-info $SOURCE --out $TARGET $tax_url')
 
 """
+For mapping taxonomy to blast dbs
+"""
+btaxdb = env.Command(
+    target='$out/ncbi/taxdb.tar.gz',
+    source=None,
+    action='wget '
+           '--output-document $TARGET '
+           '--quiet '
+           'https://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz')
+
+"""
 Map for WGS records without a refseq assembly accession
 """
 asm = env.Command(
@@ -434,7 +454,7 @@ type_fa, type_info = env.Command(
            '$SOURCES $TARGETS')
 
 type_tax, type_lineages, types_mothur, type_blast = taxonomy(
-    type_fa, type_info, '$out/dedup/1200bp/types/')
+    type_fa, type_info, btaxdb, '$out/dedup/1200bp/types/')
 
 """
 filter into named set and other criteria
@@ -455,7 +475,7 @@ fa, seq_info = env.Command(
 named = fa
 
 taxtable, lineages, mothur, blast = taxonomy(
-    fa, seq_info, '$out/dedup/1200bp/named/')
+    fa, seq_info, btaxdb, '$out/dedup/1200bp/named/')
 
 """
 Trimmed seqname,tax_id map file that can be easily cached by filter_outliers
@@ -499,7 +519,7 @@ filter_outliers = env.Command(
     action=['filter_outliers.py $SOURCES', 'md5sum ${SOURCES[0]} > $TARGET'])
 
 taxtable, filtered_lineages, mothur, blast = taxonomy(
-    fa, seq_info, '$out/dedup/1200bp/named/filtered/')
+    fa, seq_info, btaxdb, '$out/dedup/1200bp/named/filtered/')
 
 filtered_type_fa, filtered_type_info = env.Command(
     target=['$out/dedup/1200bp/named/filtered/types/seqs.fasta',
@@ -510,6 +530,7 @@ filtered_type_fa, filtered_type_info = env.Command(
 filtered_type_tax, filtered_type_lineages, filtered_type_mothur, _ = taxonomy(
     filtered_type_fa,
     filtered_type_info,
+    btaxdb,
     '$out/dedup/1200bp/named/filtered/types/')
 
 filtered_type_hits = env.Command(
@@ -598,7 +619,7 @@ fa, seq_info = env.Command(
 Depends([fa, seq_info], filter_outliers)
 
 taxtable, lineages, mothur, blast = taxonomy(
-    fa, seq_info, '$out/dedup/1200bp/named/filtered/trusted/')
+    fa, seq_info, btaxdb, '$out/dedup/1200bp/named/filtered/trusted/')
 
 '''
 Pull type strains from trusted db
@@ -611,7 +632,7 @@ fa, seq_info = env.Command(
 
 
 taxtable, lineages, mothur, blast = taxonomy(
-    fa, seq_info, '$out/dedup/1200bp/named/filtered/trusted/types/')
+    fa, seq_info, btaxdb, '$out/dedup/1200bp/named/filtered/trusted/types/')
 
 '''
 find top hit for each sequence among type strains
