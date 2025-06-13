@@ -84,17 +84,13 @@ def main():
         raise TypeError('file extension not yet supported ' + args.info)
 
     if args.trusted:
-        # all type strains are trusted - GL #79
-        trusted = info[info['is_type']]
         recs = (i.strip() for i in open(args.trusted) if not i.startswith('#'))
         recs = set(i for i in recs if i)
-        # add special trusted recs after type strains
-        # because they are preferred
-        trusted = pandas.concat([trusted, info[
+        trusted = info[
             (info['version'].isin(recs)) |
             (info['accession'].isin(recs)) |
             (info['tax_id'].isin(recs)) |
-            (info['seqname'].isin(recs))]])
+            (info['seqname'].isin(recs))]
 
     if args.is_valid:
         info = info[info['is_valid']]
