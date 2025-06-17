@@ -14,7 +14,7 @@ COPY testfiles/ ./testfiles/
 COPY tests/ ./tests/
 COPY bin/ ./bin/
 COPY data/ ./data/
-RUN bin/bootstrap.sh /usr/local/
+RUN bin/bootstrap.sh /usr/local
 RUN find . -type f -exec chmod 644 {} \; && \
 find . -type d -exec chmod 755 {} \; && \
 find ./bin/ -type f -exec chmod 755 {} \;
