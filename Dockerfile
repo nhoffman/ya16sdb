@@ -1,4 +1,4 @@
-FROM python:3.13-bookworm
+FROM python:3.11-bookworm
 ARG YA16SDB_VERSION
 ENV \
 PIP_ROOT_USER_ACTION=ignore \
