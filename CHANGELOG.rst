@@ -2,6 +2,12 @@
 Changes for ya16sdb
 ===================
 
+0.8.3
+=====
+* Type strain records are included in filtering (GH: 80)
+* Support for NCBI Blast taxid filtering (GH: 69)
+* Fixed Docker image esearch error related to version of curl Debian bookworm image
+
 0.8.2
 =====
 * Update to new NCBI assembly_summary_genbank.txt format
