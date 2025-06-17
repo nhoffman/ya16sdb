@@ -13,7 +13,6 @@ fi
 bin_dir=$(dirname "$(readlink -f "$0")")
 pipeline_dir=$(dirname $bin_dir)
 
-$venv/bin/pip3 install --upgrade pip
 $venv/bin/pip3 install --requirement $pipeline_dir/requirements.txt
 
 mkdir src
@@ -46,7 +45,6 @@ VSEARCH_GZ=vsearch-2.13.0-linux-x86_64.tar.gz
 (cd src &&
  wget --quiet https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz &&
  tar tzf edirect.tar.gz | grep -E 'esearch$|ecommon.sh|nquire$|xtract$' | xargs tar xzf edirect.tar.gz --strip-components 1 --directory $venv/bin)
-
 
 rm -rf src
 
