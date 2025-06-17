@@ -38,10 +38,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         annotations: ${{ steps.meta.outputs.annotations }}
-        build-args: |
-          MEFETCH_EMAIL=${{ secrets.MEFETCH_EMAIL }}
-          MEFETCH_API_KEY=${{ secrets.MEFETCH_API_KEY }}
-          YA16SDB_VERSION=${{ steps.meta.outputs.version }}
+        build-args: YA16SDB_VERSION=${{ steps.meta.outputs.version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         labels: ${{ steps.meta.outputs.labels }}
@@ -52,7 +49,7 @@ jobs:
           gha_image
 
     - name: Test run and unnitests
-      run: docker run gha_image /bin/bash -c "scons settings=testfiles/settings.conf;python -m unittest"
+      run: docker run --env MEFETCH_EMAIL=${{ secrets.MEFETCH_EMAIL }},MEFETCH_API_KEY=${{ secrets.MEFETCH_API_KEY }} gha_image /bin/bash -c "scons settings=testfiles/settings.conf;python -m unittest"
 
     - name: Build and push tag
       if: github.ref_type == 'tag'
