@@ -546,6 +546,12 @@ filtered_type_hits = env.Command(
            '--threads 14 '
            '--top_hits_only')
 
+filtered_rank_thresholds = env.Command(
+    target='$out/dedup/1200bp/named/rank_thresholds.csv',
+    source=[filtered_type_tax,
+            os.path.join('$pipeline', 'data/rank_threshold_defaults.csv')],
+    action='tax2thresholds.py --out $TARGET $SOURCES')
+
 """
 This output will be used in the filter plots
 """
@@ -554,7 +560,7 @@ filtered_type_classifications = env.Command(
     source=[filtered_type_hits,
             filtered_type_info,
             filtered_type_tax,
-            os.path.join('$pipeline', 'data/classifier_thresholds.csv')],
+            filtered_rank_thresholds],
     action='classify -vv '
            '--lineages ${SOURCES[2]} '
            '--rank-thresholds ${SOURCES[3]} '
