@@ -60,6 +60,10 @@ def set_global_data():
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_KEY_ID,
             get_data=True)
+        df = df.astype({
+            'modified_date': 'datetime64[ns]',
+            'download_date': 'datetime64[ns]'
+             })
         df = df[~df['x'].isna() & ~df['y'].isna()]
         df['genus_name'] = df['genus_name'].fillna('Unclassified')
         df['genus'] = df['genus'].fillna('')

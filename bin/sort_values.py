@@ -29,6 +29,10 @@ def main():
         help='Database string URI or filename.')
     args = p.parse_args()
     info = pandas.read_feather(args.feather)
+    info = info.astype({
+        'modified_date': 'datetime64[ns]',
+        'download_date': 'datetime64[ns]'
+         })
     by = args.sort_values.split(',')
     info = info.sort_values(by=by, ascending=[ascending[i] for i in by])
     info.reset_index(drop=True).to_feather(args.feather)

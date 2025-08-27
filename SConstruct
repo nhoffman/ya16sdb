@@ -562,6 +562,7 @@ filtered_type_classifications = env.Command(
             filtered_type_tax,
             filtered_rank_thresholds],
     action='classify -vv '
+           '--blast6 '
            '--lineages ${SOURCES[2]} '
            '--rank-thresholds ${SOURCES[3]} '
            '--seq-info ${SOURCES[1]} '
