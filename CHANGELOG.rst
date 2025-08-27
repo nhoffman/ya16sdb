@@ -2,6 +2,10 @@
 Changes for ya16sdb
 ===================
 
+0.8.4
+=====
+* Fixed bugs related to sorting modified_date and download_date (GH: 82)
+
 0.8.3
 =====
 * Type strain records are included in filtering (GH: 80)
