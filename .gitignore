@@ -1,5 +1,5 @@
 .sconsign.dblite
-*-env
+.venv/
 output*
 test_output
 .DS_Store
