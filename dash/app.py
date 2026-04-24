@@ -81,6 +81,9 @@ def set_global_data():
         genera = tax.groupby(by='genus')
 
 
+set_global_data()
+
+
 def write_layout():
     '''
     This is done using a function so Dash will not cache it allowing us to
