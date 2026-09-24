@@ -390,203 +390,51 @@ def update_species_value(options, search, n_clicks, text, state, tax_id):
 
 @dash.callback(
     Output('year--slider', 'value'),
-    [Input('species-column', 'value'),
-     Input('isolation-source-visibility', 'value')])
-def update_slider_value(tax_id, iso_values):
-    '''
-    Reset the slider to generate the axis ranges with all data points.
-    This will also help avoid confusion when users select a new species
-    to view.
-    '''
-    dff = shared.get_species(tax_id)
-    if iso_values:
-        dff = dff[dff['isolation_source'].isin(iso_values)]
-    return dff['modified_date'].max().year
-
-
-@dash.callback(
     Output('year--slider', 'min'),
-    [Input('species-column', 'value'),
-     Input('isolation-source-visibility', 'value')])
-def update_slider_min(tax_id, iso_values):
-    '''
-    reset min year to avoid None errors when drawing figure
-    '''
-    dff = shared.get_species(tax_id)
-    if iso_values:
-        dff = dff[dff['isolation_source'].isin(iso_values)]
-    return dff['modified_date'].min().year
-
-
-@dash.callback(
     Output('year--slider', 'max'),
-    [Input('species-column', 'value'),
-     Input('isolation-source-visibility', 'value')])
-def update_slider_max(tax_id, iso_values):
-    '''
-    reset max year
-    '''
-    dff = shared.get_species(tax_id)
-    if iso_values:
-        dff = dff[dff['isolation_source'].isin(iso_values)]
-    return dff['modified_date'].max().year
-
-
-@dash.callback(
     Output('year--slider', 'marks'),
     [Input('species-column', 'value'),
      Input('isolation-source-visibility', 'value')])
-def update_slider_marks(tax_id, iso_values):
-    '''
-    reset marks
-    '''
+def update_slider(tax_id, iso_values):
     dff = shared.get_species(tax_id)
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
-    modified_dates = dff['modified_date'].apply(lambda x: x.year).unique()
-    return {str(year): str(year) for year in modified_dates}
+    dates = dff['modified_date']
+    min_year = dates.min().year
+    max_year = dates.max().year
+    years = dates.apply(lambda x: x.year).unique()
+    marks = {str(y): str(y) for y in years}
+    return max_year, min_year, max_year, marks
+
+
+def _make_options(series):
+    return [{'label': '{} ({})'.format(k, v), 'value': k}
+            for k, v in series.value_counts().items()]
 
 
 @dash.callback(
     Output('isolation-source-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_isolation_selection(tax_id):
-    dff = shared.get_species(tax_id)
-    iso = dff['isolation_source']
-    options = []
-    for k, v in iso.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('isolation-source-visibility', 'options'),
-    [Input('species-column', 'value')])
-def update_isolation_visiblity(tax_id):
-    dff = shared.get_species(tax_id)
-    iso = dff['isolation_source']
-    options = []
-    for k, v in iso.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('type-classification-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_type_classification_selection(tax_id):
-    dff = shared.get_species(tax_id)
-    type_classification = dff['type_classification']
-    options = []
-    for k, v in type_classification.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('type-classification-visibility', 'options'),
-    [Input('species-column', 'value')])
-def update_type_classification_visibility(tax_id):
-    dff = shared.get_species(tax_id)
-    type_classification = dff['type_classification']
-    options = []
-    for k, v in type_classification.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('ani-species-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_ani_species_selection(tax_id):
-    dff = shared.get_species(tax_id)
-    ani_species = dff['best-match-species-name']
-    options = []
-    for k, v in ani_species.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('ani-species-visibility', 'options'),
-    [Input('species-column', 'value')])
-def update_ani_species_visibility(tax_id):
-    dff = shared.get_species(tax_id)
-    ani_species = dff['best-match-species-name']
-    options = []
-    for k, v in ani_species.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('taxcheck-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_taxcheck_selection(tax_id):
-    dff = shared.get_species(tax_id)
-    taxcheck = dff['taxonomy-check-status']
-    options = []
-    for k, v in taxcheck.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('taxcheck-visibility', 'options'),
-    [Input('species-column', 'value')])
-def update_taxcheck_visibility(tax_id):
-    dff = shared.get_species(tax_id)
-    taxcheck = dff['taxonomy-check-status']
-    options = []
-    for k, v in taxcheck.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('outliers-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_outliers_selection(tax_id):
-    dff = shared.get_species(tax_id)
-    out = dff['is_out'].apply(lambda x: 'Yes' if x else 'No')
-    options = []
-    for k, v in out.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('outliers-visibility', 'options'),
-    [Input('species-column', 'value')])
-def update_outliers_visibility(tax_id):
-    dff = shared.get_species(tax_id)
-    out = dff['is_out'].apply(lambda x: 'Yes' if x else 'No')
-    options = []
-    for k, v in out.value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('confidence-selection', 'options'),
-    [Input('species-column', 'value')])
-def update_confidence_selection(tax_id):
-    dff = shared.get_species(tax_id)
-    options = []
-    for k, v in dff['confidence'].value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
-
-
-@dash.callback(
     Output('confidence-visibility', 'options'),
     [Input('species-column', 'value')])
-def update_confidence_visibility(tax_id):
+def update_dropdown_options(tax_id):
     dff = shared.get_species(tax_id)
-    options = []
-    for k, v in dff['confidence'].value_counts().items():
-        options.append({'label': '{} ({})'.format(k, v), 'value': k})
-    return options
+    iso = _make_options(dff['isolation_source'])
+    tc = _make_options(dff['type_classification'])
+    ani = _make_options(dff['best-match-species-name'])
+    txc = _make_options(dff['taxonomy-check-status'])
+    out = _make_options(dff['is_out'].apply(lambda x: 'Yes' if x else 'No'))
+    conf = _make_options(dff['confidence'])
+    return iso, iso, tc, tc, ani, ani, txc, txc, out, out, conf, conf
 
 
 def parse_multi(state, search, option):
@@ -600,110 +448,35 @@ def parse_multi(state, search, option):
 
 @dash.callback(
     Output('isolation-source-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_isolation_source_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_isolation_source')
-
-
-@dash.callback(
     Output('isolation-source-visibility', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_isolation_source_visiblity_value(_, state, search):
-    return parse_multi(state, search, 'visibility_isolation_source')
-
-
-@dash.callback(
     Output('type-classification-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_type_classification_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_type_classification')
-
-
-@dash.callback(
     Output('type-classification-visibility', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_type_classification_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_type_classification')
-
-
-@dash.callback(
     Output('ani-species-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_ani_species_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_ani_species')
-
-
-@dash.callback(
     Output('ani-species-visibility', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_ani_species_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_ani_species')
-
-
-@dash.callback(
     Output('taxcheck-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_taxcheck_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_taxcheck')
-
-
-@dash.callback(
     Output('taxcheck-visibility', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_taxcheck_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_taxcheck')
-
-
-@dash.callback(
     Output('outliers-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_outliers_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_is_out')
-
-
-@dash.callback(
     Output('outliers-visibility', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_outliers_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_is_out')
-
-
-@dash.callback(
     Output('confidence-selection', 'value'),
-    [Input('species-column', 'value')],
-    [State('state', 'data'),
-     State('url', 'search')])
-def update_confidence_selection_value(_, state, search):
-    return parse_multi(state, search, 'selection_confidence')
-
-
-@dash.callback(
     Output('confidence-visibility', 'value'),
     [Input('species-column', 'value')],
     [State('state', 'data'),
      State('url', 'search')])
-def update_confidence_visibility_value(_, state, search):
-    return parse_multi(state, search, 'visibility_confidence')
+def update_dropdown_values(_, state, search):
+    return (
+        parse_multi(state, search, 'selection_isolation_source'),
+        parse_multi(state, search, 'visibility_isolation_source'),
+        parse_multi(state, search, 'selection_type_classification'),
+        parse_multi(state, search, 'visibility_type_classification'),
+        parse_multi(state, search, 'selection_ani_species'),
+        parse_multi(state, search, 'visibility_ani_species'),
+        parse_multi(state, search, 'selection_taxcheck'),
+        parse_multi(state, search, 'visibility_taxcheck'),
+        parse_multi(state, search, 'selection_is_out'),
+        parse_multi(state, search, 'visibility_is_out'),
+        parse_multi(state, search, 'selection_confidence'),
+        parse_multi(state, search, 'visibility_confidence'),
+    )
 
 
 @dash.callback(
