@@ -40,6 +40,8 @@ species_to_id = None
 
 
 def get_species(tax_id):
+    if tax_id is None:
+        tax_id = DEFAULT_SPECIES
     return species_groups.get_group(tax_id)
 
 

@@ -22,9 +22,70 @@ SEARCH_OPTS = shared.SEARCH_OPTS
 SHAPES = shared.SHAPES
 
 
+_CTRL_ROWS = [
+    ('Outliers', 'is_out', 'outliers'),
+    ('Confidence', 'confidence', 'confidence'),
+    ('Type Classification', 'type_classification', 'type-classification'),
+    ('ANI Tax Check', 'taxonomy-check-status', 'taxcheck'),
+    ('ANI Species', 'best-match-species-name', 'ani-species'),
+    ('Isolation Source', 'isolation_source', 'isolation-source'),
+]
+_TD = {'padding': '3px 4px', 'verticalAlign': 'middle'}
+
+
+def _build_controls():
+    header = dash.html.Tr([
+        dash.html.Th('', style={'width': '15%', 'whiteSpace': 'nowrap'}),
+        dash.html.Th('Color', style={'textAlign': 'center', 'width': '40px'}),
+        dash.html.Th('Shape', style={'textAlign': 'center', 'width': '40px'}),
+        dash.html.Th('Selection'),
+        dash.html.Th('Visibility'),
+    ])
+    rows = []
+    for i, (label, value, prefix) in enumerate(_CTRL_ROWS):
+        tds = [
+            dash.html.Td(dash.html.B(label), style=_TD),
+        ]
+        if i == 0:
+            tds.append(dash.html.Td(
+                dash.dcc.RadioItems(
+                    id='color-items',
+                    options=[{'label': '', 'value': v}
+                             for _, v, _ in _CTRL_ROWS],
+                    inputStyle={'height': 15, 'width': 15, 'margin': 11}),
+                style={**_TD, 'textAlign': 'center'},
+                rowSpan=len(_CTRL_ROWS)))
+            tds.append(dash.html.Td(
+                dash.dcc.RadioItems(
+                    id='shape-items',
+                    options=[{'label': '', 'value': v}
+                             for _, v, _ in _CTRL_ROWS],
+                    inputStyle={'height': 15, 'width': 15, 'margin': 11}),
+                style={**_TD, 'textAlign': 'center'},
+                rowSpan=len(_CTRL_ROWS)))
+        tds.extend([
+            dash.html.Td(
+                dash.dcc.Dropdown(id=prefix + '-selection', multi=True),
+                style=_TD),
+            dash.html.Td(
+                dash.dcc.Dropdown(id=prefix + '-visibility', multi=True),
+                style=_TD),
+        ])
+        rows.append(dash.html.Tr(tds))
+    return dash.html.Table(
+        [header] + rows,
+        style={'width': '100%', 'borderCollapse': 'collapse'})
+
+
 def layout():
     axes = ['confidence', 'dist_pct', 'x', 'y',
             'type_classification', 'rank_order']
+    genus_opts = [{'label': gn, 'value': gi}
+                  for gi, gn in shared.tax[['genus', 'genus_name']]
+                  .drop_duplicates().values]
+    genus_group = shared.genera.get_group(DEFAULT_GENUS)
+    species_opts = [{'label': sn, 'value': si}
+                    for si, sn in genus_group[['species', 'species_name']].values]
     return dash.html.Div(
         style={'width': 1175},
         children=[
@@ -40,7 +101,8 @@ def layout():
                     'width': '100%'}),
             dash.html.Div(
                 children=[
-                    dash.dcc.Input(type='text', id='text-input'),
+                    dash.dcc.Input(type='text', id='text-input',
+                                   style={'width': '200px'}),
                     dash.html.Button(
                         id='submit-button',
                         n_clicks=0,
@@ -56,6 +118,8 @@ def layout():
                 children=[
                     dash.dcc.Dropdown(
                         id='genus-column',
+                        options=genus_opts,
+                        value=DEFAULT_GENUS,
                         clearable=False)],
                 style={
                     'display': 'inline-block',
@@ -70,127 +134,17 @@ def layout():
                     'width': '6%'}),
             dash.html.Div(
                 children=[
-                    dash.dcc.Dropdown(id='species-column', clearable=False)],
+                    dash.dcc.Dropdown(
+                        id='species-column',
+                        options=species_opts,
+                        value=DEFAULT_SPECIES,
+                        clearable=False)],
                 style={
                     'display': 'inline-block',
                     'verticalAlign': 'middle',
                     'width': '48%'}),
             dash.html.Div(
-                children=[
-                    dash.html.Div(
-                        style={'width': '11%', 'display': 'inline-block'}),
-                    dash.dcc.Markdown(
-                        children=['**Color**'],
-                        style={
-                            'width': '5%',
-                            'display': 'inline-block'}),
-                    dash.dcc.Markdown(
-                        children=['**Shape**'],
-                        style={
-                            'width': '10%',
-                            'display': 'inline-block'}),
-                    dash.dcc.Markdown(
-                        children=['**Selection**'],
-                        style={
-                             'width': '39%',
-                             'display': 'inline-block'}),
-                    dash.dcc.Markdown(
-                        children=['**Visibility**'],
-                        style={
-                                'width': '35%',
-                                'display': 'inline-block'}),
-                    dash.html.Div(
-                        children=[
-                            dash.dcc.Markdown(children=['**Outliers**']),
-                            dash.dcc.Markdown(children=['**Confidence**']),
-                            dash.dcc.Markdown(
-                                children=['**Type Classification**']),
-                            dash.dcc.Markdown(children=['**ANI Tax Check**']),
-                            dash.dcc.Markdown(children=['**ANI Species**']),
-                            dash.dcc.Markdown(
-                                children=['**Isolation Source**']),
-                            ],
-                        style={
-                            'verticalAlign': 'middle',
-                            'width': '11%',
-                            'display': 'inline-block',
-                            }),
-                    dash.dcc.RadioItems(
-                        id='color-items',
-                        options=[
-                            {'label': '', 'value': 'is_out'},
-                            {'label': '', 'value': 'confidence'},
-                            {'label': '', 'value': 'type_classification'},
-                            {'label': '', 'value': 'taxonomy-check-status'},
-                            {'label': '', 'value': 'best-match-species-name'},
-                            {'label': '', 'value': 'isolation_source'}],
-                        inputStyle={'height': 15, 'width': 15, 'margin': 11},
-                        style={
-                            'verticalAlign': 'middle',
-                            'width': '5%',
-                            'display': 'inline-block'}),
-                    dash.dcc.RadioItems(
-                        id='shape-items',
-                        options=[
-                            {'label': '', 'value': 'is_out'},
-                            {'label': '', 'value': 'confidence'},
-                            {'label': '', 'value': 'type_classification'},
-                            {'label': '', 'value': 'taxonomy-check-status'},
-                            {'label': '', 'value': 'best-match-species-name'},
-                            {'label': '', 'value': 'isolation_source'}],
-                        inputStyle={'height': 15, 'width': 15, 'margin': 11},
-                        style={
-                            'verticalAlign': 'middle',
-                            'width': '5%',
-                            'display': 'inline-block'}),
-                    dash.html.Div(
-                        children=[
-                            dash.dcc.Dropdown(
-                                id='outliers-selection',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='confidence-selection',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='type-classification-selection',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='taxcheck-selection',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='ani-species-selection',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='isolation-source-selection',
-                                multi=True)],
-                        style={
-                            'verticalAlign': 'middle',
-                            'width': '39%',
-                            'display': 'inline-block'}),
-                    dash.html.Div(
-                        children=[
-                            dash.dcc.Dropdown(
-                                id='outliers-visibility',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='confidence-visibility',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='type-classification-visibility',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='taxcheck-visibility',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='ani-species-visibility',
-                                multi=True),
-                            dash.dcc.Dropdown(
-                                id='isolation-source-visibility',
-                                multi=True)],
-                        style={
-                            'verticalAlign': 'middle',
-                            'width': '39%',
-                            'display': 'inline-block'})],
+                children=[_build_controls()],
                 style={
                     'border': 'thin lightgrey solid',
                     'borderRadius': 5,
@@ -198,7 +152,9 @@ def layout():
                     'padding': 10,
                     'width': '97%'}),
             dash.html.Div(
-                children=[dash.dcc.Slider(id='year--slider', marks=None)],
+                children=[dash.dcc.Slider(id='year--slider', marks=None,
+                                         tooltip=None,
+                                         allow_direct_input=False)],
                 style={'margin': 15, 'width': '95%'}),
             dash.dcc.Markdown(
                 children=['**Axes**'],
@@ -360,6 +316,8 @@ def update_genus_value(search, n_clicks, text, state):
     Output('species-column', 'options'),
     [Input('genus-column', 'value')])
 def update_species_options(tax_id):
+    if tax_id is None:
+        tax_id = DEFAULT_GENUS
     group = shared.genera.get_group(tax_id)
     group = group[['species', 'species_name']]
     return [{'label': sn, 'value': si} for si, sn in group.values]
@@ -374,6 +332,8 @@ def update_species_options(tax_id):
      State('state', 'data'),
      State('genus-column', 'value')])
 def update_species_value(options, search, n_clicks, text, state, tax_id):
+    if not options:
+        return DEFAULT_SPECIES
     dff = shared.df[shared.df['genus'] == tax_id]
     request, data = parse_search_input(dff, state, search, n_clicks, text)
     if request is None:  # no request
@@ -528,6 +488,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
                  vconf, sconf,
                  color, symbol,
                  n_clicks, state, text, search):
+    if tax_id is None:
+        tax_id = DEFAULT_SPECIES
     dff = shared.get_species(tax_id)
     dff = dff[dff['modified_date'] <= str(year_value+1)]
 
@@ -545,8 +507,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         x_range = None
         y_range = None
     else:
-        x_range = state['xrange']
-        y_range = state['yrange']
+        x_range = state.get('xrange')
+        y_range = state.get('yrange')
 
     # decide visibile points
     if viso_source:
@@ -631,6 +593,23 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             })
 
     outliers = dff[dff['is_out']]  # for title denominator
+
+    # compute explicit ranges from data when not preserving user zoom
+    if x_range is None and len(dff) > 0:
+        xvals = dff[xaxis]
+        if xvals.dtype == 'object':
+            x_range = None
+        else:
+            pad = (xvals.max() - xvals.min()) * 0.05 or 1
+            x_range = [float(xvals.min() - pad), float(xvals.max() + pad)]
+    if y_range is None and len(dff) > 0:
+        yvals = dff[yaxis]
+        if yvals.dtype == 'object':
+            y_range = None
+        else:
+            pad = (yvals.max() - yvals.min()) * 0.05 or 1
+            y_range = [float(yvals.min() - pad), float(yvals.max() + pad)]
+
     figure = {
         'data': data,
         'layout': {
@@ -677,11 +656,13 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
     preserve state on the client to help determine how actions are processed
     here on the server
     '''
+    if figure is None:
+        return dash.no_update
     return {
-        'n_clicks': n_clicks,  # determine if button was clicked
-        'tax_id': tax_id,  # to check if tax_id has changed
-        'xrange': figure['layout']['xaxis']['range'],  # preserve axes ranges
-        'yrange': figure['layout']['yaxis']['range'],
+        'n_clicks': n_clicks,
+        'tax_id': tax_id,
+        'xrange': figure.get('layout', {}).get('xaxis', {}).get('range'),
+        'yrange': figure.get('layout', {}).get('yaxis', {}).get('range'),
         'xaxis': xaxis,
         'yaxis': yaxis}
 
@@ -701,6 +682,8 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
      State('state', 'data')])
 def update_table(selected, iso, match, ani, outliers, confidence,
                  n_clicks, tax_id, text, search, state):
+    if tax_id is None:
+        tax_id = DEFAULT_SPECIES
     dff = shared.get_species(tax_id)
     dff = dff.sort_values(by='dist_pct', ascending=False)
 
