@@ -33,13 +33,18 @@ df = None
 genera = None
 last_modified = None
 seq_info = None
+species_groups = None
 tax = None
 species_to_genus = None
 species_to_id = None
 
 
+def get_species(tax_id):
+    return species_groups.get_group(tax_id)
+
+
 def set_global_data():
-    global df, genera, last_modified, seq_info, species_to_genus, species_to_id, tax
+    global df, genera, last_modified, seq_info, species_groups, species_to_genus, species_to_id, tax
     _, modified = data.read_feather(
         FEATHER_FILE,
         aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -71,6 +76,7 @@ def set_global_data():
         species_to_id = dict(
             tax[['species_name', 'species']].drop_duplicates().values)
         genera = tax.groupby(by='genus')
+        species_groups = df.groupby(by='species')
 
 
 set_global_data()

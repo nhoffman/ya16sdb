@@ -398,7 +398,7 @@ def update_slider_value(tax_id, iso_values):
     This will also help avoid confusion when users select a new species
     to view.
     '''
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
     return dff['modified_date'].max().year
@@ -412,7 +412,7 @@ def update_slider_min(tax_id, iso_values):
     '''
     reset min year to avoid None errors when drawing figure
     '''
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
     return dff['modified_date'].min().year
@@ -426,7 +426,7 @@ def update_slider_max(tax_id, iso_values):
     '''
     reset max year
     '''
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
     return dff['modified_date'].max().year
@@ -440,7 +440,7 @@ def update_slider_marks(tax_id, iso_values):
     '''
     reset marks
     '''
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     if iso_values:
         dff = dff[dff['isolation_source'].isin(iso_values)]
     modified_dates = dff['modified_date'].apply(lambda x: x.year).unique()
@@ -451,7 +451,7 @@ def update_slider_marks(tax_id, iso_values):
     Output('isolation-source-selection', 'options'),
     [Input('species-column', 'value')])
 def update_isolation_selection(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     iso = dff['isolation_source']
     options = []
     for k, v in iso.value_counts().items():
@@ -463,7 +463,7 @@ def update_isolation_selection(tax_id):
     Output('isolation-source-visibility', 'options'),
     [Input('species-column', 'value')])
 def update_isolation_visiblity(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     iso = dff['isolation_source']
     options = []
     for k, v in iso.value_counts().items():
@@ -475,7 +475,7 @@ def update_isolation_visiblity(tax_id):
     Output('type-classification-selection', 'options'),
     [Input('species-column', 'value')])
 def update_type_classification_selection(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     type_classification = dff['type_classification']
     options = []
     for k, v in type_classification.value_counts().items():
@@ -487,7 +487,7 @@ def update_type_classification_selection(tax_id):
     Output('type-classification-visibility', 'options'),
     [Input('species-column', 'value')])
 def update_type_classification_visibility(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     type_classification = dff['type_classification']
     options = []
     for k, v in type_classification.value_counts().items():
@@ -499,7 +499,7 @@ def update_type_classification_visibility(tax_id):
     Output('ani-species-selection', 'options'),
     [Input('species-column', 'value')])
 def update_ani_species_selection(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     ani_species = dff['best-match-species-name']
     options = []
     for k, v in ani_species.value_counts().items():
@@ -511,7 +511,7 @@ def update_ani_species_selection(tax_id):
     Output('ani-species-visibility', 'options'),
     [Input('species-column', 'value')])
 def update_ani_species_visibility(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     ani_species = dff['best-match-species-name']
     options = []
     for k, v in ani_species.value_counts().items():
@@ -523,7 +523,7 @@ def update_ani_species_visibility(tax_id):
     Output('taxcheck-selection', 'options'),
     [Input('species-column', 'value')])
 def update_taxcheck_selection(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     taxcheck = dff['taxonomy-check-status']
     options = []
     for k, v in taxcheck.value_counts().items():
@@ -535,7 +535,7 @@ def update_taxcheck_selection(tax_id):
     Output('taxcheck-visibility', 'options'),
     [Input('species-column', 'value')])
 def update_taxcheck_visibility(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     taxcheck = dff['taxonomy-check-status']
     options = []
     for k, v in taxcheck.value_counts().items():
@@ -547,7 +547,7 @@ def update_taxcheck_visibility(tax_id):
     Output('outliers-selection', 'options'),
     [Input('species-column', 'value')])
 def update_outliers_selection(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     out = dff['is_out'].apply(lambda x: 'Yes' if x else 'No')
     options = []
     for k, v in out.value_counts().items():
@@ -559,7 +559,7 @@ def update_outliers_selection(tax_id):
     Output('outliers-visibility', 'options'),
     [Input('species-column', 'value')])
 def update_outliers_visibility(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     out = dff['is_out'].apply(lambda x: 'Yes' if x else 'No')
     options = []
     for k, v in out.value_counts().items():
@@ -571,7 +571,7 @@ def update_outliers_visibility(tax_id):
     Output('confidence-selection', 'options'),
     [Input('species-column', 'value')])
 def update_confidence_selection(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     options = []
     for k, v in dff['confidence'].value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
@@ -582,7 +582,7 @@ def update_confidence_selection(tax_id):
     Output('confidence-visibility', 'options'),
     [Input('species-column', 'value')])
 def update_confidence_visibility(tax_id):
-    dff = shared.df[shared.df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     options = []
     for k, v in dff['confidence'].value_counts().items():
         options.append({'label': '{} ({})'.format(k, v), 'value': k})
@@ -755,8 +755,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
                  vconf, sconf,
                  color, symbol,
                  n_clicks, state, text, search):
-    df = shared.df
-    dff = df[df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     dff = dff[dff['modified_date'] <= str(year_value+1)]
 
     # decide if we should allow plot to calculate axes ranges
@@ -929,8 +928,7 @@ def update_state(n_clicks, tax_id, figure, xaxis, yaxis):
      State('state', 'data')])
 def update_table(selected, iso, match, ani, outliers, confidence,
                  n_clicks, tax_id, text, search, state):
-    df = shared.df
-    dff = df[df['species'] == tax_id]
+    dff = shared.get_species(tax_id)
     dff = dff.sort_values(by='dist_pct', ascending=False)
 
     # parse selected points
