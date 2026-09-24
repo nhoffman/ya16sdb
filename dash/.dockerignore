@@ -1,6 +1,8 @@
 *
 !/app.py
 !/data.py
+!/shared.py
+!/pages/
 !/entrypoint.sh
 !/filter_details.feather.gz
 !/requirements.txt
