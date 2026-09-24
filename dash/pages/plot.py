@@ -983,7 +983,7 @@ def update_table(selected, iso, match, ani, outliers, confidence,
                     target='_blank',
                     title=r['description'])
             elif c == 'ani_species':
-                if r['best-match-type-assembly']:
+                if pandas.notna(r['best-match-type-assembly']):
                     cell = dash.html.A(
                         href=('https://www.ncbi.nlm.nih.gov/assembly/' +
                               r['best-match-type-assembly']),
