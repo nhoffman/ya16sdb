@@ -226,21 +226,6 @@ def layout():
                 ])
 
 
-def assign_hover_text(s):
-    '''
-    assign hover text to outliers for now
-    '''
-    text = None
-    if s['is_out']:
-        text = ('seqname: {seqname}<br>'
-                'accession: {version}<br>'
-                'modified_date: {modified_date}<br>'
-                'type_classification: {type_classification}<br>'
-                'ani_tax_check: {taxonomy-check-status}<br>'
-                'ani_species: {best-match-species-name}<br>'
-                'isolation source: {isolation_source}'.format(**s))
-    return text
-
 
 def parse_search_input(dff, state, search, n_clicks, text):
     '''
@@ -544,7 +529,18 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         taxcheck = dff['taxonomy-check-status'].isin(staxcheck)
         dff.loc[taxcheck, 'selected'] = True
 
-    dff['text'] = dff.apply(assign_hover_text, axis='columns')
+    dff['text'] = None
+    outlier_mask = dff['is_out']
+    if outlier_mask.any():
+        o = dff.loc[outlier_mask]
+        dff.loc[outlier_mask, 'text'] = (
+            'seqname: ' + o['seqname'].astype(str) + '<br>'
+            'accession: ' + o['version'].astype(str) + '<br>'
+            'modified_date: ' + o['modified_date'].astype(str) + '<br>'
+            'type_classification: ' + o['type_classification'].astype(str) + '<br>'
+            'ani_tax_check: ' + o['taxonomy-check-status'].astype(str) + '<br>'
+            'ani_species: ' + o['best-match-species-name'].astype(str) + '<br>'
+            'isolation source: ' + o['isolation_source'].astype(str))
 
     # assign symbols and colors
     for col, label, styles in [[symbol, 'symbol', SHAPES],
@@ -566,8 +562,8 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     data = []
     by = ['symbol_name', 'color_name', 'symbol', 'color']
     for (sym_name, clr_name, _, _), d in dff.groupby(by=by):
-        d = d.copy()
-        d['iselected'] = range(len(d))
+        iselected = list(range(len(d)))
+        selected_idx = [i for i, v in enumerate(d['selected'].values) if v]
         if sym_name == clr_name:
             name = sym_name
         elif sym_name == LEGEND_OTHER:
@@ -577,19 +573,22 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         else:
             name = '{} and {}'.format(clr_name, sym_name)
         data.append({
-            'customdata': d.index,
+            'customdata': d.index.tolist(),
             'hoverinfo': 'text',
-            'marker': {'symbol': d['symbol'], 'color': d['color'], 'size': 12},
+            'marker': {
+                'symbol': d['symbol'].tolist(),
+                'color': d['color'].tolist(),
+                'size': 12},
             'mode': 'markers',
             'name': name,
             'legendgroup': clr_name,
             'selected': {'marker': {'size': 15, 'opacity': 0.7}},
-            'selectedpoints': d[d['selected']]['iselected'],
+            'selectedpoints': selected_idx,
             'type': 'scatter',
             'unselected': {'marker': {'size': 10, 'opacity': 0.4}},
-            'hovertext': d['text'],
-            'x': d[xaxis],
-            'y': d[yaxis],
+            'hovertext': d['text'].tolist(),
+            'x': d[xaxis].tolist(),
+            'y': d[yaxis].tolist(),
             })
 
     outliers = dff[dff['is_out']]  # for title denominator
@@ -685,7 +684,6 @@ def update_table(selected, iso, match, ani, outliers, confidence,
     if tax_id is None:
         tax_id = DEFAULT_SPECIES
     dff = shared.get_species(tax_id)
-    dff = dff.sort_values(by='dist_pct', ascending=False)
 
     # parse selected points
     request, data = parse_search_input(dff, state, search, n_clicks, text)
@@ -710,7 +708,12 @@ def update_table(selected, iso, match, ani, outliers, confidence,
     if not irows.any():
         irows[:] = True
 
-    rows = dff[irows].iloc[:MAX_TABLE_RECORDS].copy()  # pull selected rows
+    selected_rows = dff[irows]
+    if len(selected_rows) > MAX_TABLE_RECORDS:
+        rows = selected_rows.nlargest(MAX_TABLE_RECORDS, 'dist_pct').copy()
+    else:
+        rows = selected_rows.sort_values(
+            by='dist_pct', ascending=False).copy()
 
     # clean up boolean text and sort by dist
     rows['is_type'] = rows['is_type'].apply(lambda x: 'Yes' if x else '')
