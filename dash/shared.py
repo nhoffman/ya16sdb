@@ -63,12 +63,6 @@ def set_global_data():
             'download_date': 'datetime64[ns]'
              })
         seq_info = df.copy()
-        seq_info['_search'] = (
-            seq_info.fillna('')
-            .astype(str)
-            .agg(' '.join, axis=1)
-            .str.lower()
-        )
         df = df[~df['x'].isna() & ~df['y'].isna()]
         df['genus_name'] = df['genus_name'].fillna('Unclassified')
         df['genus'] = df['genus'].fillna('')

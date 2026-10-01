@@ -10,8 +10,7 @@ TABLE_PAGE_SIZE = 50
 
 
 def layout():
-    columns = [{'name': c, 'id': c} for c in shared.seq_info.columns
-               if c != '_search']
+    columns = [{'name': c, 'id': c} for c in shared.seq_info.columns]
     return dash.html.Div(
         style={'width': '98%', 'margin': '10px auto'},
         children=[
@@ -50,7 +49,10 @@ def layout():
 def update_seq_info_table(page, page_size, sort_by, search):
     dff = shared.seq_info
     if search:
-        dff = dff[dff['_search'].str.contains(search.lower(), na=False)]
+        mask = dff.astype(str).apply(
+            lambda col: col.str.contains(search, case=False, na=False)
+        ).any(axis=1)
+        dff = dff[mask]
     if sort_by:
         dff = dff.sort_values(
             [s['column_id'] for s in sort_by],
@@ -58,6 +60,6 @@ def update_seq_info_table(page, page_size, sort_by, search):
     page_count = max(1, -(-len(dff) // page_size))
     start = page * page_size
     return (
-        dff.iloc[start:start + page_size].drop(columns='_search').to_dict('records'),
+        dff.iloc[start:start + page_size].to_dict('records'),
         page_count,
     )
