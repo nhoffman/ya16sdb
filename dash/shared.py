@@ -64,8 +64,9 @@ def set_global_data():
              })
         seq_info = df.copy()
         seq_info['_search'] = (
-            seq_info.astype(str)
-            .apply(lambda row: ' '.join(row), axis=1)
+            seq_info.fillna('')
+            .astype(str)
+            .agg(' '.join, axis=1)
             .str.lower()
         )
         df = df[~df['x'].isna() & ~df['y'].isna()]
