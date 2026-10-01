@@ -1,12 +1,17 @@
 import dash
+import pandas
 from dash import dash_table
 from dash.dependencies import Input, Output
+from functools import reduce
+from operator import or_
 
 import shared
 
 dash.register_page(__name__, path='/datatable', name='Data Table')
 
 TABLE_PAGE_SIZE = 50
+_STR_COLS = [c for c in shared.seq_info.columns
+             if pandas.api.types.is_string_dtype(shared.seq_info[c])]
 
 
 def layout():
@@ -49,10 +54,9 @@ def layout():
 def update_seq_info_table(page, page_size, sort_by, search):
     dff = shared.seq_info
     if search:
-        mask = dff.astype(str).apply(
-            lambda col: col.str.contains(search, case=False, na=False)
-        ).any(axis=1)
-        dff = dff[mask]
+        masks = (dff[c].str.contains(search, case=False, na=False)
+                 for c in _STR_COLS)
+        dff = dff[reduce(or_, masks)]
     if sort_by:
         dff = dff.sort_values(
             [s['column_id'] for s in sort_by],
