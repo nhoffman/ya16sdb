@@ -183,18 +183,22 @@ def layout():
                     'width': '14%',
                     'display': 'inline-block',
                     'verticalAlign': 'middle'}),
-            dash.dcc.Graph(id='plot'),
-            dash.html.Table(
-                id='table-div',
-                style={
-                    'border': 'thin lightgrey solid',
-                    'borderRadius': 5,
-                    'display': 'inline-block',
-                    'height': 413,
-                    'margin': 5,
-                    'overflowY': 'scroll',
-                    'padding': 10,
-                    'width': '97%'}),
+            dash.dcc.Loading(
+                dash.dcc.Graph(id='plot'),
+                type='circle'),
+            dash.dcc.Loading(
+                dash.html.Table(
+                    id='table-div',
+                    style={
+                        'border': 'thin lightgrey solid',
+                        'borderRadius': 5,
+                        'display': 'inline-block',
+                        'height': 413,
+                        'margin': 5,
+                        'overflowY': 'scroll',
+                        'padding': 10,
+                        'width': '97%'}),
+                type='circle'),
             dash.html.Div(
                 children=[
                     dash.html.Div(style={'flex': '1'}),
