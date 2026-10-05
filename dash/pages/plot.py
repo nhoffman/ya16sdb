@@ -590,7 +590,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             'selectedpoints': selected_idx,
             'type': 'scattergl',
             'unselected': {'marker': {'size': 10, 'opacity': 0.4}},
-            'hovertext': d['text'].tolist(),
+            'text': d['text'].tolist(),
             'x': d[xaxis].tolist(),
             'y': d[yaxis].tolist(),
             })
