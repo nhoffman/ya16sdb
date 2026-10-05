@@ -533,7 +533,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
         taxcheck = dff['taxonomy-check-status'].isin(staxcheck)
         dff.loc[taxcheck, 'selected'] = True
 
-    dff['text'] = None
+    dff['text'] = ''
     outlier_mask = dff['is_out']
     if outlier_mask.any():
         o = dff.loc[outlier_mask]
