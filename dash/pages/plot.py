@@ -576,9 +576,10 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             name = sym_name
         else:
             name = '{} and {}'.format(clr_name, sym_name)
-        data.append({
+        texts = d['text'].tolist()
+        has_text = any(t != '' for t in texts)
+        trace = {
             'customdata': d.index.tolist(),
-            'hoverinfo': 'text',
             'marker': {
                 'symbol': d['symbol'].tolist(),
                 'color': d['color'].tolist(),
@@ -588,12 +589,17 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
             'legendgroup': clr_name,
             'selected': {'marker': {'size': 15, 'opacity': 0.7}},
             'selectedpoints': selected_idx,
-            'type': 'scattergl',
+            'type': 'scatter',
             'unselected': {'marker': {'size': 10, 'opacity': 0.4}},
-            'text': d['text'].tolist(),
             'x': d[xaxis].tolist(),
             'y': d[yaxis].tolist(),
-            })
+        }
+        if has_text:
+            trace['hovertemplate'] = '%{text}<extra></extra>'
+            trace['text'] = texts
+        else:
+            trace['hoverinfo'] = 'skip'
+        data.append(trace)
 
     outliers = dff[dff['is_out']]  # for title denominator
 
