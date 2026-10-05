@@ -536,7 +536,7 @@ def update_graph(tax_id, xaxis, yaxis, year_value,
     dff['text'] = ''
     outlier_mask = dff['is_out']
     if outlier_mask.any():
-        o = dff.loc[outlier_mask]
+        o = dff.loc[outlier_mask].fillna('')
         dff.loc[outlier_mask, 'text'] = (
             'seqname: ' + o['seqname'].astype(str) + '<br>'
             'accession: ' + o['version'].astype(str) + '<br>'
