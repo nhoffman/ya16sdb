@@ -22,15 +22,15 @@ SEQ_INFO_COLS = [c for c in ya16sdb.SEQ_INFO_COLS
                  if c not in ['16s_start', '16s_stop']]
 
 # https://www.ncbi.nlm.nih.gov/Sequin/acc.html
-REFSEQ = '[A-Z]{2}_\w+'
-ACCESSION = '[A-Z]+\d+'
-COORDINATES = ':(?P<seq_start>\d+)-(?P<seq_stop>\d+)'
+REFSEQ = r'[A-Z]{2}_\w+'
+ACCESSION = r'[A-Z]+\d+'
+COORDINATES = r':(?P<seq_start>\d+)-(?P<seq_stop>\d+)'
 REFSEQ_SOURCE = re.compile(
     'REFSEQ.*?(?P<accession>{REFSEQ}|{ACCESSION})({COORDINATES})?'.format(
         REFSEQ=REFSEQ, ACCESSION=ACCESSION, COORDINATES=COORDINATES),
     re.DOTALL)
 
-GI_SOURCE = re.compile('gi:(?P<gi>\d+)')
+GI_SOURCE = re.compile(r'gi:(?P<gi>\d+)')
 
 ACGT = frozenset('ACGT')
 
@@ -132,7 +132,7 @@ def parse_coordinates(record):
     accessions = record.annotations['accessions']
     if 'REGION:' in accessions:
         coordinates = accessions[accessions.index('REGION:') + 1]
-        matches = re.findall('\d+', coordinates)
+        matches = re.findall(r'\d+', coordinates)
         if len(matches) == 1:
             # some records are strange...
             seq_start, seq_stop = matches[0], len(record.seq)
