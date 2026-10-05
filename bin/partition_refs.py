@@ -66,6 +66,11 @@ def build_parser():
         type=int,
         help='group records by species taxid and accept ony top nth')
     f.add_argument(
+        '--rescue-type-strains',
+        action='store_true',
+        help='when used with --inliers, re-include type strains for '
+             'species that lost all type strains to outlier filtering')
+    f.add_argument(
         '--trusted',
         help='trusted record accessions and versions')
     return p
@@ -112,7 +117,19 @@ def main():
         info = info[~info['species'].isna()]
 
     if args.inliers:
+        pre_inliers = info if args.rescue_type_strains else None
         info = info[info['filter_outliers'] & ~info['is_out']]
+        if args.rescue_type_strains and pre_inliers is not None:
+            types_before = set(
+                pre_inliers[pre_inliers['is_type']]['species'].dropna())
+            types_after = set(
+                info[info['is_type']]['species'].dropna())
+            lost_all = types_before - types_after
+            if lost_all:
+                rescued = pre_inliers[
+                    pre_inliers['species'].isin(lost_all) &
+                    pre_inliers['is_type']]
+                info = pandas.concat([info, rescued])
 
     if args.drop_noaligns:
         info = info[info['16s_stop'] != 0]

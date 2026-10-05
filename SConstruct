@@ -616,6 +616,7 @@ fa, seq_info = env.Command(
            '--do_not_trust ${SOURCES[3]} '
            '--drop-duplicate-sequences '
            '--inliers '  # filter_outliers = True & is_out = False
+           '--rescue-type-strains '
            '--is_species '
            '--is_valid '
            '--min-length 1200 '
