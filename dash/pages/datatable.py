@@ -29,18 +29,20 @@ def layout():
                 placeholder='Search all columns...',
                 debounce=True,
                 style={'width': '300px', 'margin': '10px 0'}),
-            dash_table.DataTable(
-                id='seq-info-table',
-                columns=columns,
-                page_current=0,
-                page_size=TABLE_PAGE_SIZE,
-                page_action='custom',
-                sort_action='custom',
-                sort_mode='multi',
-                style_table={'overflowX': 'auto'},
-                style_cell={'textAlign': 'left', 'padding': '5px'},
-                style_header={'fontWeight': 'bold'},
-            ),
+            dash.dcc.Loading(
+                dash_table.DataTable(
+                    id='seq-info-table',
+                    columns=columns,
+                    page_current=0,
+                    page_size=TABLE_PAGE_SIZE,
+                    page_action='custom',
+                    sort_action='custom',
+                    sort_mode='multi',
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'textAlign': 'left', 'padding': '5px'},
+                    style_header={'fontWeight': 'bold'},
+                ),
+                type='circle'),
         ])
 
 
