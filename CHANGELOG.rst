@@ -2,6 +2,16 @@
 Changes for ya16sdb
 ===================
 
+0.8.5
+=====
+* Add ``--rescue-type-strains`` to partition_refs.py for species that lost
+  all type strains to outlier filtering
+* Refactor Dash app to use Dash Pages with URL routing (``/datatable``)
+* Upgrade Dash app to Dash 4, Plotly 7, pandas 3, Python 3.13/Bookworm
+* Dash app performance improvements and loading spinners
+* Add per-column filtering to DataTable
+* Fix hover text for outlier points
+
 0.8.4
 =====
 * Fixed bugs related to sorting modified_date and download_date (GH: 82)
