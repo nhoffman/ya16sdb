@@ -78,8 +78,7 @@ def update_seq_info_table(page, page_size, sort_by, filter_query, search):
         dff = dff[reduce(or_, masks)]
     for col, val in _parse_filter_query(filter_query):
         if col in dff.columns:
-            dff = dff[dff[col].astype(str).str.contains(
-                val, case=False, na=False)]
+            dff = dff[dff[col].astype(str).str.lower() == val.lower()]
     if sort_by:
         dff = dff.sort_values(
             [s['column_id'] for s in sort_by],
